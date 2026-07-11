@@ -261,6 +261,53 @@ test("a user gesture cancels a running fit animation", async () => {
   expect(viewer.view.unitsPerPixel).toBe(interrupted);
 });
 
+test("zoomBy scales at the viewport center, immediate and animated", async () => {
+  const { viewer } = makeViewer();
+  await viewer.load(SAMPLE);
+  const before = viewer.view;
+
+  viewer.zoomBy(2);
+  expect(viewer.view.unitsPerPixel).toBeCloseTo(before.unitsPerPixel / 2);
+  expect(viewer.view.center).toEqual(before.center);
+
+  viewer.zoomBy(0.5, { animate: true, durationMs: 50 });
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  expect(viewer.view.unitsPerPixel).toBeCloseTo(before.unitsPerPixel, 6);
+});
+
+test("resetRotation returns to 0 keeping center and zoom", async () => {
+  const { viewer, container } = makeViewer();
+  await viewer.load(SAMPLE);
+  const canvas = container.querySelector("canvas");
+  // Rotate via shift+drag gesture events.
+  canvas?.dispatchEvent(
+    new PointerEvent("pointerdown", {
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: 100,
+      clientY: 0,
+      shiftKey: true,
+    }),
+  );
+  canvas?.dispatchEvent(
+    new PointerEvent("pointermove", {
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: 100,
+      clientY: 80,
+      shiftKey: true,
+    }),
+  );
+  canvas?.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
+  expect(viewer.view.rotation).not.toBe(0);
+  const zoom = viewer.view.unitsPerPixel;
+
+  viewer.resetRotation({ animate: true, durationMs: 50 });
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  expect(viewer.view.rotation).toBe(0);
+  expect(viewer.view.unitsPerPixel).toBeCloseTo(zoom, 6);
+});
+
 test("dispose removes the canvas and detaches everything", () => {
   const { viewer, container } = makeViewer();
   viewer.dispose();

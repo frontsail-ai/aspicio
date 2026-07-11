@@ -15,8 +15,8 @@ import type { Camera2D } from "../camera/camera2d.ts";
 import type { Tessellation } from "../tessellate/tessellate.ts";
 
 export interface SceneRendererOptions {
-  /** Canvas clear color, 24-bit RGB. */
-  background?: number;
+  /** Canvas clear color, 24-bit RGB — or null for a transparent canvas. */
+  background?: number | null;
   /** Pixel width of the layer-highlight overlay lines. */
   highlightWidth?: number;
 }
@@ -33,8 +33,9 @@ export class SceneRenderer {
   private tessellation: Tessellation | null = null;
 
   constructor(canvas: HTMLCanvasElement, options: SceneRendererOptions = {}) {
-    this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false });
-    this.renderer.setClearColor(new Color(options.background ?? 0x16181d));
+    const transparent = options.background === null;
+    this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: transparent });
+    this.renderer.setClearColor(new Color(options.background ?? 0x16181d), transparent ? 0 : 1);
     this.camera.position.z = 10;
     this.highlightMaterial = new LineMaterial({
       vertexColors: true,
