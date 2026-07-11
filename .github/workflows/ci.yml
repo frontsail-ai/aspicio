@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format, lint, type-check
+        run: bunx vp check
+
+      - name: Unit tests
+        run: bunx vp run -r test
+
+      - name: Build all packages
+        run: bunx vp run -r build
+
+  e2e:
+    name: E2E and built-app smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+        working-directory: apps/demo
+
+      - name: E2E against dev server
+        run: bun run e2e
+        working-directory: apps/demo
+
+      - name: Build all packages
+        run: bunx vp run -r build
+
+      - name: Smoke test the built app
+        run: bunx playwright test -c e2e/playwright.config.ts --grep "loads the sample|renders every layer"
+        working-directory: apps/demo
+        env:
+          E2E_PREVIEW: "1"
+
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: apps/demo/test-results/
+          retention-days: 7

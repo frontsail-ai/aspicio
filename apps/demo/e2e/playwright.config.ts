@@ -13,7 +13,9 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "vp dev --port 4173",
+    // E2E_PREVIEW=1 runs the suite against the production build (requires
+    // `vp run -r build` first) instead of the dev server.
+    command: process.env.E2E_PREVIEW ? "vp preview --port 4173" : "vp dev --port 4173",
     url: "http://localhost:4173",
     cwd: "..",
     reuseExistingServer: !process.env.CI,
