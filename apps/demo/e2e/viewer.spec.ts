@@ -6,8 +6,9 @@ import { canvasColors, probeViewer } from "./helpers.ts";
 const fixture = (name: string): string =>
   fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 
-const status = (page: Page) => page.locator("#status");
 const canvas = (page: Page) => page.locator("#viewer canvas");
+const row = (page: Page, name: string) =>
+  page.locator(".layer-row").filter({ hasText: name }).first();
 
 async function canvasCenter(page: Page): Promise<{ x: number; y: number }> {
   const box = await canvas(page).boundingBox();
@@ -15,14 +16,31 @@ async function canvasCenter(page: Page): Promise<{ x: number; y: number }> {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
+async function loadSample(page: Page): Promise<void> {
+  await page.locator("#empty-sample").click();
+  await expect(page.locator("#file-chip")).toHaveText("sample.dxf");
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await expect(status(page)).toContainText("sample.dxf —");
 });
 
-test("loads the sample with correct stats, layers, and skip report", async ({ page }) => {
-  await expect(status(page)).toContainText("13 entities, 226 segments");
-  await expect(status(page)).toContainText("skipped: 1 MTEXT");
+test("starts in the empty state with canvas chrome hidden", async ({ page }) => {
+  await expect(page.locator("#empty-state")).toBeVisible();
+  await expect(page.locator("#empty-state")).toContainText("Open a DXF to view it");
+  await expect(page.locator("#controls")).toBeHidden();
+  await expect(page.locator("#readout")).toBeHidden();
+  await expect(page.locator("#file-status")).toBeHidden();
+  await expect(page.locator("#layer-list li")).toHaveCount(0);
+});
+
+test("loads the sample with stats, layers, and skip report", async ({ page }) => {
+  await loadSample(page);
+
+  await expect(page.locator("#stats")).toHaveText("13 ENT · 226 SEG");
+  await expect(page.locator("#skipped-btn")).toContainText("1 SKIPPED");
+  await expect(page.locator("#empty-state")).toBeHidden();
+  await expect(page.locator("#controls")).toBeVisible();
 
   const probe = await probeViewer(page);
   expect(probe.entityCount).toBe(13);
@@ -32,9 +50,20 @@ test("loads the sample with correct stats, layers, and skip report", async ({ pa
     expect.arrayContaining(["WALLS", "DOORS", "FURNITURE", "DECOR", "NOTES"]),
   );
   await expect(page.locator("#layer-list li")).toHaveCount(6);
+  await expect(page.locator("#layer-count")).toHaveText("6");
+});
+
+test("skipped-entities popover opens with detail and closes outside", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#skipped-btn").click();
+  await expect(page.locator("#skipped-pop")).toBeVisible();
+  await expect(page.locator("#skipped-detail")).toContainText("1 MTEXT");
+  await page.locator(".brand").click();
+  await expect(page.locator("#skipped-pop")).toBeHidden();
 });
 
 test("renders every layer's signature color on the canvas", async ({ page }) => {
+  await loadSample(page);
   const colors = await canvasColors(page);
   expect(colors.green).toBeGreaterThan(100); // walls
   expect(colors.red).toBeGreaterThan(20); // door arc
@@ -43,13 +72,14 @@ test("renders every layer's signature color on the canvas", async ({ page }) => 
 });
 
 test("toggling a layer hides and restores its geometry", async ({ page }) => {
+  await loadSample(page);
   const furniture = page.getByRole("checkbox", { name: "FURNITURE" });
 
   await furniture.uncheck();
-  await page.waitForTimeout(100); // one rAF for the re-render
+  await page.waitForTimeout(100);
   let colors = await canvasColors(page);
   expect(colors.cyan).toBeLessThan(10);
-  expect(colors.green).toBeGreaterThan(100); // others untouched
+  expect(colors.green).toBeGreaterThan(100);
 
   await furniture.check();
   await page.waitForTimeout(100);
@@ -60,7 +90,8 @@ test("toggling a layer hides and restores its geometry", async ({ page }) => {
   expect(probe.layers.find((l) => l.name === "FURNITURE")?.visible).toBe(true);
 });
 
-test("wheel zoom scales the view and anchors the cursor point", async ({ page }) => {
+test("wheel zoom scales the view, anchors the cursor, updates readout", async ({ page }) => {
+  await loadSample(page);
   const before = (await probeViewer(page)).view;
   const c = await canvasCenter(page);
 
@@ -70,14 +101,16 @@ test("wheel zoom scales the view and anchors the cursor point", async ({ page })
 
   const after = (await probeViewer(page)).view;
   expect(after.unitsPerPixel).toBeLessThan(before.unitsPerPixel);
-  // Zooming at the viewport center must not move the center
-  // (allow ~2px of drift: mouse coordinates land on integer pixels).
   const tolerance = before.unitsPerPixel * 2;
   expect(Math.abs(after.center.x - before.center.x)).toBeLessThan(tolerance);
   expect(Math.abs(after.center.y - before.center.y)).toBeLessThan(tolerance);
+
+  const pct = Number(await page.locator("#zoom-pct").textContent());
+  expect(pct).toBeGreaterThan(100);
 });
 
 test("drag pans the drawing", async ({ page }) => {
+  await loadSample(page);
   const before = (await probeViewer(page)).view;
   const c = await canvasCenter(page);
 
@@ -87,12 +120,12 @@ test("drag pans the drawing", async ({ page }) => {
   await page.mouse.up();
 
   const after = (await probeViewer(page)).view;
-  // Dragging right moves the view center left in world space.
   expect(after.center.x).toBeLessThan(before.center.x);
   expect(after.center.y).toBeCloseTo(before.center.y, 5);
 });
 
-test("shift+drag rotates", async ({ page }) => {
+test("shift+drag rotates and updates the rotation readout", async ({ page }) => {
+  await loadSample(page);
   const c = await canvasCenter(page);
   await page.keyboard.down("Shift");
   await page.mouse.move(c.x + 200, c.y);
@@ -103,13 +136,15 @@ test("shift+drag rotates", async ({ page }) => {
 
   const view = (await probeViewer(page)).view;
   expect(Math.abs(view.rotation)).toBeGreaterThan(0.1);
+  const deg = Number(await page.locator("#rot-deg").textContent());
+  expect(deg).toBeGreaterThan(0);
 });
 
-test("double click restores the fitted view", async ({ page }) => {
+test("double click restores the fitted view (animated)", async ({ page }) => {
+  await loadSample(page);
   const initial = (await probeViewer(page)).view;
   const c = await canvasCenter(page);
 
-  // Mess up the camera.
   await page.mouse.move(c.x, c.y);
   await page.mouse.wheel(0, -480);
   await page.keyboard.down("Shift");
@@ -120,7 +155,6 @@ test("double click restores the fitted view", async ({ page }) => {
   await page.keyboard.up("Shift");
 
   await canvas(page).dblclick();
-  // The reset is animated; wait for it to settle.
   await expect
     .poll(async () => (await probeViewer(page)).view.unitsPerPixel, { timeout: 2000 })
     .toBeCloseTo(initial.unitsPerPixel, 5);
@@ -130,7 +164,36 @@ test("double click restores the fitted view", async ({ page }) => {
   expect(restored.center.y).toBeCloseTo(initial.center.y, 3);
 });
 
+test("canvas control buttons zoom and reset rotation", async ({ page }) => {
+  await loadSample(page);
+  const initial = (await probeViewer(page)).view;
+
+  await page.locator("#zoom-in").click();
+  await expect
+    .poll(async () => (await probeViewer(page)).view.unitsPerPixel, { timeout: 1000 })
+    .toBeLessThan(initial.unitsPerPixel);
+
+  // Rotate, then reset via the compass button.
+  const c = await canvasCenter(page);
+  await page.keyboard.down("Shift");
+  await page.mouse.move(c.x + 200, c.y);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 200, c.y - 100, { steps: 4 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  expect((await probeViewer(page)).view.rotation).not.toBe(0);
+
+  await page.locator("#reset-rot").click();
+  await expect.poll(async () => (await probeViewer(page)).view.rotation, { timeout: 1000 }).toBe(0);
+
+  await page.locator("#fit-btn").click();
+  await expect
+    .poll(async () => (await probeViewer(page)).view.unitsPerPixel, { timeout: 2000 })
+    .toBeCloseTo(initial.unitsPerPixel, 5);
+});
+
 test("synthetic two-finger pinch zooms in", async ({ page }) => {
+  await loadSample(page);
   const before = (await probeViewer(page)).view;
 
   await canvas(page).evaluate((el) => {
@@ -151,7 +214,7 @@ test("synthetic two-finger pinch zooms in", async ({ page }) => {
     };
     fire("pointerdown", 1, cx - 50, cy);
     fire("pointerdown", 2, cx + 50, cy);
-    fire("pointermove", 2, cx + 150, cy); // spread: 100px → 200px
+    fire("pointermove", 2, cx + 150, cy);
     fire("pointerup", 1, cx - 50, cy);
     fire("pointerup", 2, cx + 150, cy);
   });
@@ -161,6 +224,7 @@ test("synthetic two-finger pinch zooms in", async ({ page }) => {
 });
 
 test("synthetic two-finger twist rotates", async ({ page }) => {
+  await loadSample(page);
   await canvas(page).evaluate((el) => {
     const rect = el.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
@@ -179,7 +243,7 @@ test("synthetic two-finger twist rotates", async ({ page }) => {
     };
     fire("pointerdown", 1, cx, cy);
     fire("pointerdown", 2, cx + 100, cy);
-    fire("pointermove", 2, cx, cy - 100); // finger 2 sweeps 90° visually CCW
+    fire("pointermove", 2, cx, cy - 100);
     fire("pointerup", 1, cx, cy);
     fire("pointerup", 2, cx, cy - 100);
   });
@@ -188,16 +252,92 @@ test("synthetic two-finger twist rotates", async ({ page }) => {
   expect(view.rotation).toBeCloseTo(Math.PI / 2, 1);
 });
 
+test("hovering a layer row draws that layer thicker", async ({ page }) => {
+  await loadSample(page);
+  const before = await canvasColors(page);
+
+  await row(page, "WALLS").hover();
+  await page.waitForTimeout(150);
+  const during = await canvasColors(page);
+  expect(during.green).toBeGreaterThan(before.green * 1.8);
+  expect(during.cyan).toBeGreaterThan(before.cyan * 0.7);
+
+  await page.locator(".brand").hover();
+  await page.waitForTimeout(150);
+  const after = await canvasColors(page);
+  expect(after.green).toBeLessThan(during.green * 0.7);
+});
+
+test("double-clicking a row solos it with banner, again restores", async ({ page }) => {
+  await loadSample(page);
+  const walls = row(page, "WALLS");
+
+  await walls.dblclick();
+  await page.waitForTimeout(150);
+  await expect(page.locator("#solo-banner")).toBeVisible();
+  await expect(page.locator("#solo-name")).toHaveText("WALLS");
+  await expect(walls).toHaveClass(/solo/);
+
+  let probe = await probeViewer(page);
+  for (const layer of probe.layers) {
+    expect(layer.visible, layer.name).toBe(layer.name === "WALLS");
+  }
+  let colors = await canvasColors(page);
+  expect(colors.green).toBeGreaterThan(100);
+  expect(colors.cyan).toBeLessThan(10);
+
+  await walls.dblclick();
+  await page.waitForTimeout(150);
+  await expect(page.locator("#solo-banner")).toBeHidden();
+  probe = await probeViewer(page);
+  for (const layer of probe.layers) expect(layer.visible, layer.name).toBe(true);
+  colors = await canvasColors(page);
+  expect(colors.cyan).toBeGreaterThan(100);
+});
+
+test("the solo banner EXIT button restores all layers", async ({ page }) => {
+  await loadSample(page);
+  await row(page, "DOORS").dblclick();
+  await expect(page.locator("#solo-banner")).toBeVisible();
+  await page.locator("#exit-solo").click();
+  await expect(page.locator("#solo-banner")).toBeHidden();
+  const probe = await probeViewer(page);
+  for (const layer of probe.layers) expect(layer.visible, layer.name).toBe(true);
+});
+
+test("hovering geometry on the canvas reverse-highlights its layer row", async ({ page }) => {
+  await loadSample(page);
+  const probe = await probeViewer(page);
+  const box = await canvas(page).boundingBox();
+  if (!box) throw new Error("no canvas box");
+
+  // Sample bounds are (0,0)-(100,70) → tessellation offset (50,35);
+  // the inner wall runs x=60, y=0..30 — aim at world (60,15).
+  const wx = 60 - 50;
+  const wy = 15 - 35;
+  const sx = box.width / 2 + (wx - probe.view.center.x) / probe.view.unitsPerPixel;
+  const sy = box.height / 2 - (wy - probe.view.center.y) / probe.view.unitsPerPixel;
+
+  await page.mouse.move(box.x + sx, box.y + sy);
+  await expect(row(page, "WALLS")).toHaveClass(/reverse/);
+
+  await page.mouse.move(box.x + sx + 60, box.y + sy);
+  await expect(page.locator(".layer-row.reverse")).toHaveCount(0);
+});
+
 test("opens a DXF via the file picker", async ({ page }) => {
-  await page.locator("#open").click();
+  await loadSample(page);
   await page.locator("#file").setInputFiles(fixture("box.dxf"));
-  await expect(status(page)).toContainText("box.dxf — 1 entities, 4 segments");
+  await expect(page.locator("#file-chip")).toHaveText("box.dxf");
+  await expect(page.locator("#stats")).toHaveText("1 ENT · 4 SEG");
+  await expect(page.locator("#skipped-btn")).toBeHidden();
 
   const probe = await probeViewer(page);
   expect(probe.layers.map((l) => l.name)).toContain("BOX");
 });
 
 test("drag-and-drop shows the overlay, then loads the file", async ({ page }) => {
+  await loadSample(page);
   const overlay = page.locator("#drop");
   await expect(overlay).toBeHidden();
 
@@ -217,10 +357,11 @@ test("drag-and-drop shows the overlay, then loads the file", async ({ page }) =>
     );
   });
   await expect(overlay).toBeHidden();
-  await expect(status(page)).toContainText("dropped.dxf — 13 entities");
+  await expect(page.locator("#file-chip")).toHaveText("dropped.dxf");
 });
 
 test("drag leaving the window hides the overlay without loading", async ({ page }) => {
+  await loadSample(page);
   const overlay = page.locator("#drop");
   await page.evaluate(() => {
     const dt = new DataTransfer();
@@ -229,16 +370,33 @@ test("drag leaving the window hides the overlay without loading", async ({ page 
     window.dispatchEvent(new DragEvent("dragleave", { bubbles: true }));
   });
   await expect(overlay).toBeHidden();
-  await expect(status(page)).toContainText("sample.dxf —");
+  await expect(page.locator("#file-chip")).toHaveText("sample.dxf");
 });
 
-test("an invalid file reports a load failure", async ({ page }) => {
+test("an invalid file shows the error toast; dismiss hides it", async ({ page }) => {
+  await loadSample(page);
   await page.locator("#file").setInputFiles(fixture("invalid.dxf"));
-  await expect(status(page)).toContainText("Failed to load invalid.dxf");
+  await expect(page.locator("#error-toast")).toBeVisible();
+  await expect(page.locator("#error-title")).toContainText("Couldn't open invalid.dxf");
+  // Previous drawing stays visible under the toast.
+  await expect(page.locator("#file-chip")).toHaveText("sample.dxf");
+
+  await page.locator("#error-dismiss").click();
+  await expect(page.locator("#error-toast")).toBeHidden();
+});
+
+test("error state from the empty state offers recovery actions", async ({ page }) => {
+  await page.locator("#file").setInputFiles(fixture("invalid.dxf"));
+  await expect(page.locator("#error-toast")).toBeVisible();
+  await expect(page.locator("#empty-state")).toBeVisible();
+  await page.locator("#error-sample").click();
+  await expect(page.locator("#file-chip")).toHaveText("sample.dxf");
+  await expect(page.locator("#error-toast")).toBeHidden();
 });
 
 test("mobile viewport: layer panel slides in and out", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await loadSample(page);
   const panel = page.locator("#panel");
   const toggle = page.locator("#toggle-layers");
 
@@ -249,91 +407,19 @@ test("mobile viewport: layer panel slides in and out", async ({ page }) => {
   await expect(panel).toHaveClass(/open/);
   await expect(page.getByRole("checkbox", { name: "WALLS" })).toBeVisible();
 
+  await page.locator("#close-panel").click();
+  await expect(panel).not.toHaveClass(/open/);
+
+  // Backdrop click also closes.
   await toggle.click();
+  await expect(panel).toHaveClass(/open/);
+  // Click the strip of backdrop not covered by the 300px panel.
+  await page.locator("#panel-backdrop").click({ position: { x: 355, y: 300 } });
   await expect(panel).not.toHaveClass(/open/);
 });
 
-test("hovering a layer row draws that layer thicker", async ({ page }) => {
-  const before = await canvasColors(page);
-
-  await page.locator("#layer-list label", { hasText: "WALLS" }).hover();
-  await page.waitForTimeout(150);
-  const during = await canvasColors(page);
-  // 3px overlay lines on top of 1px ones → far more green pixels.
-  expect(during.green).toBeGreaterThan(before.green * 1.8);
-  // Other layers unchanged (rough band, antialiasing wiggles a little).
-  expect(during.cyan).toBeGreaterThan(before.cyan * 0.7);
-
-  // Moving off the row removes the highlight.
-  await page.locator(".brand").hover();
-  await page.waitForTimeout(150);
-  const after = await canvasColors(page);
-  expect(after.green).toBeLessThan(during.green * 0.7);
-});
-
-test("double-clicking a layer row solos it, double-clicking again restores", async ({ page }) => {
-  const walls = page.locator("#layer-list label", { hasText: "WALLS" });
-
-  await walls.dblclick();
-  await page.waitForTimeout(150);
-  let probe = await probeViewer(page);
-  for (const layer of probe.layers) {
-    expect(layer.visible, layer.name).toBe(layer.name === "WALLS");
-  }
-  let colors = await canvasColors(page);
-  expect(colors.green).toBeGreaterThan(100);
-  expect(colors.cyan).toBeLessThan(10);
-  expect(colors.magenta).toBeLessThan(10);
-
-  await walls.dblclick();
-  await page.waitForTimeout(150);
-  probe = await probeViewer(page);
-  for (const layer of probe.layers) expect(layer.visible, layer.name).toBe(true);
-  colors = await canvasColors(page);
-  expect(colors.cyan).toBeGreaterThan(100);
-});
-
-test("hovering geometry on the canvas highlights its layer row", async ({ page }) => {
-  const probe = await probeViewer(page);
-  const box = await canvas(page).boundingBox();
-  if (!box) throw new Error("no canvas box");
-
-  // Sample bounds are (0,0)-(100,70) → tessellation offset (50,35).
-  // The inner wall line runs x=60, y=0..30; aim at world (60,15).
-  const wx = 60 - 50;
-  const wy = 15 - 35;
-  const sx = box.width / 2 + (wx - probe.view.center.x) / probe.view.unitsPerPixel;
-  const sy = box.height / 2 - (wy - probe.view.center.y) / probe.view.unitsPerPixel;
-
-  await page.mouse.move(box.x + sx, box.y + sy);
-  await expect(page.locator("#layer-list li", { hasText: "WALLS" })).toHaveClass(/hovered/);
-
-  // Move to empty space → highlight clears.
-  await page.mouse.move(box.x + sx + 60, box.y + sy);
-  await expect(page.locator("#layer-list li.hovered")).toHaveCount(0);
-});
-
-test("double-clicking the canvas animates the pose reset", async ({ page }) => {
-  const fitted = (await probeViewer(page)).view;
-  const c = await canvasCenter(page);
-
-  // Zoom well in so the animation has distance to cover.
-  await page.mouse.move(c.x, c.y);
-  for (let i = 0; i < 4; i++) await page.mouse.wheel(0, -240);
-  const zoomed = (await probeViewer(page)).view;
-  expect(zoomed.unitsPerPixel).toBeLessThan(fitted.unitsPerPixel / 2);
-
-  await canvas(page).dblclick();
-  // Immediately after the double click the camera must still be in flight…
-  const mid = (await probeViewer(page)).view;
-  expect(mid.unitsPerPixel).toBeLessThan(fitted.unitsPerPixel * 0.98);
-  // …and settle at the fitted pose when the animation completes.
-  await expect
-    .poll(async () => (await probeViewer(page)).view.unitsPerPixel, { timeout: 2000 })
-    .toBeCloseTo(fitted.unitsPerPixel, 5);
-});
-
 test("canvas resizes with the window without breaking rendering", async ({ page }) => {
+  await loadSample(page);
   await page.setViewportSize({ width: 700, height: 500 });
   await page.waitForTimeout(150);
   const colors = await canvasColors(page);
