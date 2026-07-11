@@ -1,0 +1,286 @@
+import { Camera2D } from "./camera/camera2d.ts";
+import { attachGestures } from "./input/gestures.ts";
+import type { DxfDocument, LayerInfo } from "./model/types.ts";
+import { parseDxf } from "./parse/parse.ts";
+import { pickLayer } from "./pick/pick.ts";
+import { SceneRenderer } from "./render/renderer.ts";
+import { tessellate } from "./tessellate/tessellate.ts";
+import type { Tessellation } from "./tessellate/tessellate.ts";
+
+export interface DxfViewerOptions {
+  /** Canvas clear color, 24-bit RGB. Default: dark slate. */
+  background?: number;
+  /** Segments per full circle when flattening curves. Default: 72. */
+  curveSegments?: number;
+}
+
+export interface ViewerStats {
+  entityCount: number;
+  segmentCount: number;
+  unsupported: Record<string, number>;
+}
+
+/** Read-only snapshot of the camera state. */
+export interface ViewState {
+  center: { x: number; y: number };
+  unitsPerPixel: number;
+  rotation: number;
+}
+
+export interface FitViewOptions {
+  /** Animate the camera to the fitted pose instead of jumping. */
+  animate?: boolean;
+  /** Animation length in milliseconds. Default: 400. */
+  durationMs?: number;
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+export type ViewerEvent = "loaded" | "render";
+type Listener = () => void;
+
+/** Everything the viewer accepts as a DXF source. */
+export type DxfSource = string | ArrayBuffer | Blob;
+
+/**
+ * The Observo viewer facade: owns a canvas inside `container`, renders a
+ * DXF document, and exposes layers, camera fitting, and events.
+ */
+export class DxfViewer {
+  private readonly container: HTMLElement;
+  private readonly canvas: HTMLCanvasElement;
+  private readonly renderer: SceneRenderer;
+  private readonly camera = new Camera2D();
+  private readonly options: DxfViewerOptions;
+  private readonly detachGestures: () => void;
+  private readonly resizeObserver: ResizeObserver;
+  private readonly listeners = new Map<ViewerEvent, Set<Listener>>();
+  private tessellation: Tessellation | null = null;
+  private renderQueued = false;
+  private highlightedLayer: string | null = null;
+  private animationFrame: number | null = null;
+
+  document: DxfDocument | null = null;
+
+  constructor(container: HTMLElement, options: DxfViewerOptions = {}) {
+    this.container = container;
+    this.options = options;
+
+    this.canvas = window.document.createElement("canvas");
+    this.canvas.style.display = "block";
+    this.canvas.style.width = "100%";
+    this.canvas.style.height = "100%";
+    container.appendChild(this.canvas);
+
+    this.renderer = new SceneRenderer(this.canvas, { background: options.background });
+
+    this.detachGestures = attachGestures(this.canvas, this.camera, {
+      onChange: () => {
+        // A user gesture takes over the camera: stop any running animation.
+        this.cancelViewAnimation();
+        this.requestRender();
+      },
+      onReset: () => this.fitView({ animate: true }),
+    });
+
+    this.resizeObserver = new ResizeObserver(() => this.handleResize());
+    this.resizeObserver.observe(container);
+    this.handleResize();
+  }
+
+  /** Load a DXF from text, a File/Blob, or an ArrayBuffer. */
+  async load(source: DxfSource): Promise<void> {
+    const text =
+      typeof source === "string"
+        ? source
+        : source instanceof Blob
+          ? await source.text()
+          : new TextDecoder().decode(source);
+
+    this.document = parseDxf(text);
+    this.tessellation = tessellate(this.document, {
+      curveSegments: this.options.curveSegments,
+    });
+    this.renderer.setGeometry(this.tessellation);
+    for (const layer of this.document.layers.values()) {
+      this.renderer.setLayerVisible(layer.name, layer.visible);
+    }
+    this.fitView();
+    this.emit("loaded");
+  }
+
+  /** Convenience: fetch a URL and load it. */
+  async loadUrl(url: string): Promise<void> {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
+    await this.load(await response.text());
+  }
+
+  getLayers(): LayerInfo[] {
+    return this.document ? [...this.document.layers.values()] : [];
+  }
+
+  setLayerVisible(name: string, visible: boolean): void {
+    const layer = this.document?.layers.get(name);
+    if (layer) layer.visible = visible;
+    this.renderer.setLayerVisible(name, visible);
+    if (!visible && this.highlightedLayer === name) this.setLayerHighlight(null);
+    this.requestRender();
+  }
+
+  /** Emphasize one layer (drawn with fat lines on top), or clear with null. */
+  setLayerHighlight(name: string | null): void {
+    // Highlighting a hidden layer would draw invisible geometry — treat as clear.
+    if (name !== null && this.document?.layers.get(name)?.visible === false) name = null;
+    if (name === this.highlightedLayer) return;
+    this.highlightedLayer = name;
+    this.renderer.setHighlight(name);
+    this.requestRender();
+  }
+
+  /**
+   * Hit-test the drawing at canvas coordinates (CSS px). Returns the layer
+   * of the closest visible geometry within `tolerancePx`, or null.
+   */
+  pickLayer(x: number, y: number, tolerancePx = 6): string | null {
+    if (!this.tessellation || !this.document) return null;
+    const world = this.camera.screenToWorld(x, y);
+    return pickLayer(
+      this.tessellation,
+      world,
+      tolerancePx * this.camera.unitsPerPixel,
+      (name) => this.document?.layers.get(name)?.visible !== false,
+    );
+  }
+
+  get view(): ViewState {
+    return {
+      center: { ...this.camera.center },
+      unitsPerPixel: this.camera.unitsPerPixel,
+      rotation: this.camera.rotation,
+    };
+  }
+
+  get stats(): ViewerStats {
+    return {
+      entityCount: this.document?.entities.length ?? 0,
+      segmentCount: this.tessellation?.segmentCount ?? 0,
+      unsupported: this.document?.unsupported ?? {},
+    };
+  }
+
+  /** Fit the whole drawing into the viewport, optionally animated. */
+  fitView(options: FitViewOptions = {}): void {
+    this.cancelViewAnimation();
+    const target = this.fittedView();
+    if (!target) {
+      this.requestRender();
+      return;
+    }
+    if (options.animate) {
+      this.animateView(target, options.durationMs ?? 400);
+    } else {
+      this.camera.center = { ...target.center };
+      this.camera.unitsPerPixel = target.unitsPerPixel;
+      this.camera.rotation = target.rotation;
+      this.requestRender();
+    }
+  }
+
+  /** Compute the fitted camera pose without mutating the live camera. */
+  private fittedView(): ViewState | null {
+    const bounds = this.tessellation?.bounds;
+    const offset = this.tessellation?.offset;
+    if (!bounds || !offset) return null;
+    const probe = new Camera2D();
+    probe.setViewport(this.camera.viewportWidth, this.camera.viewportHeight);
+    // Camera works in offset space (geometry is re-centered for precision).
+    probe.fit({
+      minX: bounds.minX - offset.x,
+      minY: bounds.minY - offset.y,
+      maxX: bounds.maxX - offset.x,
+      maxY: bounds.maxY - offset.y,
+    });
+    return { center: probe.center, unitsPerPixel: probe.unitsPerPixel, rotation: probe.rotation };
+  }
+
+  private animateView(target: ViewState, durationMs: number): void {
+    // Normalize rotation so the animation takes the short way around.
+    this.camera.rotation -= 2 * Math.PI * Math.round(this.camera.rotation / (2 * Math.PI));
+    const start = this.view;
+    const startLogZoom = Math.log(start.unitsPerPixel);
+    const endLogZoom = Math.log(target.unitsPerPixel);
+    const startTime = performance.now();
+
+    const step = (): void => {
+      const t = Math.min(1, (performance.now() - startTime) / durationMs);
+      const e = easeInOutCubic(t);
+      this.camera.center.x = lerp(start.center.x, target.center.x, e);
+      this.camera.center.y = lerp(start.center.y, target.center.y, e);
+      // Interpolate zoom logarithmically so it feels uniform.
+      this.camera.unitsPerPixel = Math.exp(lerp(startLogZoom, endLogZoom, e));
+      this.camera.rotation = lerp(start.rotation, target.rotation, e);
+      this.requestRender();
+      this.animationFrame = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    this.animationFrame = requestAnimationFrame(step);
+  }
+
+  private cancelViewAnimation(): void {
+    if (this.animationFrame !== null) {
+      cancelAnimationFrame(this.animationFrame);
+      this.animationFrame = null;
+    }
+  }
+
+  on(event: ViewerEvent, listener: Listener): void {
+    let set = this.listeners.get(event);
+    if (!set) {
+      set = new Set();
+      this.listeners.set(event, set);
+    }
+    set.add(listener);
+  }
+
+  off(event: ViewerEvent, listener: Listener): void {
+    this.listeners.get(event)?.delete(listener);
+  }
+
+  private emit(event: ViewerEvent): void {
+    for (const listener of this.listeners.get(event) ?? []) listener();
+  }
+
+  private handleResize(): void {
+    const width = this.container.clientWidth || 1;
+    const height = this.container.clientHeight || 1;
+    this.camera.setViewport(width, height);
+    this.renderer.resize(width, height, window.devicePixelRatio || 1);
+    this.requestRender();
+  }
+
+  /** Render on demand, coalesced to animation frames. */
+  private requestRender(): void {
+    if (this.renderQueued) return;
+    this.renderQueued = true;
+    requestAnimationFrame(() => {
+      this.renderQueued = false;
+      this.renderer.render(this.camera);
+      this.emit("render");
+    });
+  }
+
+  dispose(): void {
+    this.cancelViewAnimation();
+    this.resizeObserver.disconnect();
+    this.detachGestures();
+    this.renderer.dispose();
+    this.canvas.remove();
+    this.listeners.clear();
+  }
+}

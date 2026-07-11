@@ -1,0 +1,39 @@
+{
+  "name": "@observo/core",
+  "version": "0.0.0",
+  "description": "Observo — a TypeScript DXF viewer library (WebGL, mobile-first).",
+  "license": "MIT",
+  "author": "Dmitri Kochelorov <kochelorov.dmitri@gmail.com>",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build"
+  },
+  "dependencies": {
+    "dxf-parser": "^1.1.2",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/three": "^0.185.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "@vitest/coverage-v8": "4.1.10",
+    "bumpp": "^11.1.0",
+    "happy-dom": "^20.10.6",
+    "typescript": "^7.0.2",
+    "vite-plus": "catalog:"
+  }
+}
