@@ -8,8 +8,11 @@ import { tessellate } from "./tessellate/tessellate.ts";
 import type { Tessellation } from "./tessellate/tessellate.ts";
 
 export interface DxfViewerOptions {
-  /** Canvas clear color, 24-bit RGB. Default: dark slate. */
-  background?: number;
+  /**
+   * Canvas clear color, 24-bit RGB — or null for a transparent canvas
+   * (the page background shows through). Default: dark slate.
+   */
+  background?: number | null;
   /** Segments per full circle when flattening curves. Default: 72. */
   curveSegments?: number;
 }
@@ -189,6 +192,38 @@ export class DxfViewer {
       this.camera.center = { ...target.center };
       this.camera.unitsPerPixel = target.unitsPerPixel;
       this.camera.rotation = target.rotation;
+      this.requestRender();
+    }
+  }
+
+  /** Zoom by `factor` (>1 zooms in) at the viewport center. */
+  zoomBy(factor: number, options: { animate?: boolean; durationMs?: number } = {}): void {
+    this.cancelViewAnimation();
+    const target: ViewState = {
+      center: { ...this.camera.center },
+      unitsPerPixel: this.camera.unitsPerPixel / factor,
+      rotation: this.camera.rotation,
+    };
+    if (options.animate) {
+      this.animateView(target, options.durationMs ?? 250);
+    } else {
+      this.camera.unitsPerPixel = target.unitsPerPixel;
+      this.requestRender();
+    }
+  }
+
+  /** Rotate back to 0, keeping center and zoom. */
+  resetRotation(options: { animate?: boolean; durationMs?: number } = {}): void {
+    this.cancelViewAnimation();
+    const target: ViewState = {
+      center: { ...this.camera.center },
+      unitsPerPixel: this.camera.unitsPerPixel,
+      rotation: 0,
+    };
+    if (options.animate) {
+      this.animateView(target, options.durationMs ?? 300);
+    } else {
+      this.camera.rotation = 0;
       this.requestRender();
     }
   }
