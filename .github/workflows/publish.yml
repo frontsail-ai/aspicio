@@ -61,7 +61,10 @@ jobs:
 
       - name: Set package versions
         # npm version trips over the root devEngines (bun) declaration;
-        # stamp the manifests with bun directly instead.
+        # stamp the manifests with bun directly instead. The workspace:^
+        # dependency is replaced explicitly: bun publish would rewrite it
+        # from the (stale, pre-stamp) lockfile — that shipped react@0.1.0
+        # depending on core@^0.0.0.
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -69,10 +72,25 @@ jobs:
             for (const path of ["packages/core/package.json", "packages/react/package.json"]) {
               const pkg = await Bun.file(path).json();
               pkg.version = process.env.VERSION;
+              for (const deps of [pkg.dependencies, pkg.peerDependencies]) {
+                for (const name of Object.keys(deps ?? {})) {
+                  if (deps[name].startsWith("workspace:")) deps[name] = `^${process.env.VERSION}`;
+                }
+              }
               await Bun.write(path, JSON.stringify(pkg, null, 2) + "\n");
             }
             console.log("stamped", process.env.VERSION);
           '
+
+      - name: Verify packed dependency ranges
+        run: |
+          cd packages/react && bun pm pack --destination /tmp/verify --quiet
+          RANGE=$(tar -xzOf /tmp/verify/*.tgz package/package.json | bun -e '
+            const pkg = await new Response(Bun.stdin.stream()).json();
+            console.log(pkg.dependencies["@aspicio/core"]);
+          ')
+          echo "packed @aspicio/core range: $RANGE"
+          test "$RANGE" = "^${{ steps.version.outputs.version }}" || { echo "workspace protocol leaked into the tarball"; exit 1; }
 
       - name: Build all packages
         run: bunx vp run -r build
