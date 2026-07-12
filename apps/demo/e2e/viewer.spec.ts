@@ -325,6 +325,20 @@ test("hovering geometry on the canvas reverse-highlights its layer row", async (
   await expect(page.locator(".layer-row.reverse")).toHaveCount(0);
 });
 
+test("entity-styled files show effective colors in the layer list", async ({ page }) => {
+  // CAM/die-cut exports color every entity individually and leave the layer
+  // table at ACI 7 (white). Swatches must show what is actually drawn.
+  await page.locator("#file").setInputFiles(fixture("entity-colors.dxf"));
+  await expect(page.locator("#file-chip")).toHaveText("entity-colors.dxf");
+
+  const swatchColor = (name: string) =>
+    row(page, name)
+      .locator(".layer-swatch")
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await swatchColor("CUT")).toBe("rgb(255, 0, 0)"); // ACI 1 entities
+  expect(await swatchColor("MARK")).toBe("rgb(0, 0, 255)"); // ACI 5 entities
+});
+
 test("opens a DXF via the file picker", async ({ page }) => {
   await loadSample(page);
   await page.locator("#file").setInputFiles(fixture("box.dxf"));

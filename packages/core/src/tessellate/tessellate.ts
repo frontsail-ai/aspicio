@@ -22,6 +22,12 @@ export interface Tessellation {
   offset: Point2;
   /** Total line segments emitted. */
   segmentCount: number;
+  /**
+   * Colors actually drawn per layer (24-bit RGB → segment count). Unlike the
+   * layer-table color, this reflects per-entity overrides, ByBlock
+   * inheritance, and block layer rules — what the viewer really shows.
+   */
+  layerColors: Map<string, Map<number, number>>;
 }
 
 export interface TessellationContext {
@@ -130,6 +136,7 @@ export interface TessellateOptions {
 export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): Tessellation {
   const curveSegments = options.curveSegments ?? DEFAULT_CURVE_SEGMENTS;
   const accumulators = new Map<string, Accumulator>();
+  const layerColors = new Map<string, Map<number, number>>();
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -159,6 +166,13 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
             acc = { positions: [], colors: [] };
             accumulators.set(layer, acc);
           }
+          let colorCounts = layerColors.get(layer);
+          if (!colorCounts) {
+            colorCounts = new Map();
+            layerColors.set(layer, colorCounts);
+          }
+          const segments = closed ? points.length : points.length - 1;
+          colorCounts.set(color, (colorCounts.get(color) ?? 0) + segments);
           const r = ((color >> 16) & 0xff) / 255;
           const g = ((color >> 8) & 0xff) / 255;
           const b = (color & 0xff) / 255;
@@ -221,5 +235,5 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
     layers.set(name, { positions, colors: new Float32Array(acc.colors) });
   }
 
-  return { layers, bounds, offset, segmentCount };
+  return { layers, bounds, offset, segmentCount, layerColors };
 }

@@ -14,8 +14,14 @@ export interface Bounds {
 
 export interface LayerInfo {
   name: string;
-  /** 24-bit RGB. */
+  /** Layer-table color, 24-bit RGB. May differ from what is drawn. */
   color: number;
+  /**
+   * Colors actually drawn on this layer, dominant first (populated after
+   * tessellation). Entity-styled files override the table color per entity,
+   * so UI should prefer `effectiveColors[0]` over `color`.
+   */
+  effectiveColors?: number[];
   visible: boolean;
   frozen: boolean;
   /** Number of top-level entities on this layer. */
