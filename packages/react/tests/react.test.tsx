@@ -36,8 +36,10 @@ const mock = vi.hoisted(() => {
       this.disposed = true;
     });
 
-    constructor(container: HTMLElement) {
+    options: Record<string, unknown> | undefined;
+    constructor(container: HTMLElement, options?: Record<string, unknown>) {
       this.container = container;
+      this.options = options;
       instances.push(this);
     }
     getLayers() {
@@ -193,6 +195,32 @@ test("DxfEmbed exposes the viewer via ref", async () => {
   render(<DxfEmbed src="dxf-data" ref={ref} />);
   await flush();
   expect(ref.current).toBe(lastViewer() as unknown as DxfViewer);
+});
+
+test("DxfEmbed is themed like the demo app by default", async () => {
+  const { container, getByRole } = render(<DxfEmbed src="dxf-data" />);
+  await flush();
+  const root = container.firstElementChild as HTMLElement;
+  expect(root.style.background).toContain("#0f1115");
+  expect(root.style.overflow).toBe("hidden");
+  expect((getByRole("list") as HTMLElement).style.background).toContain("#191c22");
+  // Themed embeds default to a transparent canvas so the grid shows through.
+  expect(lastViewer().options).toMatchObject({ background: null });
+});
+
+test("DxfEmbed theme=none inherits the host page", async () => {
+  const { container, getByRole } = render(<DxfEmbed src="dxf-data" theme="none" />);
+  await flush();
+  const root = container.firstElementChild as HTMLElement;
+  expect(root.style.background).toBe("");
+  expect((getByRole("list") as HTMLElement).style.background).toBe("");
+  expect(lastViewer().options?.background).toBeUndefined();
+});
+
+test("DxfEmbed keeps an explicit background over the themed default", async () => {
+  render(<DxfEmbed src="dxf-data" options={{ background: 0x112233 }} />);
+  await flush();
+  expect(lastViewer().options).toMatchObject({ background: 0x112233 });
 });
 
 /* ---------- DxfLayerPanel ---------- */

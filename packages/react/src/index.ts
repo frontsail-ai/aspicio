@@ -12,3 +12,5 @@ export { DxfPreview } from "./DxfPreview.tsx";
 export type { DxfPreviewProps } from "./DxfPreview.tsx";
 export { DxfLayerPanel } from "./DxfLayerPanel.tsx";
 export type { DxfLayerPanelProps } from "./DxfLayerPanel.tsx";
+export { observoTokens, observoCanvasBackground } from "./theme.ts";
+export type { DxfTheme } from "./theme.ts";

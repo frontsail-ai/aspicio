@@ -21,6 +21,18 @@ import { DxfEmbed } from "@observo/react";
 Props: `panel="left" | "right" | "none"`, `panelStyle`, `options`,
 `onLoaded`, `onError`, plus a `ref` exposing the full `DxfViewer`.
 
+### Theming
+
+`DxfEmbed` and `DxfLayerPanel` ship with the Observo demo look by default —
+dark panel, blueprint grid behind a transparent canvas, hover states. Pass
+`theme="none"` to inherit the host page's styles instead.
+
+The theme uses IBM Plex font _stacks_ but never loads webfonts itself (no
+surprise network requests from a library). Load IBM Plex Sans/Mono in your
+page for the exact demo typography; otherwise system faces are used. The
+raw tokens are exported as `observoTokens` if you want to match the palette
+elsewhere.
+
 ## Custom layout
 
 ```tsx

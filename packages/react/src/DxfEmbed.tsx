@@ -4,18 +4,23 @@ import type { CSSProperties, ReactElement } from "react";
 import { DxfLayerPanel } from "./DxfLayerPanel.tsx";
 import { DxfPreview } from "./DxfPreview.tsx";
 import type { DxfPreviewProps } from "./DxfPreview.tsx";
+import { observoCanvasBackground, observoTokens } from "./theme.ts";
+import type { DxfTheme } from "./theme.ts";
 
 export interface DxfEmbedProps extends DxfPreviewProps {
   /** Where the layer list sits. Default: "left". */
   panel?: "left" | "right" | "none";
   panelClassName?: string;
   panelStyle?: CSSProperties;
+  /** Visual theme. Defaults to the Observo demo look; "none" inherits the host. */
+  theme?: DxfTheme;
 }
 
 /**
  * Batteries-included embed: layer list + interactive preview in one
- * component. Pass the DXF as `src` (text, File, Blob, ArrayBuffer) or
- * `srcUrl`; everything else is optional.
+ * component, styled like the Observo demo app (blueprint grid, dark
+ * panel) unless theme="none". Pass the DXF as `src` (text, File, Blob,
+ * ArrayBuffer) or `srcUrl`; everything else is optional.
  *
  *   <DxfEmbed src={file} style={{ height: 480 }} />
  *
@@ -24,30 +29,66 @@ export interface DxfEmbedProps extends DxfPreviewProps {
  * a custom layout.
  */
 export const DxfEmbed = forwardRef<DxfViewer | null, DxfEmbedProps>(function DxfEmbed(
-  { panel = "left", panelClassName, panelStyle, className, style, onViewer, ...previewProps },
+  {
+    panel = "left",
+    panelClassName,
+    panelStyle,
+    theme = "observo",
+    className,
+    style,
+    options,
+    onViewer,
+    ...previewProps
+  },
   ref,
 ): ReactElement {
   const [viewer, setViewer] = useState<DxfViewer | null>(null);
   useImperativeHandle(ref, () => viewer as DxfViewer, [viewer]);
+  const themed = theme === "observo";
 
   const panelElement =
     panel === "none" ? null : (
       <DxfLayerPanel
         viewer={viewer}
+        theme={theme}
         className={panelClassName}
-        style={{ width: 220, flexShrink: 0, overflowY: "auto", ...panelStyle }}
+        style={{
+          width: 220,
+          flexShrink: 0,
+          overflowY: "auto",
+          ...(themed && {
+            [panel === "left" ? "borderRight" : "borderLeft"]:
+              `1px solid ${observoTokens.hairline}`,
+          }),
+          ...panelStyle,
+        }}
       />
     );
 
+  const rootStyle: CSSProperties = themed
+    ? {
+        display: "flex",
+        width: "100%",
+        height: "100%",
+        background: observoTokens.bg,
+        border: `1px solid ${observoTokens.hairline2}`,
+        borderRadius: 6,
+        overflow: "hidden",
+        ...style,
+      }
+    : { display: "flex", gap: "0.75em", width: "100%", height: "100%", ...style };
+
   return (
-    <div
-      className={className}
-      style={{ display: "flex", gap: "0.75em", width: "100%", height: "100%", ...style }}
-    >
+    <div className={className} style={rootStyle}>
       {panel === "left" && panelElement}
       <DxfPreview
         {...previewProps}
-        style={{ flex: 1, minWidth: 0 }}
+        // The demo look draws its blueprint grid behind a transparent
+        // canvas; respect an explicit background if the caller set one.
+        options={
+          themed && options?.background === undefined ? { ...options, background: null } : options
+        }
+        style={{ flex: 1, minWidth: 0, ...(themed && observoCanvasBackground) }}
         onViewer={(instance) => {
           setViewer(instance);
           onViewer?.(instance);
