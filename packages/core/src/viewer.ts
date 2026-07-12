@@ -1,11 +1,14 @@
 import { Camera2D } from "./camera/camera2d.ts";
 import { describeEntity } from "./entity-info.ts";
 import type { EntityInfo } from "./entity-info.ts";
+import { tessellationToSvg } from "./export.ts";
 import { attachGestures } from "./input/gestures.ts";
 import type { DxfDocument, Entity, LayerInfo, Point2 } from "./model/types.ts";
 import { parseDxf } from "./parse/parse.ts";
 import { pickEntity as pickEntityHit, pickLayer } from "./pick/pick.ts";
 import { SceneRenderer } from "./render/renderer.ts";
+import { buildSnapIndex } from "./snap/snap.ts";
+import type { SnapIndex, SnapResult } from "./snap/snap.ts";
 import { tessellate } from "./tessellate/tessellate.ts";
 import type { Tessellation } from "./tessellate/tessellate.ts";
 
@@ -76,6 +79,7 @@ export class DxfViewer {
   private readonly resizeObserver: ResizeObserver;
   private readonly listeners = new Map<ViewerEvent, Set<Listener>>();
   private tessellation: Tessellation | null = null;
+  private snapIndex: SnapIndex | null = null;
   private renderQueued = false;
   private highlightedLayer: string | null = null;
   private selectedIndex: number | null = null;
@@ -130,6 +134,7 @@ export class DxfViewer {
         ? [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([color]) => color)
         : [layer.color];
     }
+    this.snapIndex = buildSnapIndex(this.tessellation, this.document);
     this.selectedIndex = null;
     this.highlightedLayer = null;
     this.renderer.setGeometry(this.tessellation);
@@ -246,6 +251,46 @@ export class DxfViewer {
   worldToScreen(point: Point2): Point2 {
     const o = this.tessellation?.offset ?? { x: 0, y: 0 };
     return this.camera.worldToScreen(point.x - o.x, point.y - o.y);
+  }
+
+  /**
+   * Snap canvas coordinates (CSS px) to the nearest meaningful point —
+   * endpoint, node, center, or midpoint — within `tolerancePx`. Returns the
+   * snapped world point and its kind, or null. Only visible layers snap.
+   */
+  snap(x: number, y: number, tolerancePx = 10): SnapResult | null {
+    if (!this.snapIndex) return null;
+    const world = this.screenToWorld(x, y);
+    return this.snapIndex.query(
+      world,
+      tolerancePx * this.camera.unitsPerPixel,
+      (name) => this.document?.layers.get(name)?.visible !== false,
+    );
+  }
+
+  /**
+   * Export the whole drawing as a standalone SVG string (vector, scale-
+   * independent). Only currently-visible layers are included. `background`
+   * fills a solid backdrop; omit for a transparent SVG.
+   */
+  toSVG(options: { background?: string } = {}): string {
+    if (!this.tessellation)
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0"></svg>';
+    return tessellationToSvg(
+      this.tessellation,
+      (name) => this.document?.layers.get(name)?.visible !== false,
+      options,
+    );
+  }
+
+  /**
+   * Export the current view (WYSIWYG — same zoom, pan, rotation, and visible
+   * layers) as a PNG data URL at the canvas's native resolution. `background`
+   * (24-bit RGB) fills behind the drawing; omit to keep the canvas as-is
+   * (transparent when the viewer background is null).
+   */
+  toPNG(options: { background?: number } = {}): string {
+    return this.renderer.toDataURL(this.camera, options.background);
   }
 
   get view(): ViewState {

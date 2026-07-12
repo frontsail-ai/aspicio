@@ -75,6 +75,9 @@ Notes:
   `setLayerHighlight`, `pickLayer`, `view`, `stats`.
 - `src` accepts DXF text, `File`, `Blob`, or `ArrayBuffer`; `srcUrl` fetches.
   Changing either loads the new document; stale in-flight loads are ignored.
+- A built-in **Download** control (SVG / PNG export) shows by default; pass
+  `showDownload={false}` to hide it. The viewer's `toSVG()` / `toPNG()` stay
+  callable via the ref regardless.
 - Camera state is deliberately not React state — subscribe to the `render`
   event on the viewer if you need to display it.
 - StrictMode and SSR safe: the viewer is created in an effect and disposed on

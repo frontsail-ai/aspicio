@@ -54,11 +54,15 @@ export class SceneRenderer {
   private width = 1;
   private height = 1;
   private tessellation: Tessellation | null = null;
+  private readonly clearColor: Color;
+  private readonly clearAlpha: number;
 
   constructor(canvas: HTMLCanvasElement, options: SceneRendererOptions = {}) {
     const transparent = options.background === null;
     this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: transparent });
-    this.renderer.setClearColor(new Color(options.background ?? 0x16181d), transparent ? 0 : 1);
+    this.clearColor = new Color(options.background ?? 0x16181d);
+    this.clearAlpha = transparent ? 0 : 1;
+    this.renderer.setClearColor(this.clearColor, this.clearAlpha);
     this.camera.position.z = 10;
     this.lineWeightScale = options.lineWeightScale ?? DEFAULT_LINEWEIGHT_SCALE;
     this.highlightMaterial = new LineMaterial({
@@ -251,6 +255,24 @@ export class SceneRenderer {
     this.camera.lookAt(camera2d.center.x, camera2d.center.y, 0);
     this.camera.updateProjectionMatrix();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Render the current view and read it back as a PNG data URL. Reading
+   * synchronously in the same task as render() captures the frame even
+   * without a preserved drawing buffer.
+   */
+  toDataURL(camera2d: Camera2D, background?: number): string {
+    if (background !== undefined) this.renderer.setClearColor(new Color(background), 1);
+    this.render(camera2d);
+    const url = this.renderer.domElement.toDataURL("image/png");
+    if (background !== undefined) {
+      // Restore the live clear colour and repaint so the on-screen canvas
+      // isn't left showing the export background.
+      this.renderer.setClearColor(this.clearColor, this.clearAlpha);
+      this.render(camera2d);
+    }
+    return url;
   }
 
   private clearGeometry(): void {

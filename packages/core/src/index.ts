@@ -21,6 +21,11 @@ export { pickLayer, pickEntity } from "./pick/pick.ts";
 export type { EntityHit } from "./pick/pick.ts";
 export { describeEntity } from "./entity-info.ts";
 export type { EntityInfo } from "./entity-info.ts";
+export { buildSnapIndex, SnapIndex } from "./snap/snap.ts";
+export type { SnapKind, SnapResult } from "./snap/snap.ts";
+export { unitLabel, niceLength } from "./units.ts";
+export { tessellationToSvg } from "./export.ts";
+export type { SvgExportOptions } from "./export.ts";
 export { parseDxf } from "./parse/parse.ts";
 export { tessellate, registerEntityHandler } from "./tessellate/tessellate.ts";
 export type {

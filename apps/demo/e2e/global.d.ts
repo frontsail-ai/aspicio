@@ -13,6 +13,7 @@ interface AspicioTestHook {
   getLayers(): { name: string; visible: boolean }[];
   document: {
     entities: { type: string; layer: string; lineWeight?: number }[];
+    units?: string;
   } | null;
   worldToScreen(point: { x: number; y: number }): { x: number; y: number };
   screenToWorld(x: number, y: number): { x: number; y: number };
@@ -24,6 +25,7 @@ interface DemoTestHook {
   readonly measureActive: boolean;
   readonly measurePoints: { x: number; y: number }[];
   pickAt(x: number, y: number): { index: number } | null;
+  snapAt(x: number, y: number): { point: { x: number; y: number }; kind: string } | null;
 }
 
 declare interface Window {
