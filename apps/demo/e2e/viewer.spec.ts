@@ -445,6 +445,29 @@ test("the solo banner EXIT button restores all layers", async ({ page }) => {
   for (const layer of probe.layers) expect(layer.visible, layer.name).toBe(true);
 });
 
+test("entering solo does not shift the rows — a second click at the same spot toggles it", async ({
+  page,
+}) => {
+  await loadSample(page);
+  const doors = row(page, "DOORS");
+  const before = await doors.boundingBox();
+  if (!before) throw new Error("no row box");
+
+  await doors.dblclick();
+  await expect(page.locator("#solo-banner")).toBeVisible();
+  const after = await doors.boundingBox();
+  if (!after) throw new Error("no row box");
+  // The banner overlays the header slot instead of pushing the list down.
+  expect(Math.abs(after.y - before.y)).toBeLessThan(1);
+
+  // A double-click at the ORIGINAL cursor position lands on the same row and
+  // exits solo — the whole point of not shifting the rows.
+  await page.mouse.dblclick(before.x + before.width / 2, before.y + before.height / 2);
+  await expect(page.locator("#solo-banner")).toBeHidden();
+  const probe = await probeViewer(page);
+  for (const layer of probe.layers) expect(layer.visible, layer.name).toBe(true);
+});
+
 test("hovering geometry on the canvas reverse-highlights its layer row", async ({ page }) => {
   await loadSample(page);
   const probe = await probeViewer(page);

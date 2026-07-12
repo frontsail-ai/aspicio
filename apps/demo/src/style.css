@@ -365,6 +365,7 @@ button {
 }
 
 .panel {
+  position: relative;
   width: 248px;
   flex-shrink: 0;
   background: var(--panel);
@@ -379,6 +380,8 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 13px 14px 10px;
+  height: 46px;
+  box-sizing: border-box;
   flex-shrink: 0;
 }
 
@@ -416,15 +419,26 @@ button {
   border-radius: 3px;
 }
 
+/*
+ * Overlays the header slot (out of normal flow) instead of inserting above
+ * the list, so entering solo never shifts the rows down — a second
+ * double-click at the same spot still lands on the soloed row to toggle off.
+ */
 .solo-banner {
-  margin: 0 12px 8px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 46px;
+  box-sizing: border-box;
+  z-index: 6;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 9px;
-  background: var(--amberdim);
-  border: 1px solid rgb(224 168 46 / 40%);
-  border-radius: 3px;
+  padding: 0 12px;
+  /* Opaque amber tint (amberdim flattened over --panel) hides the header beneath. */
+  background: #393224;
+  border-bottom: 1px solid rgb(224 168 46 / 45%);
 }
 
 .solo-banner-label {
