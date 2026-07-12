@@ -408,7 +408,9 @@ test("hovering a layer row draws that layer thicker", async ({ page }) => {
   expect(after.green).toBeLessThan(during.green * 0.7);
 });
 
-test("double-clicking a row solos it with banner, again restores", async ({ page }) => {
+test("double-clicking a row solos it; double-clicking again shows all but that layer", async ({
+  page,
+}) => {
   await loadSample(page);
   const walls = row(page, "WALLS");
 
@@ -426,13 +428,15 @@ test("double-clicking a row solos it with banner, again restores", async ({ page
   expect(colors.green).toBeGreaterThan(100);
   expect(colors.cyan).toBeLessThan(10);
 
+  // Double-click in solo leaves solo, showing everything BUT the clicked layer.
   await walls.dblclick();
   await page.waitForTimeout(150);
   await expect(page.locator("#solo-banner")).toBeHidden();
   probe = await probeViewer(page);
-  for (const layer of probe.layers) expect(layer.visible, layer.name).toBe(true);
+  for (const layer of probe.layers) expect(layer.visible, layer.name).toBe(layer.name !== "WALLS");
   colors = await canvasColors(page);
-  expect(colors.cyan).toBeGreaterThan(100);
+  expect(colors.cyan).toBeGreaterThan(100); // furniture back
+  expect(colors.green).toBeLessThan(10); // walls now hidden
 });
 
 test("the solo banner EXIT button restores all layers", async ({ page }) => {
@@ -460,7 +464,7 @@ test("single-clicking a layer row toggles that layer's visibility", async ({ pag
   await expect.poll(doorsVisible).toBe(true);
 });
 
-test("single-clicking a row while soloing shows every layer except that one", async ({ page }) => {
+test("single-clicking a row while soloing exits solo and shows every layer", async ({ page }) => {
   await loadSample(page);
   await row(page, "WALLS").dblclick();
   await expect(page.locator("#solo-banner")).toBeVisible();
@@ -469,11 +473,22 @@ test("single-clicking a row while soloing shows every layer except that one", as
   if (!box) throw new Error("no row box");
   await page.mouse.click(box.x + box.width * 0.6, box.y + box.height / 2);
 
-  // Leaves solo, hiding only the clicked layer — the inverse of solo.
+  // A single click in solo just leaves solo — every layer visible again.
   await expect(page.locator("#solo-banner")).toBeHidden();
   await expect
     .poll(async () => (await probeViewer(page)).layers.every((l) => l.visible))
-    .toBe(false);
+    .toBe(true);
+});
+
+test("double-clicking a row while soloing shows every layer but that one", async ({ page }) => {
+  await loadSample(page);
+  await row(page, "WALLS").dblclick();
+  await expect(page.locator("#solo-banner")).toBeVisible();
+
+  await row(page, "DOORS").dblclick();
+
+  // Double-click in solo leaves solo, hiding only the clicked layer.
+  await expect(page.locator("#solo-banner")).toBeHidden();
   const probe = await probeViewer(page);
   for (const l of probe.layers) expect(l.visible, l.name).toBe(l.name !== "DOORS");
 });
@@ -494,11 +509,12 @@ test("entering solo does not shift the rows — a second click at the same spot 
   expect(Math.abs(after.y - before.y)).toBeLessThan(1);
 
   // A double-click at the ORIGINAL cursor position lands on the same row and
-  // exits solo — the whole point of not shifting the rows.
+  // exits solo — the whole point of not shifting the rows. Double-click in
+  // solo shows all but the clicked (DOORS) row, proving it hit the same row.
   await page.mouse.dblclick(before.x + before.width / 2, before.y + before.height / 2);
   await expect(page.locator("#solo-banner")).toBeHidden();
   const probe = await probeViewer(page);
-  for (const layer of probe.layers) expect(layer.visible, layer.name).toBe(true);
+  for (const layer of probe.layers) expect(layer.visible, layer.name).toBe(layer.name !== "DOORS");
 });
 
 test("hovering geometry on the canvas reverse-highlights its layer row", async ({ page }) => {

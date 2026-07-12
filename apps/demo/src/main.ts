@@ -226,23 +226,26 @@ function isVisible(name: string): boolean {
   return viewer.getLayers().find((l) => l.name === name)?.visible !== false;
 }
 
+/** Single click: toggle the layer in normal mode, or leave solo (show all). */
 function toggleLayer(name: string): void {
   if (soloLayer) {
-    // In solo, a single click leaves solo by showing everything EXCEPT the
-    // clicked layer — the natural inverse of "show only this one".
-    for (const layer of viewer.getLayers()) viewer.setLayerVisible(layer.name, layer.name !== name);
-    soloLayer = null;
-  } else {
-    const layer = viewer.getLayers().find((l) => l.name === name);
-    viewer.setLayerVisible(name, layer?.visible === false);
+    exitSolo();
+    return;
   }
+  const layer = viewer.getLayers().find((l) => l.name === name);
+  viewer.setLayerVisible(name, layer?.visible === false);
   syncPanel();
 }
 
+/** Double click: solo the layer, or (already soloing) leave solo showing all but it. */
 function toggleSolo(name: string): void {
-  soloLayer = soloLayer === name ? null : name;
-  for (const layer of viewer.getLayers()) {
-    viewer.setLayerVisible(layer.name, soloLayer ? layer.name === soloLayer : true);
+  if (soloLayer) {
+    // Exit solo, showing every layer EXCEPT the clicked one — the inverse of solo.
+    soloLayer = null;
+    for (const layer of viewer.getLayers()) viewer.setLayerVisible(layer.name, layer.name !== name);
+  } else {
+    soloLayer = name;
+    for (const layer of viewer.getLayers()) viewer.setLayerVisible(layer.name, layer.name === name);
   }
   syncPanel();
 }
