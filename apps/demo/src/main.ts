@@ -41,6 +41,7 @@ const DESKTOP_HINTS: [string, string][] = [
   ["⇧+DRAG", "rotate"],
   ["CLICK", "select entity"],
   ["HOVER", "highlight layer"],
+  ["CLICK ROW", "toggle layer"],
   ["2×CLICK ROW", "solo layer"],
 ];
 
@@ -227,8 +228,9 @@ function isVisible(name: string): boolean {
 
 function toggleLayer(name: string): void {
   if (soloLayer) {
-    // Exiting solo via a checkbox: the clicked layer becomes the only visible one.
-    for (const layer of viewer.getLayers()) viewer.setLayerVisible(layer.name, layer.name === name);
+    // In solo, a single click leaves solo by showing everything EXCEPT the
+    // clicked layer — the natural inverse of "show only this one".
+    for (const layer of viewer.getLayers()) viewer.setLayerVisible(layer.name, layer.name !== name);
     soloLayer = null;
   } else {
     const layer = viewer.getLayers().find((l) => l.name === name);
@@ -431,9 +433,18 @@ function buildLayerPanel(): void {
     check.setAttribute("role", "checkbox");
     check.setAttribute("aria-label", layer.name);
     check.tabIndex = 0;
+    // The checkbox toggles instantly (it's an explicit affordance, and stays
+    // snappy for keyboard/AT users); the rest of the row defers so a double
+    // click can solo without a stray toggle.
     check.addEventListener("click", (e) => {
       e.stopPropagation();
       toggleLayer(layer.name);
+    });
+    check.addEventListener("keydown", (e) => {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        toggleLayer(layer.name);
+      }
     });
 
     const swatch = document.createElement("span");
@@ -459,8 +470,23 @@ function buildLayerPanel(): void {
     row.append(soloBar, check, swatch, name, soloChip, count);
     row.addEventListener("mouseenter", () => setHover(layer.name, "row"));
     row.addEventListener("mouseleave", () => setHover(null, null));
+    // Single click toggles the layer; double click solos it. Defer the single
+    // click so a double click can cancel it — otherwise a solo would also fire
+    // a stray toggle.
+    let clickTimer: number | null = null;
+    row.addEventListener("click", () => {
+      if (clickTimer !== null) return;
+      clickTimer = window.setTimeout(() => {
+        clickTimer = null;
+        toggleLayer(layer.name);
+      }, 250);
+    });
     row.addEventListener("dblclick", (e) => {
       e.preventDefault();
+      if (clickTimer !== null) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+      }
       toggleSolo(layer.name);
     });
 

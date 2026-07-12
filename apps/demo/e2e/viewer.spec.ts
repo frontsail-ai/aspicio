@@ -445,6 +445,39 @@ test("the solo banner EXIT button restores all layers", async ({ page }) => {
   for (const layer of probe.layers) expect(layer.visible, layer.name).toBe(true);
 });
 
+test("single-clicking a layer row toggles that layer's visibility", async ({ page }) => {
+  await loadSample(page);
+  const box = await row(page, "DOORS").boundingBox();
+  if (!box) throw new Error("no row box");
+  // Click the name area (well clear of the checkbox on the far left).
+  const clickRow = () => page.mouse.click(box.x + box.width * 0.6, box.y + box.height / 2);
+  const doorsVisible = async () =>
+    (await probeViewer(page)).layers.find((l) => l.name === "DOORS")?.visible;
+
+  await clickRow();
+  await expect.poll(doorsVisible).toBe(false);
+  await clickRow();
+  await expect.poll(doorsVisible).toBe(true);
+});
+
+test("single-clicking a row while soloing shows every layer except that one", async ({ page }) => {
+  await loadSample(page);
+  await row(page, "WALLS").dblclick();
+  await expect(page.locator("#solo-banner")).toBeVisible();
+
+  const box = await row(page, "DOORS").boundingBox();
+  if (!box) throw new Error("no row box");
+  await page.mouse.click(box.x + box.width * 0.6, box.y + box.height / 2);
+
+  // Leaves solo, hiding only the clicked layer — the inverse of solo.
+  await expect(page.locator("#solo-banner")).toBeHidden();
+  await expect
+    .poll(async () => (await probeViewer(page)).layers.every((l) => l.visible))
+    .toBe(false);
+  const probe = await probeViewer(page);
+  for (const l of probe.layers) expect(l.visible, l.name).toBe(l.name !== "DOORS");
+});
+
 test("entering solo does not shift the rows — a second click at the same spot toggles it", async ({
   page,
 }) => {
