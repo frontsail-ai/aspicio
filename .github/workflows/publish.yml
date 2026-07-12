@@ -1,0 +1,84 @@
+name: Publish to npm
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g. 0.1.0)"
+        required: true
+      dry_run:
+        description: "Dry run (build and pack, publish nothing)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Gate, version, publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          case "$VERSION" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "Invalid version: $VERSION"; exit 1 ;;
+          esac
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing $VERSION"
+
+      - name: Gate — format, lint, type-check
+        run: bunx vp check
+
+      - name: Gate — unit tests
+        run: bunx vp run -r test
+
+      - name: Set package versions
+        run: |
+          for pkg in packages/core packages/react; do
+            (cd "$pkg" && npm version "${{ steps.version.outputs.version }}" --no-git-tag-version)
+          done
+
+      - name: Build all packages
+        run: bunx vp run -r build
+
+      - name: Configure npm auth
+        # bun publish requires a token even for --dry-run; fall back to a
+        # placeholder so dry runs work before the secret exists.
+        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN:-dry-run-placeholder}" > ~/.npmrc
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @aspicio/core
+        run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+        working-directory: packages/core
+
+      - name: Publish @aspicio/react
+        run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+        working-directory: packages/react
