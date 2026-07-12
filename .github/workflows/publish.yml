@@ -60,10 +60,19 @@ jobs:
         run: bunx vp run -r test
 
       - name: Set package versions
+        # npm version trips over the root devEngines (bun) declaration;
+        # stamp the manifests with bun directly instead.
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          for pkg in packages/core packages/react; do
-            (cd "$pkg" && npm version "${{ steps.version.outputs.version }}" --no-git-tag-version)
-          done
+          bun -e '
+            for (const path of ["packages/core/package.json", "packages/react/package.json"]) {
+              const pkg = await Bun.file(path).json();
+              pkg.version = process.env.VERSION;
+              await Bun.write(path, JSON.stringify(pkg, null, 2) + "\n");
+            }
+            console.log("stamped", process.env.VERSION);
+          '
 
       - name: Build all packages
         run: bunx vp run -r build
