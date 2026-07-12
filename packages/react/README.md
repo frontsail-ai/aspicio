@@ -1,7 +1,7 @@
 # @aspicio/react
 
 React bindings for the
-[Aspicio](https://github.com/frontsail-ai/observo#readme) DXF viewer.
+[Aspicio](https://github.com/frontsail-ai/aspicio#readme) DXF viewer.
 
 ```bash
 npm install @aspicio/react   # @aspicio/core comes along; react 18/19 is a peer
