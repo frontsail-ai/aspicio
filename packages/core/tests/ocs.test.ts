@@ -36,6 +36,7 @@ function makeDoc(entities: Entity[], blocks: DxfDocument["blocks"] = new Map()):
     ]),
     entities,
     blocks,
+    lineTypes: new Map(),
     unsupported: {},
   };
 }

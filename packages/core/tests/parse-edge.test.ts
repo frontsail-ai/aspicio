@@ -293,9 +293,13 @@ test("unsupported entities inside blocks are counted too", () => {
       3,
       "B",
       0,
-      "MTEXT",
+      "POINT",
       8,
       "0",
+      10,
+      1,
+      20,
+      1,
       0,
       "ENDBLK",
       0,
@@ -310,7 +314,7 @@ test("unsupported entities inside blocks are counted too", () => {
       "EOF",
     ),
   );
-  expect(doc.unsupported.MTEXT).toBe(1);
+  expect(doc.unsupported.POINT).toBe(1);
 });
 
 test("garbage input throws", () => {

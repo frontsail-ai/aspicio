@@ -53,9 +53,13 @@ const SAMPLE = [
   "51",
   "90",
   "0",
-  "MTEXT",
+  "POINT",
   "8",
   "WALLS",
+  "10",
+  "5",
+  "20",
+  "5",
   "0",
   "ENDSEC",
   "0",
@@ -78,5 +82,5 @@ test("parses layers, entities, and unsupported counts", () => {
     expect(arc.endAngle).toBeCloseTo(Math.PI / 2); // degrees → radians
   }
 
-  expect(doc.unsupported.MTEXT).toBe(1);
+  expect(doc.unsupported.POINT).toBe(1);
 });

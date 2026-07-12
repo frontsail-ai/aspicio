@@ -72,13 +72,18 @@ new DxfViewer(container, {
 ## Supported entities
 
 LINE, LWPOLYLINE/POLYLINE (including bulge arcs), CIRCLE, ARC, ELLIPSE,
-and nested INSERT (block references with transforms, ByBlock color
-inheritance, and the layer-0 rule). Everything else — TEXT, MTEXT,
-SPLINE, HATCH, dimensions — is skipped, counted in `stats.unsupported`,
-and never breaks the load.
+nested INSERT (block references with transforms, ByBlock color
+inheritance, and the layer-0 rule), TEXT and MTEXT (rendered with a
+built-in single-stroke vector font; MTEXT formatting codes are
+collapsed to plain text), and SPLINE (B-spline sampled to a polyline).
+Everything else — HATCH, DIMENSION, SOLID, POINT, … — is skipped,
+counted in `stats.unsupported`, and never breaks the load.
 
-Colors resolve like CAD expects: per-entity overrides beat ByLayer, and
-`effectiveColors` reports what actually reached the screen — important
+Linetypes from the LTYPE table are honored: dashed/hidden/center
+patterns are dashed in drawing units (an entity's linetype, or its
+layer's). Colors resolve like CAD expects: per-entity overrides beat
+ByLayer, and `effectiveColors` reports what actually reached the
+screen — important
 for CAM/die-cutting exports that color every entity and leave the layer
 table blank-white.
 

@@ -1,6 +1,17 @@
 import DxfParser from "dxf-parser";
 import type { IBlock, IEntity, ILayer } from "dxf-parser";
-import type { BlockDef, DxfDocument, Entity, LayerInfo, Point2, Point3 } from "../model/types.ts";
+import type {
+  BlockDef,
+  DxfDocument,
+  Entity,
+  LayerInfo,
+  LineTypeDef,
+  Point2,
+  Point3,
+  TextHAlign,
+  TextVAlign,
+} from "../model/types.ts";
+import { stripMText } from "../text/layout.ts";
 
 const DEG2RAD = Math.PI / 180;
 const DEFAULT_COLOR = 0xffffff;
@@ -15,6 +26,13 @@ function entityColor(raw: IEntity): number | null {
   // undefined when code 62 is absent (implicit ByLayer).
   if (raw.colorIndex === 0 || raw.colorIndex === 256) return null;
   return typeof raw.color === "number" ? raw.color : null;
+}
+
+/** Linetype name, or undefined for ByLayer/continuous. */
+function lineTypeOf(raw: IEntity): string | undefined {
+  const name = (raw as { lineType?: string }).lineType;
+  if (!name || name === "ByLayer" || name === "BYLAYER") return undefined;
+  return name;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw parser entities are shape-checked per type */
@@ -33,8 +51,25 @@ function extrusionOf(e: any): Point3 | undefined {
   return { x, y, z };
 }
 
+function textHAlign(halign: number): TextHAlign {
+  if (halign === 1 || halign === 4) return "center";
+  if (halign === 2) return "right";
+  return "left";
+}
+
+function textVAlign(valign: number): TextVAlign {
+  if (valign === 1) return "bottom";
+  if (valign === 2) return "middle";
+  if (valign === 3) return "top";
+  return "baseline";
+}
+
 function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entity | null {
-  const base = { layer: raw.layer ?? "0", color: entityColor(raw) };
+  const base = {
+    layer: raw.layer ?? "0",
+    color: entityColor(raw),
+    lineType: lineTypeOf(raw),
+  };
   const e = raw as any;
   switch (raw.type) {
     case "LINE": {
@@ -88,12 +123,82 @@ function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entit
         scale: { x: e.xScale ?? 1, y: e.yScale ?? 1 },
         rotation: (e.rotation ?? 0) * DEG2RAD,
       };
+    case "TEXT": {
+      const text: string = e.text ?? "";
+      if (!text) return null;
+      const halign = e.halign ?? 0;
+      const valign = e.valign ?? 0;
+      const aligned = halign !== 0 || valign !== 0;
+      const position = aligned && e.endPoint ? point2(e.endPoint) : point2(e.startPoint);
+      return {
+        ...base,
+        type: "TEXT",
+        position,
+        text,
+        height: e.textHeight ?? 1,
+        rotation: (e.rotation ?? 0) * DEG2RAD,
+        widthFactor: e.xScale ?? 1,
+        hAlign: textHAlign(halign),
+        vAlign: textVAlign(valign),
+      };
+    }
+    case "MTEXT": {
+      const text = stripMText(e.text ?? "");
+      if (!text) return null;
+      const ap: number = e.attachmentPoint ?? 1;
+      const hCol = (ap - 1) % 3; // 0 left, 1 center, 2 right
+      const vRow = Math.floor((ap - 1) / 3); // 0 top, 1 middle, 2 bottom
+      const rotation =
+        typeof e.rotation === "number"
+          ? e.rotation * DEG2RAD
+          : e.directionVector
+            ? Math.atan2(e.directionVector.y ?? 0, e.directionVector.x ?? 1)
+            : 0;
+      return {
+        ...base,
+        type: "TEXT",
+        position: point2(e.position),
+        text,
+        height: e.height ?? 1,
+        rotation,
+        widthFactor: 1,
+        hAlign: hCol === 1 ? "center" : hCol === 2 ? "right" : "left",
+        vAlign: vRow === 0 ? "top" : vRow === 1 ? "middle" : "bottom",
+      };
+    }
+    case "SPLINE": {
+      const controlPoints: Point2[] = (e.controlPoints ?? []).map(point2);
+      if (controlPoints.length < 2) return null;
+      return {
+        ...base,
+        type: "SPLINE",
+        controlPoints,
+        knots: Array.isArray(e.knotValues) ? e.knotValues : [],
+        degree: e.degreeOfSplineCurve ?? 3,
+        closed: e.closed === true,
+      };
+    }
     default:
       unsupported[raw.type] = (unsupported[raw.type] ?? 0) + 1;
       return null;
   }
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+function parseLineTypes(dxf: {
+  tables?: { lineType?: { lineTypes?: Record<string, unknown> } };
+}): Map<string, LineTypeDef> {
+  const map = new Map<string, LineTypeDef>();
+  const raw = dxf.tables?.lineType?.lineTypes ?? {};
+  for (const [name, def] of Object.entries(raw)) {
+    const pattern: number[] = ((def as { pattern?: unknown[] }).pattern ?? [])
+      .map((n) => (typeof n === "number" ? n : Number(n)))
+      .filter((n) => Number.isFinite(n));
+    const patternLength = pattern.reduce((sum, n) => sum + Math.abs(n), 0);
+    map.set(name, { name, pattern, patternLength });
+  }
+  return map;
+}
 
 /** Parse DXF text into the normalized Aspicio document model. */
 export function parseDxf(text: string): DxfDocument {
@@ -102,6 +207,7 @@ export function parseDxf(text: string): DxfDocument {
   if (!dxf) throw new Error("Failed to parse DXF: parser returned no document");
 
   const unsupported: Record<string, number> = {};
+  const lineTypes = parseLineTypes(dxf);
 
   const layers = new Map<string, LayerInfo>();
   const rawLayers: Record<string, ILayer> = dxf.tables?.layer?.layers ?? {};
@@ -112,6 +218,7 @@ export function parseDxf(text: string): DxfDocument {
       visible: layer.visible !== false && layer.frozen !== true,
       frozen: layer.frozen === true,
       entityCount: 0,
+      lineType: (layer as { lineType?: string }).lineType,
     });
   }
 
@@ -146,5 +253,5 @@ export function parseDxf(text: string): DxfDocument {
     blocks.set(name, { name, basePoint: point2(block.position), entities: blockEntities });
   }
 
-  return { layers, entities, blocks, unsupported };
+  return { layers, entities, blocks, lineTypes, unsupported };
 }

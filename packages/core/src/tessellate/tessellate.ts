@@ -1,6 +1,9 @@
 import { DEFAULT_CURVE_SEGMENTS, sampleArc, sampleBulge, sampleEllipse } from "../geom/arc.ts";
+import { dashPolyline } from "../geom/dash.ts";
 import { ocsToWcs } from "../geom/ocs.ts";
+import { sampleSpline } from "../geom/spline.ts";
 import type { Affine2D, Bounds, DxfDocument, Entity, EntityType, Point2 } from "../model/types.ts";
+import { layoutText } from "../text/layout.ts";
 
 type Affine = Affine2D;
 
@@ -96,6 +99,32 @@ registerEntityHandler("ELLIPSE", (e, ctx) => {
   );
 });
 
+registerEntityHandler("SPLINE", (e, ctx) => {
+  if (e.type !== "SPLINE") return;
+  ctx.addPolyline(sampleSpline(e.controlPoints, e.knots, e.degree, ctx.curveSegments), e.closed);
+});
+
+registerEntityHandler("TEXT", (e, ctx) => {
+  if (e.type !== "TEXT") return;
+  const strokes = layoutText(e.text, {
+    height: e.height,
+    widthFactor: e.widthFactor,
+    hAlign: e.hAlign,
+    vAlign: e.vAlign,
+  });
+  const cos = Math.cos(e.rotation);
+  const sin = Math.sin(e.rotation);
+  for (const stroke of strokes) {
+    // Rotate around the insertion point, then translate to it.
+    ctx.addPolyline(
+      stroke.map((p) => ({
+        x: e.position.x + p.x * cos - p.y * sin,
+        y: e.position.y + p.x * sin + p.y * cos,
+      })),
+    );
+  }
+});
+
 registerEntityHandler("INSERT", (e, ctx) => {
   if (e.type !== "INSERT") return;
   const cos = Math.cos(e.rotation);
@@ -145,6 +174,16 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
 
   const layerColor = (name: string): number => doc.layers.get(name)?.color ?? 0xffffff;
 
+  // Resolve an entity's linetype dash pattern (entity → layer → continuous).
+  // Text is never dashed (its glyph strokes should stay solid).
+  const resolveDash = (entity: Entity, layer: string): number[] | null => {
+    if (entity.type === "TEXT") return null;
+    const name = entity.lineType ?? doc.layers.get(layer)?.lineType;
+    if (!name) return null;
+    const lt = doc.lineTypes.get(name);
+    return lt && lt.pattern.length > 0 && lt.patternLength > 1e-9 ? lt.pattern : null;
+  };
+
   function walk(
     entities: Entity[],
     transform: Affine,
@@ -156,6 +195,7 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
       // CAD rule: block entities on layer "0" belong to the insert's layer.
       const layer = layerOverride !== null && entity.layer === "0" ? layerOverride : entity.layer;
       const color = entity.color ?? colorOverride ?? layerColor(layer);
+      const dashPattern = resolveDash(entity, layer);
       // OCS: entities carrying an extrusion normal (mirrored ARCs, POLYLINEs,
       // INSERTs) have OCS-relative coordinates — map them to world first.
       const entityTransform = entity.extrusion
@@ -176,30 +216,41 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
             colorCounts = new Map();
             layerColors.set(layer, colorCounts);
           }
-          const segments = closed ? points.length : points.length - 1;
-          colorCounts.set(color, (colorCounts.get(color) ?? 0) + segments);
           const r = ((color >> 16) & 0xff) / 255;
           const g = ((color >> 8) & 0xff) / 255;
           const b = (color & 0xff) / 255;
-          const n = closed ? points.length : points.length - 1;
-          for (let i = 0; i < n; i++) {
-            const p1 = points[i];
-            const p2 = points[(i + 1) % points.length];
-            const x1 = entityTransform[0] * p1.x + entityTransform[2] * p1.y + entityTransform[4];
-            const y1 = entityTransform[1] * p1.x + entityTransform[3] * p1.y + entityTransform[5];
-            const x2 = entityTransform[0] * p2.x + entityTransform[2] * p2.y + entityTransform[4];
-            const y2 = entityTransform[1] * p2.x + entityTransform[3] * p2.y + entityTransform[5];
-            acc.positions.push(x1, y1, 0, x2, y2, 0);
-            acc.colors.push(r, g, b, r, g, b);
-            segmentCount += 1;
-            if (x1 < minX) minX = x1;
-            if (x1 > maxX) maxX = x1;
-            if (y1 < minY) minY = y1;
-            if (y1 > maxY) maxY = y1;
-            if (x2 < minX) minX = x2;
-            if (x2 > maxX) maxX = x2;
-            if (y2 < minY) minY = y2;
-            if (y2 > maxY) maxY = y2;
+
+          const emit = (pts: Point2[], wrap: boolean): void => {
+            const n = wrap ? pts.length : pts.length - 1;
+            colorCounts.set(color, (colorCounts.get(color) ?? 0) + n);
+            for (let i = 0; i < n; i++) {
+              const p1 = pts[i];
+              const p2 = pts[(i + 1) % pts.length];
+              const x1 = entityTransform[0] * p1.x + entityTransform[2] * p1.y + entityTransform[4];
+              const y1 = entityTransform[1] * p1.x + entityTransform[3] * p1.y + entityTransform[5];
+              const x2 = entityTransform[0] * p2.x + entityTransform[2] * p2.y + entityTransform[4];
+              const y2 = entityTransform[1] * p2.x + entityTransform[3] * p2.y + entityTransform[5];
+              acc.positions.push(x1, y1, 0, x2, y2, 0);
+              acc.colors.push(r, g, b, r, g, b);
+              segmentCount += 1;
+              if (x1 < minX) minX = x1;
+              if (x1 > maxX) maxX = x1;
+              if (y1 < minY) minY = y1;
+              if (y1 > maxY) maxY = y1;
+              if (x2 < minX) minX = x2;
+              if (x2 > maxX) maxX = x2;
+              if (y2 < minY) minY = y2;
+              if (y2 > maxY) maxY = y2;
+            }
+          };
+
+          if (dashPattern) {
+            // Dash the full (corner-continuous) polyline; each drawn piece is
+            // an open sub-polyline. Bounds still come from the drawn dashes.
+            const full = closed ? [...points, points[0]] : points;
+            for (const piece of dashPolyline(full, dashPattern)) emit(piece, false);
+          } else {
+            emit(points, closed);
           }
         },
         addBlock(blockName, local, insertLayer, insertColor) {
