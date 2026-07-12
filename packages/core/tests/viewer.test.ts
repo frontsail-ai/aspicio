@@ -261,6 +261,127 @@ test("a user gesture cancels a running fit animation", async () => {
   expect(viewer.view.unitsPerPixel).toBe(interrupted);
 });
 
+test("effectiveColors reflect entity overrides, dominant first", async () => {
+  const { viewer } = makeViewer();
+  // Layer table says green (ACI 3), but two entities override to red (62=1)
+  // and one stays ByLayer — dominant effective color must be red.
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "TABLES",
+    "0",
+    "TABLE",
+    "2",
+    "LAYER",
+    "0",
+    "LAYER",
+    "2",
+    "W",
+    "70",
+    "0",
+    "62",
+    "3",
+    "0",
+    "ENDTAB",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "LINE",
+    "8",
+    "W",
+    "62",
+    "1",
+    "10",
+    "0",
+    "20",
+    "0",
+    "11",
+    "1",
+    "21",
+    "0",
+    "0",
+    "LINE",
+    "8",
+    "W",
+    "62",
+    "1",
+    "10",
+    "0",
+    "20",
+    "1",
+    "11",
+    "1",
+    "21",
+    "1",
+    "0",
+    "LINE",
+    "8",
+    "W",
+    "10",
+    "0",
+    "20",
+    "2",
+    "11",
+    "1",
+    "21",
+    "2",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+  await viewer.load(dxf);
+
+  const layer = viewer.getLayers()[0];
+  expect(layer.color).toBe(0x00ff00); // table color unchanged
+  expect(layer.effectiveColors).toEqual([0xff0000, 0x00ff00]); // dominant first
+});
+
+test("layers without geometry fall back to the table color", async () => {
+  const { viewer } = makeViewer();
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "TABLES",
+    "0",
+    "TABLE",
+    "2",
+    "LAYER",
+    "0",
+    "LAYER",
+    "2",
+    "EMPTY",
+    "70",
+    "0",
+    "62",
+    "5",
+    "0",
+    "ENDTAB",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "MTEXT",
+    "8",
+    "EMPTY",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+  await viewer.load(dxf);
+  expect(viewer.getLayers()[0].effectiveColors).toEqual([0x0000ff]);
+});
+
 test("zoomBy scales at the viewport center, immediate and animated", async () => {
   const { viewer } = makeViewer();
   await viewer.load(SAMPLE);

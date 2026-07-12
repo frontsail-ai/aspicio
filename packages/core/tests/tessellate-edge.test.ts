@@ -245,6 +245,42 @@ test("ELLIPSE entity tessellates around its center", () => {
   expect(tess.bounds?.maxY).toBeCloseTo(2, 1);
 });
 
+test("layerColors aggregates resolved colors per layer", () => {
+  const tess = tessellate(
+    makeDoc([
+      line(), // ByLayer → white (layer "0" table color)
+      line({ color: 0xff0000 } as Partial<Entity>),
+      line({ color: 0xff0000, start: { x: 0, y: 1 }, end: { x: 2, y: 1 } } as Partial<Entity>),
+      line({ layer: "A" } as Partial<Entity>), // ByLayer → green
+    ]),
+  );
+  expect(tess.layerColors.get("0")?.get(0xffffff)).toBe(1);
+  expect(tess.layerColors.get("0")?.get(0xff0000)).toBe(2);
+  expect(tess.layerColors.get("A")?.get(0x00ff00)).toBe(1);
+});
+
+test("layerColors sees through INSERT color resolution", () => {
+  const block: BlockDef = { name: "B", basePoint: { x: 0, y: 0 }, entities: [line()] };
+  const tess = tessellate(
+    makeDoc(
+      [
+        {
+          type: "INSERT",
+          layer: "A",
+          color: 0x123456,
+          blockName: "B",
+          position: { x: 0, y: 0 },
+          scale: { x: 1, y: 1 },
+          rotation: 0,
+        },
+      ],
+      [["B", block]],
+    ),
+  );
+  // Block entity on layer 0 lands on the insert's layer with the insert color.
+  expect(tess.layerColors.get("A")?.get(0x123456)).toBe(1);
+});
+
 test("unknown layer falls back to white", () => {
   const tess = tessellate(makeDoc([line({ layer: "MISSING" } as Partial<Entity>)]));
   expect([...(tess.layers.get("MISSING")?.colors.slice(0, 3) ?? [])]).toEqual([1, 1, 1]);

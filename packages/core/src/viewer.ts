@@ -110,6 +110,14 @@ export class DxfViewer {
     this.tessellation = tessellate(this.document, {
       curveSegments: this.options.curveSegments,
     });
+    // The layer table's color is a lie for entity-styled files; record what
+    // tessellation actually resolved onto each layer, dominant color first.
+    for (const layer of this.document.layers.values()) {
+      const counts = this.tessellation.layerColors.get(layer.name);
+      layer.effectiveColors = counts
+        ? [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([color]) => color)
+        : [layer.color];
+    }
     this.renderer.setGeometry(this.tessellation);
     for (const layer of this.document.layers.values()) {
       this.renderer.setLayerVisible(layer.name, layer.visible);

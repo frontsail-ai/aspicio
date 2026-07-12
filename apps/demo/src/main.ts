@@ -304,7 +304,10 @@ function syncPanel(): void {
     check.setAttribute("aria-checked", String(visible));
     check.innerHTML = visible ? icons.check : icons.uncheck;
     const swatch = row.querySelector<HTMLElement>(".layer-swatch")!;
-    const color = `#${layer.color.toString(16).padStart(6, "0")}`;
+    // Effective color: what tessellation actually drew (entity overrides
+    // included); the layer-table color is only a fallback.
+    const rgb = layer.effectiveColors?.[0] ?? layer.color;
+    const color = `#${rgb.toString(16).padStart(6, "0")}`;
     swatch.style.background = visible ? color : "transparent";
     swatch.style.border = visible ? "1px solid rgb(255 255 255 / 25%)" : `1px solid ${color}`;
   }
