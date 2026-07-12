@@ -1,0 +1,45 @@
+# @observo/react
+
+React bindings for the [Observo](../..) DXF viewer.
+
+- `<DxfPreview>` — the embeddable canvas: pan/zoom/rotate (mouse and
+  multi-touch), animated fit, batched WebGL rendering. No chrome.
+- `<DxfLayerPanel>` — optional ready-made layer list: visibility toggles,
+  effective-color swatches, entity counts, hover-to-highlight.
+
+```tsx
+import { useRef, useState } from "react";
+import type { DxfViewer } from "@observo/core";
+import { DxfLayerPanel, DxfPreview } from "@observo/react";
+
+export function DrawingPage({ url }: { url: string }) {
+  const viewerRef = useRef<DxfViewer>(null);
+  const [viewer, setViewer] = useState<DxfViewer | null>(null);
+
+  return (
+    <div style={{ display: "flex", height: 480 }}>
+      <DxfLayerPanel viewer={viewer} style={{ width: 220 }} />
+      <DxfPreview
+        ref={viewerRef}
+        srcUrl={url}
+        options={{ background: 0x16181d }}
+        onViewer={setViewer}
+        onLoaded={({ stats }) => console.log(stats)}
+        onError={(error) => console.error(error)}
+      />
+    </div>
+  );
+}
+```
+
+Notes:
+
+- The viewer instance (via `ref` or `onViewer`) is the full `@observo/core`
+  API — `fitView`, `zoomBy`, `resetRotation`, `setLayerVisible`,
+  `setLayerHighlight`, `pickLayer`, `view`, `stats`.
+- `src` accepts DXF text, `File`, `Blob`, or `ArrayBuffer`; `srcUrl` fetches.
+  Changing either loads the new document; stale in-flight loads are ignored.
+- Camera state is deliberately not React state — subscribe to the `render`
+  event on the viewer if you need to display it.
+- StrictMode and SSR safe: the viewer is created in an effect and disposed on
+  unmount.
