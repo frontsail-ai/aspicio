@@ -50,6 +50,22 @@ export class Camera2D {
     };
   }
 
+  /** Convert world coordinates to viewport pixel coordinates (y down). */
+  worldToScreen(x: number, y: number): Point2 {
+    const dx = x - this.center.x;
+    const dy = y - this.center.y;
+    const right = this.rightAxis();
+    const up = this.upAxis();
+    // right/up are orthonormal, so projecting (dx,dy) onto them inverts
+    // screenToWorld without a matrix solve.
+    const sx = dx * right.x + dy * right.y;
+    const sy = dx * up.x + dy * up.y;
+    return {
+      x: sx / this.unitsPerPixel + this.viewportWidth / 2,
+      y: this.viewportHeight / 2 - sy / this.unitsPerPixel,
+    };
+  }
+
   /** Pan so content follows a pointer drag of (dx, dy) pixels. */
   panPixels(dx: number, dy: number): void {
     const right = this.rightAxis();

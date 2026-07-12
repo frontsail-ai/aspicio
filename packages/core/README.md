@@ -38,8 +38,21 @@ its canvas, tracks container resizes, and renders on demand.
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `getLayers()`                     | `LayerInfo[]`: `name`, `color` (layer-table RGB), `effectiveColors` (colors actually drawn, dominant first — prefer `effectiveColors[0]` for UI), `visible`, `frozen`, `entityCount` |
 | `setLayerVisible(name, visible)`  | flag flip on batched geometry — O(1)                                                                                                                                                 |
-| `setLayerHighlight(name \| null)` | draws that layer with 3px fat lines on top                                                                                                                                           |
+| `setLayerHighlight(name \| null)` | draws that layer with fat lines on top                                                                                                                                               |
 | `pickLayer(x, y, tolerancePx?)`   | hit-test canvas CSS-pixel coords → layer name or `null`; pure math, no GPU readback                                                                                                  |
+
+### Selection & measurement
+
+| Member                           | Notes                                                                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `pickEntity(x, y, tolerancePx?)` | hit-test → `{ index, entity, info, layer }` or `null`; edges win within tolerance, else a filled interior under the cursor |
+| `setSelection(index \| null)`    | draw a bright overlay on one entity (its lines and any fill) by its `document.entities` index                              |
+| `screenToWorld(x, y)`            | canvas CSS-pixel coords → world (drawing) coordinates                                                                      |
+| `worldToScreen(point)`           | world coordinates → canvas CSS-pixel coords (place labels, rulers, measure overlays)                                       |
+
+`describeEntity(entity)` (a free function) summarizes any entity as
+`{ type, layer, color, length?, radius?, area?, points?, position?, text? }`
+for an info panel — reused by the demo and the React bindings.
 
 ### Camera
 
@@ -84,7 +97,9 @@ is skipped, counted in `stats.unsupported`, and never breaks the load.
 
 Linetypes from the LTYPE table are honored: dashed/hidden/center
 patterns are dashed in drawing units (an entity's linetype, or its
-layer's). Colors resolve like CAD expects: per-entity overrides beat
+layer's). Lineweights (group 370) render at width: segments are grouped
+by weight and drawn with fat lines, so bold outlines read as bold.
+Colors resolve like CAD expects: per-entity overrides beat
 ByLayer, and `effectiveColors` reports what actually reached the
 screen — important
 for CAM/die-cutting exports that color every entity and leave the layer

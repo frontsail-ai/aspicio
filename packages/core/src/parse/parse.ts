@@ -39,6 +39,15 @@ function lineTypeOf(raw: IEntity): string | undefined {
   return name;
 }
 
+/**
+ * Lineweight in 1/100 mm (group 370), or undefined for the negative
+ * ByLayer/ByBlock/default codes (so the layer default applies).
+ */
+function lineWeightOf(raw: { lineweight?: number }): number | undefined {
+  const w = raw.lineweight;
+  return typeof w === "number" && w >= 0 ? w : undefined;
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw parser entities are shape-checked per type */
 
 /**
@@ -73,6 +82,7 @@ function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entit
     layer: raw.layer ?? "0",
     color: entityColor(raw),
     lineType: lineTypeOf(raw),
+    lineWeight: lineWeightOf(raw as { lineweight?: number }),
   };
   const e = raw as any;
   switch (raw.type) {
@@ -215,7 +225,12 @@ function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entit
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-type EntityBaseFields = { layer: string; color: number | null; lineType?: string };
+type EntityBaseFields = {
+  layer: string;
+  color: number | null;
+  lineType?: string;
+  lineWeight?: number;
+};
 
 /** Sample one HATCH boundary loop into a closed polyline. */
 function sampleBoundary(b: HatchBoundary): Point2[] {
@@ -288,6 +303,7 @@ export function parseDxf(text: string): DxfDocument {
       frozen: layer.frozen === true,
       entityCount: 0,
       lineType: (layer as { lineType?: string }).lineType,
+      lineWeight: lineWeightOf(layer as { lineweight?: number }),
     });
   }
 

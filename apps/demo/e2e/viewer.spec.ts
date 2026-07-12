@@ -128,6 +128,89 @@ test("renders DIMENSION geometry — block lines, arrowheads, and text (NOTES so
   expect(colors.cyan).toBeLessThan(10);
 });
 
+test("parses per-entity lineweights (group 370)", async ({ page }) => {
+  await loadSample(page);
+  const weights = await page.evaluate(() => {
+    const doc = window.__aspicio?.document;
+    const arc = doc?.entities.find((e) => e.type === "ARC");
+    const doorLine = doc?.entities.find((e) => e.type === "LINE" && e.layer === "DOORS");
+    const circle = doc?.entities.find((e) => e.type === "CIRCLE");
+    return { arc: arc?.lineWeight, doorLine: doorLine?.lineWeight, circle: circle?.lineWeight };
+  });
+  // The door swing arc is bold (1.0 mm); the door line and table are lighter.
+  expect(weights.arc).toBe(100);
+  expect(weights.doorLine).toBe(50);
+  expect(weights.circle).toBe(50);
+});
+
+test("clicking an entity selects it and shows a measured info panel", async ({ page }) => {
+  await loadSample(page);
+  const box = await canvas(page).boundingBox();
+  if (!box) throw new Error("no canvas box");
+  // The round table is a CIRCLE at world (30,45), r=8 — click its top edge.
+  const top = await page.evaluate(() => window.__aspicio!.worldToScreen({ x: 30, y: 53 }));
+  await page.mouse.click(box.x + top.x, box.y + top.y);
+
+  await expect(page.locator("#info-panel")).toBeVisible();
+  await expect(page.locator("#info-type")).toHaveText("CIRCLE");
+  await expect(page.locator("#info-rows")).toContainText("RADIUS");
+  await expect(page.locator("#info-rows")).toContainText("FURNITURE");
+  expect(await page.evaluate(() => window.__demo?.selectedIndex)).not.toBeNull();
+
+  // Clicking empty space clears the selection.
+  await page.mouse.click(box.x + 6, box.y + 6);
+  await expect(page.locator("#info-panel")).toBeHidden();
+  expect(await page.evaluate(() => window.__demo?.selectedIndex)).toBeNull();
+});
+
+test("the cursor coordinate readout tracks the pointer in world units", async ({ page }) => {
+  await loadSample(page);
+  const box = await canvas(page).boundingBox();
+  if (!box) throw new Error("no canvas box");
+  const s = await page.evaluate(() => window.__aspicio!.worldToScreen({ x: 50, y: 35 }));
+  await page.mouse.move(box.x + s.x, box.y + s.y);
+  await expect
+    .poll(async () => Number(await page.locator("#cur-x").textContent()))
+    .toBeGreaterThan(48);
+  const x = Number(await page.locator("#cur-x").textContent());
+  const y = Number(await page.locator("#cur-y").textContent());
+  expect(Math.abs(x - 50)).toBeLessThan(1.5);
+  expect(Math.abs(y - 35)).toBeLessThan(1.5);
+});
+
+test("the measure tool reports segment length, total, and area", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#measure-btn").click();
+  expect(await page.evaluate(() => window.__demo?.measureActive)).toBe(true);
+
+  const box = await canvas(page).boundingBox();
+  if (!box) throw new Error("no canvas box");
+  // A right triangle in world units: (0,0)→(60,0)→(60,40). Perimeter-so-far
+  // for the two placed legs is 60+40=100; enclosed area is 60·40/2 = 1200.
+  const pts = await page.evaluate(() =>
+    [
+      { x: 0, y: 0 },
+      { x: 60, y: 0 },
+      { x: 60, y: 40 },
+    ].map((p) => window.__aspicio!.worldToScreen(p)),
+  );
+  for (const p of pts) await page.mouse.click(box.x + p.x, box.y + p.y);
+  expect(await page.evaluate(() => window.__demo?.measurePoints.length)).toBe(3);
+
+  const total = Number(await page.locator("#measure-total").textContent());
+  const area = Number(await page.locator("#measure-area").textContent());
+  expect(Math.abs(total - 100)).toBeLessThan(2);
+  expect(Math.abs(area - 1200)).toBeLessThan(50);
+
+  // Escape clears the path, then exits the tool.
+  await page.keyboard.press("Escape");
+  await expect
+    .poll(async () => (await page.evaluate(() => window.__demo?.measurePoints.length)) ?? -1)
+    .toBe(0);
+  await page.keyboard.press("Escape");
+  expect(await page.evaluate(() => window.__demo?.measureActive)).toBe(false);
+});
+
 test("toggling a layer hides and restores its geometry", async ({ page }) => {
   await loadSample(page);
   const furniture = page.getByRole("checkbox", { name: "FURNITURE" });

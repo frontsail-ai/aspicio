@@ -1,8 +1,10 @@
 import { Camera2D } from "./camera/camera2d.ts";
+import { describeEntity } from "./entity-info.ts";
+import type { EntityInfo } from "./entity-info.ts";
 import { attachGestures } from "./input/gestures.ts";
-import type { DxfDocument, LayerInfo } from "./model/types.ts";
+import type { DxfDocument, Entity, LayerInfo, Point2 } from "./model/types.ts";
 import { parseDxf } from "./parse/parse.ts";
-import { pickLayer } from "./pick/pick.ts";
+import { pickEntity as pickEntityHit, pickLayer } from "./pick/pick.ts";
 import { SceneRenderer } from "./render/renderer.ts";
 import { tessellate } from "./tessellate/tessellate.ts";
 import type { Tessellation } from "./tessellate/tessellate.ts";
@@ -48,6 +50,15 @@ function lerp(a: number, b: number, t: number): number {
 export type ViewerEvent = "loaded" | "render";
 type Listener = () => void;
 
+/** A picked entity plus its precomputed summary. */
+export interface PickedEntity {
+  /** Index into `document.entities`. */
+  index: number;
+  entity: Entity;
+  info: EntityInfo;
+  layer: string;
+}
+
 /** Everything the viewer accepts as a DXF source. */
 export type DxfSource = string | ArrayBuffer | Blob;
 
@@ -67,6 +78,7 @@ export class DxfViewer {
   private tessellation: Tessellation | null = null;
   private renderQueued = false;
   private highlightedLayer: string | null = null;
+  private selectedIndex: number | null = null;
   private animationFrame: number | null = null;
 
   document: DxfDocument | null = null;
@@ -118,6 +130,8 @@ export class DxfViewer {
         ? [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([color]) => color)
         : [layer.color];
     }
+    this.selectedIndex = null;
+    this.highlightedLayer = null;
     this.renderer.setGeometry(this.tessellation);
     for (const layer of this.document.layers.values()) {
       this.renderer.setLayerVisible(layer.name, layer.visible);
@@ -168,6 +182,70 @@ export class DxfViewer {
       tolerancePx * this.camera.unitsPerPixel,
       (name) => this.document?.layers.get(name)?.visible !== false,
     );
+  }
+
+  /**
+   * Hit-test the drawing at canvas coordinates (CSS px) and return the
+   * closest visible entity (edges win within `tolerancePx`; otherwise a
+   * filled interior under the cursor), with a precomputed summary. Null when
+   * nothing is hit.
+   */
+  pickEntity(x: number, y: number, tolerancePx = 6): PickedEntity | null {
+    if (!this.tessellation || !this.document) return null;
+    const world = this.camera.screenToWorld(x, y);
+    const hit = pickEntityHit(
+      this.tessellation,
+      world,
+      tolerancePx * this.camera.unitsPerPixel,
+      (name) => this.document?.layers.get(name)?.visible !== false,
+    );
+    if (!hit) return null;
+    const entity = this.document.entities[hit.entityId];
+    if (!entity) return null;
+    return { index: hit.entityId, entity, info: describeEntity(entity), layer: hit.layer };
+  }
+
+  /** Highlight a single entity by its `document.entities` index, or clear with null. */
+  setSelection(index: number | null): void {
+    if (index === this.selectedIndex) return;
+    this.selectedIndex = index;
+    if (index === null || !this.tessellation) {
+      this.renderer.setSelection(null, null);
+      this.requestRender();
+      return;
+    }
+    const pos: number[] = [];
+    const fills: number[] = [];
+    for (const layer of this.tessellation.layers.values()) {
+      const p = layer.positions;
+      const ids = layer.segmentIds;
+      for (let i = 0, s = 0; i + 5 < p.length; i += 6, s++) {
+        if (ids[s] === index) pos.push(p[i], p[i + 1], p[i + 2], p[i + 3], p[i + 4], p[i + 5]);
+      }
+      const fp = layer.fillPositions;
+      const fids = layer.fillIds;
+      for (let i = 0, t = 0; i + 8 < fp.length; i += 9, t++) {
+        if (fids[t] === index) for (let k = 0; k < 9; k++) fills.push(fp[i + k]);
+      }
+    }
+    this.renderer.setSelection(
+      pos.length ? new Float32Array(pos) : null,
+      fills.length ? new Float32Array(fills) : null,
+    );
+    this.requestRender();
+  }
+
+  /** Convert canvas coordinates (CSS px) to world (drawing) coordinates. */
+  screenToWorld(x: number, y: number): Point2 {
+    const w = this.camera.screenToWorld(x, y);
+    const o = this.tessellation?.offset ?? { x: 0, y: 0 };
+    return { x: w.x + o.x, y: w.y + o.y };
+  }
+
+  /** Convert world (drawing) coordinates to canvas coordinates (CSS px). */
+  worldToScreen(point: Point2): Point2 {
+    const o = this.tessellation?.offset ?? { x: 0, y: 0 };
+    return this.camera.worldToScreen(point.x - o.x, point.y - o.y);
   }
 
   get view(): ViewState {

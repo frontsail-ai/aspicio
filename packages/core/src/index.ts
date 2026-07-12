@@ -11,12 +11,16 @@ export type {
   DxfViewerOptions,
   DxfSource,
   FitViewOptions,
+  PickedEntity,
   ViewerEvent,
   ViewerStats,
   ViewState,
 } from "./viewer.ts";
 
-export { pickLayer } from "./pick/pick.ts";
+export { pickLayer, pickEntity } from "./pick/pick.ts";
+export type { EntityHit } from "./pick/pick.ts";
+export { describeEntity } from "./entity-info.ts";
+export type { EntityInfo } from "./entity-info.ts";
 export { parseDxf } from "./parse/parse.ts";
 export { tessellate, registerEntityHandler } from "./tessellate/tessellate.ts";
 export type {
