@@ -1,23 +1,52 @@
 # Aspicio
 
-_Aspicio_ (Latin: "I look at") — a TypeScript-first DXF viewer.
+_Aspicio_ (Latin: "I look at") — a TypeScript-first 2D DXF viewer for the
+web.
 
-- WebGL rendering (Three.js) with an extensible entity pipeline
-- Layer listing and visibility toggling
-- Pan, zoom, and rotate — mobile gestures are first-class
-- Usable as a library (`@aspicio/core`) or as a standalone app (`@aspicio/demo`)
+- WebGL rendering (Three.js) with batched geometry — one draw call per
+  layer, large drawings stay interactive
+- Layer list with visibility toggles, hover highlight (3× fat lines),
+  double-click solo, and effective colors (what's actually drawn, not
+  just the layer table)
+- Pan, zoom, rotate, animated fit-to-view — mouse and multi-touch
+  (pinch zoom, twist rotate) are equally first-class
+- Hit-testing (`pickLayer`), camera state access, extensible
+  entity-handler registry
+- Unsupported entity types are counted and reported, never fatal
 
-Out of scope for now: editing, 3D.
+Out of scope for now: editing, 3D, text rendering (TEXT/MTEXT/SPLINE/HATCH
+are skipped and reported).
 
 <img width="1543" height="756" alt="Screenshot 2026-07-11 at 23 06 21" src="https://github.com/user-attachments/assets/60d5487b-b090-4379-9189-703b63805bfd" />
 
-
 ## Packages
 
-| Package                          | Description                                                         |
-| -------------------------------- | ------------------------------------------------------------------- |
-| [`@aspicio/core`](packages/core) | The viewer library: parsing, tessellation, rendering, camera, input |
-| [`@aspicio/demo`](apps/demo)     | Standalone demo app (layer panel, file loading)                     |
+| Package                            | Description                                                         |
+| ---------------------------------- | ------------------------------------------------------------------- |
+| [`@aspicio/core`](packages/core)   | The viewer library: parsing, tessellation, rendering, camera, input |
+| [`@aspicio/react`](packages/react) | React bindings: `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`     |
+| [`@aspicio/demo`](apps/demo)       | Standalone demo app (private) — also the reference integration      |
+
+## Quick start
+
+React (one component — layer list + interactive preview):
+
+```tsx
+import { DxfEmbed } from "@aspicio/react";
+
+<DxfEmbed src={file} style={{ height: 480 }} />;
+```
+
+Vanilla:
+
+```ts
+import { DxfViewer } from "@aspicio/core";
+
+const viewer = new DxfViewer(document.querySelector("#preview")!);
+await viewer.load(file); // File | Blob | ArrayBuffer | DXF text
+```
+
+See each package's README for the full API.
 
 ## Development
 
@@ -32,33 +61,29 @@ vp run e2e       # run browser e2e tests (Playwright)
 vp run ready     # check + test + build everything
 ```
 
-## Releasing
-
-Publishing to npm is automated by
-[`.github/workflows/publish.yml`](.github/workflows/publish.yml). Both
-public packages (`@aspicio/core`, `@aspicio/react`) share one version.
-
-```bash
-git tag v0.1.0 && git push origin v0.1.0   # gate → version → publish
-```
-
-The workflow re-runs lint and unit tests, stamps the tag's version into
-the package manifests, builds, and publishes core before react (bun
-rewrites the `workspace:^` dependency to `^<version>`). A manual
-`workflow_dispatch` run supports a dry-run mode. Requires the
-`NPM_TOKEN` repository secret (an npm automation token with publish
-rights to the `@aspicio` scope).
+CI runs the same gates on every PR, plus a smoke suite against the
+production build ([ci.yml](.github/workflows/ci.yml)).
 
 ## Testing
 
-- **Unit tests** (`packages/core/tests/`, Vitest): parsing, geometry math,
-  tessellation, camera invariants, gestures (happy-dom), and the viewer facade
-  (mocked renderer). `vp test --coverage` inside `packages/core` reports 100%
-  line coverage for every module except `render/renderer.ts`.
-- **E2E tests** (`apps/demo/e2e/`, Playwright): real-browser coverage of the
-  WebGL renderer and the demo app — pixel-level render checks, layer toggling,
-  zoom/pan/rotate/fit, synthetic multi-touch pinch and twist, file picker,
-  drag & drop, error handling, and the mobile layout.
+- **Unit tests** (`packages/core/tests/`, `packages/react/tests/`,
+  Vitest): parsing, geometry math, tessellation, camera invariants,
+  gestures (happy-dom), the viewer facade (mocked renderer), and the
+  React component lifecycle (mocked core).
+- **E2E tests** (`apps/demo/e2e/`, Playwright): real-browser coverage of
+  the WebGL renderer and the demo app — pixel-level render checks, layer
+  toggling, zoom/pan/rotate/fit, synthetic multi-touch pinch and twist,
+  file loading, error handling, and the mobile layout.
 
 The renderer is intentionally untested at the unit level (it needs a real
 WebGL context); the e2e suite exercises it end to end instead.
+
+## Releasing
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+CI gates, versions, builds, and publishes both public packages. Full
+runbook — one-time npm setup, versioning policy, dry runs, recovery —
+in [docs/releasing.md](docs/releasing.md).
