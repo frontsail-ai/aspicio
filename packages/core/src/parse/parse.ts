@@ -77,7 +77,7 @@ function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entit
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-/** Parse DXF text into the normalized Observo document model. */
+/** Parse DXF text into the normalized Aspicio document model. */
 export function parseDxf(text: string): DxfDocument {
   const parser = new DxfParser();
   const dxf = parser.parseSync(text);

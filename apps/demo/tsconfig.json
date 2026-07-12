@@ -15,7 +15,7 @@
     "noEmit": true,
     "esModuleInterop": true,
     "paths": {
-      "@observo/core": ["../../packages/core/src/index.ts"]
+      "@aspicio/core": ["../../packages/core/src/index.ts"]
     },
 
     /* Linting */

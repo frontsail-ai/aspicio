@@ -1,11 +1,11 @@
-# Observo
+# Aspicio
 
-_Observo_ (Latin: "I watch") — a TypeScript-first DXF viewer.
+_Aspicio_ (Latin: "I look at") — a TypeScript-first DXF viewer.
 
 - WebGL rendering (Three.js) with an extensible entity pipeline
 - Layer listing and visibility toggling
 - Pan, zoom, and rotate — mobile gestures are first-class
-- Usable as a library (`@observo/core`) or as a standalone app (`@observo/demo`)
+- Usable as a library (`@aspicio/core`) or as a standalone app (`@aspicio/demo`)
 
 Out of scope for now: editing, 3D.
 
@@ -13,8 +13,8 @@ Out of scope for now: editing, 3D.
 
 | Package                          | Description                                                         |
 | -------------------------------- | ------------------------------------------------------------------- |
-| [`@observo/core`](packages/core) | The viewer library: parsing, tessellation, rendering, camera, input |
-| [`@observo/demo`](apps/demo)     | Standalone demo app (layer panel, file loading)                     |
+| [`@aspicio/core`](packages/core) | The viewer library: parsing, tessellation, rendering, camera, input |
+| [`@aspicio/demo`](apps/demo)     | Standalone demo app (layer panel, file loading)                     |
 
 ## Development
 

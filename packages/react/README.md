@@ -1,6 +1,6 @@
-# @observo/react
+# @aspicio/react
 
-React bindings for the [Observo](../..) DXF viewer.
+React bindings for the [Aspicio](../..) DXF viewer.
 
 - `<DxfEmbed>` — batteries included: layer list + interactive preview in one
   component.
@@ -12,7 +12,7 @@ React bindings for the [Observo](../..) DXF viewer.
 ## One component
 
 ```tsx
-import { DxfEmbed } from "@observo/react";
+import { DxfEmbed } from "@aspicio/react";
 
 // file: File | Blob | ArrayBuffer | string (DXF text) — or use srcUrl
 <DxfEmbed src={file} style={{ height: 480 }} />;
@@ -23,22 +23,22 @@ Props: `panel="left" | "right" | "none"`, `panelStyle`, `options`,
 
 ### Theming
 
-`DxfEmbed` and `DxfLayerPanel` ship with the Observo demo look by default —
+`DxfEmbed` and `DxfLayerPanel` ship with the Aspicio demo look by default —
 dark panel, blueprint grid behind a transparent canvas, hover states. Pass
 `theme="none"` to inherit the host page's styles instead.
 
 The theme uses IBM Plex font _stacks_ but never loads webfonts itself (no
 surprise network requests from a library). Load IBM Plex Sans/Mono in your
 page for the exact demo typography; otherwise system faces are used. The
-raw tokens are exported as `observoTokens` if you want to match the palette
+raw tokens are exported as `aspicioTokens` if you want to match the palette
 elsewhere.
 
 ## Custom layout
 
 ```tsx
 import { useRef, useState } from "react";
-import type { DxfViewer } from "@observo/core";
-import { DxfLayerPanel, DxfPreview } from "@observo/react";
+import type { DxfViewer } from "@aspicio/core";
+import { DxfLayerPanel, DxfPreview } from "@aspicio/react";
 
 export function DrawingPage({ url }: { url: string }) {
   const viewerRef = useRef<DxfViewer>(null);
@@ -62,7 +62,7 @@ export function DrawingPage({ url }: { url: string }) {
 
 Notes:
 
-- The viewer instance (via `ref` or `onViewer`) is the full `@observo/core`
+- The viewer instance (via `ref` or `onViewer`) is the full `@aspicio/core`
   API — `fitView`, `zoomBy`, `resetRotation`, `setLayerVisible`,
   `setLayerHighlight`, `pickLayer`, `view`, `stats`.
 - `src` accepts DXF text, `File`, `Blob`, or `ArrayBuffer`; `srcUrl` fetches.

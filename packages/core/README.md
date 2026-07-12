@@ -1,6 +1,6 @@
-# @observo/core
+# @aspicio/core
 
-The Observo viewer library: DXF parsing, tessellation, WebGL rendering, camera, and input handling.
+The Aspicio viewer library: DXF parsing, tessellation, WebGL rendering, camera, and input handling.
 
 ## Development
 

@@ -2,12 +2,12 @@
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { StrictMode, createRef } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
-import type { DxfViewer } from "@observo/core";
+import type { DxfViewer } from "@aspicio/core";
 import { DxfEmbed } from "../src/DxfEmbed.tsx";
 import { DxfLayerPanel } from "../src/DxfLayerPanel.tsx";
 import { DxfPreview } from "../src/DxfPreview.tsx";
 
-/* ---------- @observo/core double ---------- */
+/* ---------- @aspicio/core double ---------- */
 
 const mock = vi.hoisted(() => {
   class MockViewer {
@@ -64,7 +64,7 @@ const mock = vi.hoisted(() => {
   return { MockViewer, instances };
 });
 
-vi.mock("@observo/core", () => ({ DxfViewer: mock.MockViewer }));
+vi.mock("@aspicio/core", () => ({ DxfViewer: mock.MockViewer }));
 
 const flush = () => act(() => Promise.resolve());
 const lastViewer = () => mock.instances[mock.instances.length - 1];

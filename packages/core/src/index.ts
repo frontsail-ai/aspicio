@@ -1,5 +1,5 @@
 /**
- * @observo/core — a TypeScript-first DXF viewer library.
+ * @aspicio/core — a TypeScript-first DXF viewer library.
  *
  * Public API surface. Everything importable by consumers goes through here.
  */

@@ -1,7 +1,7 @@
 {
-  "name": "@observo/react",
+  "name": "@aspicio/react",
   "version": "0.0.0",
-  "description": "React bindings for the Observo DXF viewer.",
+  "description": "React bindings for the Aspicio DXF viewer.",
   "license": "MIT",
   "author": "Dmitri Kochelorov <kochelorov.dmitri@gmail.com>",
   "files": [
@@ -23,7 +23,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@observo/core": "workspace:*"
+    "@aspicio/core": "workspace:*"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",

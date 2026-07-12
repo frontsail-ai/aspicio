@@ -52,7 +52,7 @@ type Listener = () => void;
 export type DxfSource = string | ArrayBuffer | Blob;
 
 /**
- * The Observo viewer facade: owns a canvas inside `container`, renders a
+ * The Aspicio viewer facade: owns a canvas inside `container`, renders a
  * DXF document, and exposes layers, camera fitting, and events.
  */
 export class DxfViewer {

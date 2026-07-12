@@ -11,9 +11,9 @@ export default defineConfig({
   },
   test: {
     // Resolve the workspace dependency from source so tests don't require
-    // a prior `vp run build` of @observo/core (CI runs tests first).
+    // a prior `vp run build` of @aspicio/core (CI runs tests first).
     alias: {
-      "@observo/core": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)),
+      "@aspicio/core": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)),
     },
   },
   lint: {

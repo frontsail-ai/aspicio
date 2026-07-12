@@ -1,5 +1,5 @@
 /** Shape of the demo app's test hook, kept structural to avoid a cross-project import. */
-interface ObservoTestHook {
+interface AspicioTestHook {
   stats: {
     entityCount: number;
     segmentCount: number;
@@ -14,5 +14,5 @@ interface ObservoTestHook {
 }
 
 declare interface Window {
-  __observo?: ObservoTestHook;
+  __aspicio?: AspicioTestHook;
 }

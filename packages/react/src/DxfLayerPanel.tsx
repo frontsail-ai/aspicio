@@ -1,13 +1,13 @@
-import type { DxfViewer, LayerInfo } from "@observo/core";
+import type { DxfViewer, LayerInfo } from "@aspicio/core";
 import { useEffect, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
-import { observoTokens } from "./theme.ts";
+import { aspicioTokens } from "./theme.ts";
 import type { DxfTheme } from "./theme.ts";
 
 export interface DxfLayerPanelProps {
   /** The viewer to control — from DxfPreview's ref or onViewer callback. */
   viewer: DxfViewer | null;
-  /** Visual theme. Defaults to the Observo demo look; "none" inherits the host. */
+  /** Visual theme. Defaults to the Aspicio demo look; "none" inherits the host. */
   theme?: DxfTheme;
   className?: string;
   style?: CSSProperties;
@@ -26,20 +26,20 @@ const baseRow: CSSProperties = {
 /**
  * Ready-made layer list for an embedded viewer: visibility checkboxes,
  * effective-color swatches, entity counts, and hover-to-highlight. Styled
- * like the Observo demo app by default (fonts degrade to system faces
+ * like the Aspicio demo app by default (fonts degrade to system faces
  * unless the host loads IBM Plex); pass theme="none" to inherit the host's
  * look instead.
  */
 export function DxfLayerPanel({
   viewer,
-  theme = "observo",
+  theme = "aspicio",
   className,
   style,
 }: DxfLayerPanelProps): ReactElement {
   const [layers, setLayers] = useState<LayerInfo[]>([]);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [, bump] = useState(0);
-  const themed = theme === "observo";
+  const themed = theme === "aspicio";
 
   useEffect(() => {
     if (!viewer) {
@@ -62,9 +62,9 @@ export function DxfLayerPanel({
         listStyle: "none",
         margin: 0,
         padding: "8px",
-        background: observoTokens.panel,
-        color: observoTokens.text,
-        fontFamily: observoTokens.fontSans,
+        background: aspicioTokens.panel,
+        color: aspicioTokens.text,
+        fontFamily: aspicioTokens.fontSans,
         fontSize: 13,
         ...style,
       }
@@ -81,7 +81,7 @@ export function DxfLayerPanel({
             style={{
               ...baseRow,
               opacity: layer.visible ? 1 : 0.5,
-              background: themed && hoveredRow === layer.name ? observoTokens.hover : undefined,
+              background: themed && hoveredRow === layer.name ? aspicioTokens.hover : undefined,
             }}
             onMouseEnter={() => {
               setHoveredRow(layer.name);
@@ -97,7 +97,7 @@ export function DxfLayerPanel({
               checked={layer.visible}
               onChange={() => toggle(layer)}
               aria-label={layer.name}
-              style={themed ? { accentColor: observoTokens.crease } : undefined}
+              style={themed ? { accentColor: aspicioTokens.crease } : undefined}
             />
             <span
               aria-hidden
@@ -117,7 +117,7 @@ export function DxfLayerPanel({
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
-                color: themed && !layer.visible ? observoTokens.text3 : undefined,
+                color: themed && !layer.visible ? aspicioTokens.text3 : undefined,
               }}
             >
               {layer.name}
@@ -125,7 +125,7 @@ export function DxfLayerPanel({
             <span
               style={
                 themed
-                  ? { color: observoTokens.text3, fontFamily: observoTokens.fontMono, fontSize: 11 }
+                  ? { color: aspicioTokens.text3, fontFamily: aspicioTokens.fontMono, fontSize: 11 }
                   : { opacity: 0.55, fontSize: "0.85em" }
               }
             >
