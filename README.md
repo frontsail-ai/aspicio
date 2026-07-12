@@ -29,6 +29,23 @@ vp run e2e       # run browser e2e tests (Playwright)
 vp run ready     # check + test + build everything
 ```
 
+## Releasing
+
+Publishing to npm is automated by
+[`.github/workflows/publish.yml`](.github/workflows/publish.yml). Both
+public packages (`@aspicio/core`, `@aspicio/react`) share one version.
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0   # gate → version → publish
+```
+
+The workflow re-runs lint and unit tests, stamps the tag's version into
+the package manifests, builds, and publishes core before react (bun
+rewrites the `workspace:^` dependency to `^<version>`). A manual
+`workflow_dispatch` run supports a dry-run mode. Requires the
+`NPM_TOKEN` repository secret (an npm automation token with publish
+rights to the `@aspicio` scope).
+
 ## Testing
 
 - **Unit tests** (`packages/core/tests/`, Vitest): parsing, geometry math,

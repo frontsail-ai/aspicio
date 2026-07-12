@@ -2,12 +2,19 @@
   "name": "@aspicio/core",
   "version": "0.0.0",
   "description": "Aspicio — a TypeScript DXF viewer library (WebGL, mobile-first).",
+  "homepage": "https://github.com/frontsail-ai/observo/tree/main/packages/core#readme",
   "license": "MIT",
   "author": "Dmitri Kochelorov <kochelorov.dmitri@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frontsail-ai/observo.git",
+    "directory": "packages/core"
+  },
   "files": [
     "dist"
   ],
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"

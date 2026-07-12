@@ -2,12 +2,19 @@
   "name": "@aspicio/react",
   "version": "0.0.0",
   "description": "React bindings for the Aspicio DXF viewer.",
+  "homepage": "https://github.com/frontsail-ai/observo/tree/main/packages/react#readme",
   "license": "MIT",
   "author": "Dmitri Kochelorov <kochelorov.dmitri@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frontsail-ai/observo.git",
+    "directory": "packages/react"
+  },
   "files": [
     "dist"
   ],
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"
@@ -23,7 +30,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@aspicio/core": "workspace:*"
+    "@aspicio/core": "workspace:^"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",
