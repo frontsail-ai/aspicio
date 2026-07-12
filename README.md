@@ -9,6 +9,9 @@ _Aspicio_ (Latin: "I look at") — a TypeScript-first DXF viewer.
 
 Out of scope for now: editing, 3D.
 
+<img width="1543" height="756" alt="Screenshot 2026-07-11 at 23 06 21" src="https://github.com/user-attachments/assets/60d5487b-b090-4379-9189-703b63805bfd" />
+
+
 ## Packages
 
 | Package                          | Description                                                         |
