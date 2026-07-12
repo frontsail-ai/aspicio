@@ -885,6 +885,47 @@ button {
   color: var(--text3);
 }
 
+/* ===================== SPACE TABS ===================== */
+
+.space-tabs {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: rgb(25 28 34 / 90%);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--hairline2);
+  border-radius: 5px;
+}
+
+.space-tab {
+  padding: 4px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text3);
+  transition:
+    color 140ms,
+    background 140ms;
+}
+
+.space-tab:hover {
+  color: var(--text2);
+}
+
+.space-tab.active {
+  color: var(--text);
+  background: var(--crease);
+}
+
 /* ===================== SCALE BAR ===================== */
 
 .scale-bar {

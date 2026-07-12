@@ -210,6 +210,30 @@ export interface BlockDef {
   entities: Entity[];
 }
 
+/** A paper-space viewport: a window that frames model space at a fixed scale. */
+export interface Viewport {
+  /** Center of the window on the paper (paper coords). */
+  center: Point2;
+  /** Window size on the paper. */
+  width: number;
+  height: number;
+  /** Model point shown at the window center. */
+  viewCenter: Point2;
+  /** Model-space height visible through the window (drives the scale). */
+  viewHeight: number;
+  /** View twist, radians (CCW). */
+  twist: number;
+}
+
+/** A paper-space layout: a printable sheet with its own geometry and viewports. */
+export interface Layout {
+  name: string;
+  /** Drawable paper-space geometry (titleblock, borders, text). */
+  entities: Entity[];
+  /** Windows into model space. */
+  viewports: Viewport[];
+}
+
 export interface DxfDocument {
   layers: Map<string, LayerInfo>;
   entities: Entity[];
@@ -224,4 +248,10 @@ export interface DxfDocument {
    * always sets it; hand-built documents may omit it (treated as "").
    */
   units?: string;
+  /**
+   * Paper-space layouts, if any. `entities` holds model space; each layout
+   * carries its own paper geometry and viewports. `parseDxf` sets it (possibly
+   * empty); hand-built documents may omit it (treated as no layouts).
+   */
+  layouts?: Layout[];
 }

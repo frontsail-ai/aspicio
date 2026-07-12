@@ -27,7 +27,7 @@ export { unitLabel, niceLength } from "./units.ts";
 export { tessellationToSvg } from "./export.ts";
 export type { SvgExportOptions } from "./export.ts";
 export { parseDxf } from "./parse/parse.ts";
-export { tessellate, registerEntityHandler } from "./tessellate/tessellate.ts";
+export { tessellate, tessellateLayout, registerEntityHandler } from "./tessellate/tessellate.ts";
 export type {
   Tessellation,
   TessellationContext,
@@ -53,6 +53,8 @@ export type {
   Entity,
   EntityType,
   LayerInfo,
+  Layout,
+  Viewport,
   LineTypeDef,
   Point2,
   Point3,

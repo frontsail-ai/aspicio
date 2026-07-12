@@ -7,16 +7,20 @@ import type {
   Entity,
   HatchEntity,
   LayerInfo,
+  Layout,
   LineTypeDef,
   Point2,
   Point3,
   TextHAlign,
   TextVAlign,
+  Viewport,
 } from "../model/types.ts";
 import { stripMText } from "../text/layout.ts";
 import { unitLabel } from "../units.ts";
 import { HatchHandler } from "./hatch.ts";
 import type { HatchBoundary, RawHatchEntity } from "./hatch.ts";
+import { ViewportHandler } from "./viewport.ts";
+import type { RawViewport } from "./viewport.ts";
 
 const DEG2RAD = Math.PI / 180;
 const DEFAULT_COLOR = 0xffffff;
@@ -268,6 +272,50 @@ function convertHatch(raw: RawHatchEntity, base: EntityBaseFields): HatchEntity 
   return { ...base, type: "HATCH", loops, solid: raw.solid };
 }
 
+/** Convert a raw VIEWPORT to a model Viewport, or null if it isn't a window. */
+function convertViewport(v: RawViewport): Viewport | null {
+  // id 1 is paper space's "overall" viewport, not a real window into the model.
+  if (v.id === 1 || v.width <= 0 || v.height <= 0 || v.viewHeight <= 0) return null;
+  const viewCenter =
+    v.viewTargetX !== undefined && v.viewTargetY !== undefined
+      ? { x: v.viewTargetX, y: v.viewTargetY }
+      : { x: v.viewCenterX, y: v.viewCenterY };
+  return {
+    center: { x: v.centerX, y: v.centerY },
+    width: v.width,
+    height: v.height,
+    viewCenter,
+    viewHeight: v.viewHeight,
+    twist: (v.twistDeg * Math.PI) / 180,
+  };
+}
+
+/**
+ * Assemble paper-space layouts: the active layout (from the ENTITIES section)
+ * first, then any `*Paper_Space<N>` blocks. Names are generic for now — real
+ * names live in the OBJECTS section, which dxf-parser doesn't expose.
+ */
+function buildLayouts(
+  activeEntities: Entity[],
+  activeViewports: Viewport[],
+  blocks: Map<string, BlockDef>,
+  blockViewports: Map<string, Viewport[]>,
+): Layout[] {
+  const layouts: Layout[] = [];
+  if (activeEntities.length > 0 || activeViewports.length > 0) {
+    layouts.push({ name: "Layout1", entities: activeEntities, viewports: activeViewports });
+  }
+  const others = [...blocks.values()]
+    .filter((b) => /^\*Paper_Space\d+$/i.test(b.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  for (const block of others) {
+    const viewports = blockViewports.get(block.name) ?? [];
+    if (block.entities.length === 0 && viewports.length === 0) continue;
+    layouts.push({ name: `Layout${layouts.length + 1}`, entities: block.entities, viewports });
+  }
+  return layouts;
+}
+
 function parseLineTypes(dxf: {
   tables?: { lineType?: { lineTypes?: Record<string, unknown> } };
 }): Map<string, LineTypeDef> {
@@ -286,8 +334,12 @@ function parseLineTypes(dxf: {
 /** Parse DXF text into the normalized Aspicio document model. */
 export function parseDxf(text: string): DxfDocument {
   const parser = new DxfParser();
-  // dxf-parser has no built-in HATCH handler; register our own.
-  (parser as { registerEntityHandler(h: unknown): void }).registerEntityHandler(HatchHandler);
+  // dxf-parser ships no HATCH or VIEWPORT handler; register our own.
+  const register = (
+    parser as { registerEntityHandler(h: unknown): void }
+  ).registerEntityHandler.bind(parser);
+  register(HatchHandler);
+  register(ViewportHandler);
   const dxf = parser.parseSync(text);
   if (!dxf) throw new Error("Failed to parse DXF: parser returned no document");
 
@@ -317,19 +369,37 @@ export function parseDxf(text: string): DxfDocument {
     return layer;
   };
 
+  // Split top-level entities into model space and the active paper layout,
+  // routing VIEWPORTs (which frame model space) to the layout's windows.
   const entities: Entity[] = [];
+  const paperEntities: Entity[] = [];
+  const paperViewports: Viewport[] = [];
   for (const raw of dxf.entities ?? []) {
+    if ((raw as { type?: string }).type === "VIEWPORT") {
+      const vp = convertViewport(raw as unknown as RawViewport);
+      if (vp) paperViewports.push(vp);
+      continue;
+    }
     const entity = convertEntity(raw, unsupported);
     if (!entity) continue;
     ensureLayer(entity.layer).entityCount += 1;
-    entities.push(entity);
+    if ((raw as { inPaperSpace?: boolean }).inPaperSpace) paperEntities.push(entity);
+    else entities.push(entity);
   }
 
   const blocks = new Map<string, BlockDef>();
+  // Non-active layouts live in *Paper_Space<N> blocks, keyed by name.
+  const blockViewports = new Map<string, Viewport[]>();
   const rawBlocks: Record<string, IBlock> = dxf.blocks ?? {};
   for (const [name, block] of Object.entries(rawBlocks)) {
     const blockEntities: Entity[] = [];
+    const viewports: Viewport[] = [];
     for (const raw of block.entities ?? []) {
+      if ((raw as { type?: string }).type === "VIEWPORT") {
+        const vp = convertViewport(raw as unknown as RawViewport);
+        if (vp) viewports.push(vp);
+        continue;
+      }
       const entity = convertEntity(raw, unsupported);
       if (entity) {
         ensureLayer(entity.layer);
@@ -337,10 +407,13 @@ export function parseDxf(text: string): DxfDocument {
       }
     }
     blocks.set(name, { name, basePoint: point2(block.position), entities: blockEntities });
+    if (viewports.length > 0) blockViewports.set(name, viewports);
   }
+
+  const layouts = buildLayouts(paperEntities, paperViewports, blocks, blockViewports);
 
   const insunits = (dxf.header as Record<string, unknown> | undefined)?.["$INSUNITS"];
   const units = unitLabel(typeof insunits === "number" ? insunits : undefined);
 
-  return { layers, entities, blocks, lineTypes, unsupported, units };
+  return { layers, entities, blocks, lineTypes, unsupported, units, layouts };
 }

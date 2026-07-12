@@ -9,8 +9,11 @@ import { pickEntity as pickEntityHit, pickLayer } from "./pick/pick.ts";
 import { SceneRenderer } from "./render/renderer.ts";
 import { buildSnapIndex } from "./snap/snap.ts";
 import type { SnapIndex, SnapResult } from "./snap/snap.ts";
-import { tessellate } from "./tessellate/tessellate.ts";
+import { tessellate, tessellateLayout } from "./tessellate/tessellate.ts";
 import type { Tessellation } from "./tessellate/tessellate.ts";
+
+/** The model space's name in `getSpaces()` / `setActiveSpace()`. */
+const MODEL_SPACE = "Model";
 
 export interface DxfViewerOptions {
   /**
@@ -80,6 +83,7 @@ export class DxfViewer {
   private readonly listeners = new Map<ViewerEvent, Set<Listener>>();
   private tessellation: Tessellation | null = null;
   private snapIndex: SnapIndex | null = null;
+  private activeSpace = MODEL_SPACE;
   private renderQueued = false;
   private highlightedLayer: string | null = null;
   private selectedIndex: number | null = null;
@@ -123,26 +127,60 @@ export class DxfViewer {
           : new TextDecoder().decode(source);
 
     this.document = parseDxf(text);
-    this.tessellation = tessellate(this.document, {
-      curveSegments: this.options.curveSegments,
-    });
+    this.activeSpace = MODEL_SPACE;
+    this.activate(tessellate(this.document, { curveSegments: this.options.curveSegments }));
+    this.emit("loaded");
+  }
+
+  /** Swap in a freshly tessellated space: colors, snap index, geometry, fit. */
+  private activate(tessellation: Tessellation): void {
+    this.tessellation = tessellation;
     // The layer table's color is a lie for entity-styled files; record what
     // tessellation actually resolved onto each layer, dominant color first.
-    for (const layer of this.document.layers.values()) {
-      const counts = this.tessellation.layerColors.get(layer.name);
-      layer.effectiveColors = counts
-        ? [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([color]) => color)
-        : [layer.color];
+    if (this.document) {
+      for (const layer of this.document.layers.values()) {
+        const counts = tessellation.layerColors.get(layer.name);
+        layer.effectiveColors = counts
+          ? [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([color]) => color)
+          : [layer.color];
+      }
     }
-    this.snapIndex = buildSnapIndex(this.tessellation, this.document);
+    this.snapIndex = this.document ? buildSnapIndex(tessellation, this.document) : null;
     this.selectedIndex = null;
     this.highlightedLayer = null;
-    this.renderer.setGeometry(this.tessellation);
-    for (const layer of this.document.layers.values()) {
+    this.renderer.setGeometry(tessellation);
+    for (const layer of this.document?.layers.values() ?? []) {
       this.renderer.setLayerVisible(layer.name, layer.visible);
     }
     this.fitView();
-    this.emit("loaded");
+  }
+
+  /** Model space plus any paper-space layouts, by name (for a space switcher). */
+  getSpaces(): string[] {
+    return [MODEL_SPACE, ...(this.document?.layouts ?? []).map((l) => l.name)];
+  }
+
+  /** The currently displayed space (`"Model"` or a layout name). */
+  get activeSpaceName(): string {
+    return this.activeSpace;
+  }
+
+  /**
+   * Switch the displayed space to model space or a paper-space layout by name.
+   * Re-tessellates, re-fits, and re-renders. Unknown names are ignored.
+   */
+  setActiveSpace(name: string): void {
+    if (!this.document || name === this.activeSpace) return;
+    const opts = { curveSegments: this.options.curveSegments };
+    if (name === MODEL_SPACE) {
+      this.activeSpace = name;
+      this.activate(tessellate(this.document, opts));
+      return;
+    }
+    const layout = this.document.layouts?.find((l) => l.name === name);
+    if (!layout) return;
+    this.activeSpace = name;
+    this.activate(tessellateLayout(this.document, layout, opts));
   }
 
   /** Convenience: fetch a URL and load it. */
@@ -196,7 +234,9 @@ export class DxfViewer {
    * nothing is hit.
    */
   pickEntity(x: number, y: number, tolerancePx = 6): PickedEntity | null {
-    if (!this.tessellation || !this.document) return null;
+    // Layout tessellations mix paper and viewport-model entity indices, so
+    // entity selection is limited to model space.
+    if (!this.tessellation || !this.document || this.activeSpace !== MODEL_SPACE) return null;
     const world = this.camera.screenToWorld(x, y);
     const hit = pickEntityHit(
       this.tessellation,

@@ -11,8 +11,12 @@ interface AspicioTestHook {
     rotation: number;
   };
   getLayers(): { name: string; visible: boolean }[];
+  getSpaces(): string[];
+  readonly activeSpaceName: string;
+  setActiveSpace(name: string): void;
   document: {
     entities: { type: string; layer: string; lineWeight?: number }[];
+    layouts?: { name: string; entities: unknown[]; viewports: unknown[] }[];
     units?: string;
   } | null;
   worldToScreen(point: { x: number; y: number }): { x: number; y: number };
