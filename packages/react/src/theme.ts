@@ -1,10 +1,10 @@
 import type { CSSProperties } from "react";
 
 /** Visual theme for the ready-made components. */
-export type DxfTheme = "observo" | "none";
+export type DxfTheme = "aspicio" | "none";
 
-/** Design tokens lifted from the Observo demo app. */
-export const observoTokens = {
+/** Design tokens lifted from the Aspicio demo app. */
+export const aspicioTokens = {
   bg: "#0f1115",
   canvas: "#16181d",
   panel: "#191c22",
@@ -25,8 +25,8 @@ export const observoTokens = {
 } as const;
 
 /** The demo app's blueprint grid, drawn behind a transparent canvas. */
-export const observoCanvasBackground: CSSProperties = {
-  background: observoTokens.canvas,
+export const aspicioCanvasBackground: CSSProperties = {
+  background: aspicioTokens.canvas,
   backgroundImage: [
     "linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px)",
     "linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px)",

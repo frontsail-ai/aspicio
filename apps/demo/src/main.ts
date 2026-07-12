@@ -1,5 +1,5 @@
 import "./style.css";
-import { DxfViewer } from "@observo/core";
+import { DxfViewer } from "@aspicio/core";
 
 /* ---------- SVG fragments ---------- */
 
@@ -44,7 +44,7 @@ const DESKTOP_HINTS: [string, string][] = [
 
 app.innerHTML = `
   <header class="topbar">
-    <div class="brand">${reticle(22, "var(--text)", "var(--text2)")}<span class="brand-name">OBSERVO</span></div>
+    <div class="brand">${reticle(22, "var(--text)", "var(--text2)")}<span class="brand-name">ASPICIO</span></div>
     <div class="statusbar">
       <span class="vdiv"></span>
       <span id="loading-status" class="loading-status" hidden>
@@ -71,7 +71,7 @@ app.innerHTML = `
     </div>
   </header>
   <div class="body">
-    <aside id="panel" class="panel obs-scroll">
+    <aside id="panel" class="panel asp-scroll">
       <div class="panel-head">
         <div class="panel-title">LAYERS <span id="layer-count" class="count-badge">0</span></div>
         <button id="close-panel" class="panel-close" type="button">${icons.close(18)}</button>
@@ -81,7 +81,7 @@ app.innerHTML = `
         <span id="solo-name" class="solo-banner-name"></span>
         <button id="exit-solo" class="solo-banner-exit" type="button">EXIT</button>
       </div>
-      <ul id="layer-list" class="layer-list obs-scroll"></ul>
+      <ul id="layer-list" class="layer-list asp-scroll"></ul>
       <div class="hints">${DESKTOP_HINTS.map(
         ([k, v]) => `<span class="hint-k">${k}</span><span class="hint-v">${v}</span>`,
       ).join("")}</div>
@@ -455,7 +455,7 @@ setMode("empty");
 /* Test hook: lets e2e tests observe viewer state. */
 declare global {
   interface Window {
-    __observo?: DxfViewer;
+    __aspicio?: DxfViewer;
   }
 }
-window.__observo = viewer;
+window.__aspicio = viewer;

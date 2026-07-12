@@ -50,28 +50,28 @@ body {
   background: rgb(76 141 255 / 35%);
 }
 
-.obs-scroll::-webkit-scrollbar {
+.asp-scroll::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
-.obs-scroll::-webkit-scrollbar-thumb {
+.asp-scroll::-webkit-scrollbar-thumb {
   background: #33383f;
   border-radius: 6px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 
-.obs-scroll::-webkit-scrollbar-thumb:hover {
+.asp-scroll::-webkit-scrollbar-thumb:hover {
   background: #454b54;
   background-clip: content-box;
 }
 
-.obs-scroll::-webkit-scrollbar-track {
+.asp-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-@keyframes obs-progress {
+@keyframes asp-progress {
   0% {
     transform: translateX(-100%);
   }
@@ -81,7 +81,7 @@ body {
   }
 }
 
-@keyframes obs-pulse {
+@keyframes asp-pulse {
   0%,
   100% {
     opacity: 0.55;
@@ -92,7 +92,7 @@ body {
   }
 }
 
-@keyframes obs-fade {
+@keyframes asp-fade {
   from {
     opacity: 0;
     transform: translateY(6px);
@@ -178,7 +178,7 @@ body {
   height: 7px;
   border-radius: 50%;
   background: var(--crease);
-  animation: obs-pulse 1s ease-in-out infinite;
+  animation: asp-pulse 1s ease-in-out infinite;
 }
 
 .file-status {
@@ -245,7 +245,7 @@ body {
   border-radius: 5px;
   box-shadow: 0 12px 32px rgb(0 0 0 / 50%);
   padding: 12px 13px;
-  animation: obs-fade 140ms ease;
+  animation: asp-fade 140ms ease;
 }
 
 .skipped-pop-title {
@@ -352,7 +352,7 @@ button {
   width: 25%;
   height: 100%;
   background: var(--crease);
-  animation: obs-progress 1.1s ease-in-out infinite;
+  animation: asp-progress 1.1s ease-in-out infinite;
 }
 
 /* ===================== BODY / PANEL ===================== */
@@ -744,7 +744,7 @@ button {
 .empty-inner {
   max-width: 380px;
   text-align: center;
-  animation: obs-fade 200ms ease;
+  animation: asp-fade 200ms ease;
 }
 
 .empty-inner > svg {
@@ -808,7 +808,7 @@ button {
   transform: translateX(-50%);
   z-index: 15;
   width: min(440px, calc(100% - 32px));
-  animation: obs-fade 180ms ease;
+  animation: asp-fade 180ms ease;
 }
 
 .error-card {
@@ -919,7 +919,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  animation: obs-pulse 1.4s ease-in-out infinite;
+  animation: asp-pulse 1.4s ease-in-out infinite;
 }
 
 .drop-title {

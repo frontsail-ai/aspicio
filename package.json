@@ -1,5 +1,5 @@
 {
-  "name": "observo",
+  "name": "aspicio",
   "version": "0.0.0",
   "private": true,
   "workspaces": [
@@ -10,8 +10,8 @@
   "type": "module",
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
-    "dev": "vp run @observo/demo#dev",
-    "e2e": "vp run @observo/demo#e2e",
+    "dev": "vp run @aspicio/demo#dev",
+    "e2e": "vp run @aspicio/demo#e2e",
     "prepare": "vp config"
   },
   "devDependencies": {

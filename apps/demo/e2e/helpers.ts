@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { PNG } from "pngjs";
 
-/** Camera + stats snapshot pulled from the window.__observo test hook. */
+/** Camera + stats snapshot pulled from the window.__aspicio test hook. */
 export interface ViewerProbe {
   entityCount: number;
   segmentCount: number;
@@ -12,7 +12,7 @@ export interface ViewerProbe {
 
 export async function probeViewer(page: Page): Promise<ViewerProbe> {
   return page.evaluate(() => {
-    const viewer = window.__observo;
+    const viewer = window.__aspicio;
     if (!viewer) throw new Error("test hook missing");
     return {
       entityCount: viewer.stats.entityCount,

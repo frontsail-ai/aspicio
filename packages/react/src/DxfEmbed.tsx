@@ -1,10 +1,10 @@
-import type { DxfViewer } from "@observo/core";
+import type { DxfViewer } from "@aspicio/core";
 import { forwardRef, useImperativeHandle, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { DxfLayerPanel } from "./DxfLayerPanel.tsx";
 import { DxfPreview } from "./DxfPreview.tsx";
 import type { DxfPreviewProps } from "./DxfPreview.tsx";
-import { observoCanvasBackground, observoTokens } from "./theme.ts";
+import { aspicioCanvasBackground, aspicioTokens } from "./theme.ts";
 import type { DxfTheme } from "./theme.ts";
 
 export interface DxfEmbedProps extends DxfPreviewProps {
@@ -12,13 +12,13 @@ export interface DxfEmbedProps extends DxfPreviewProps {
   panel?: "left" | "right" | "none";
   panelClassName?: string;
   panelStyle?: CSSProperties;
-  /** Visual theme. Defaults to the Observo demo look; "none" inherits the host. */
+  /** Visual theme. Defaults to the Aspicio demo look; "none" inherits the host. */
   theme?: DxfTheme;
 }
 
 /**
  * Batteries-included embed: layer list + interactive preview in one
- * component, styled like the Observo demo app (blueprint grid, dark
+ * component, styled like the Aspicio demo app (blueprint grid, dark
  * panel) unless theme="none". Pass the DXF as `src` (text, File, Blob,
  * ArrayBuffer) or `srcUrl`; everything else is optional.
  *
@@ -33,7 +33,7 @@ export const DxfEmbed = forwardRef<DxfViewer | null, DxfEmbedProps>(function Dxf
     panel = "left",
     panelClassName,
     panelStyle,
-    theme = "observo",
+    theme = "aspicio",
     className,
     style,
     options,
@@ -44,7 +44,7 @@ export const DxfEmbed = forwardRef<DxfViewer | null, DxfEmbedProps>(function Dxf
 ): ReactElement {
   const [viewer, setViewer] = useState<DxfViewer | null>(null);
   useImperativeHandle(ref, () => viewer as DxfViewer, [viewer]);
-  const themed = theme === "observo";
+  const themed = theme === "aspicio";
 
   const panelElement =
     panel === "none" ? null : (
@@ -58,7 +58,7 @@ export const DxfEmbed = forwardRef<DxfViewer | null, DxfEmbedProps>(function Dxf
           overflowY: "auto",
           ...(themed && {
             [panel === "left" ? "borderRight" : "borderLeft"]:
-              `1px solid ${observoTokens.hairline}`,
+              `1px solid ${aspicioTokens.hairline}`,
           }),
           ...panelStyle,
         }}
@@ -70,8 +70,8 @@ export const DxfEmbed = forwardRef<DxfViewer | null, DxfEmbedProps>(function Dxf
         display: "flex",
         width: "100%",
         height: "100%",
-        background: observoTokens.bg,
-        border: `1px solid ${observoTokens.hairline2}`,
+        background: aspicioTokens.bg,
+        border: `1px solid ${aspicioTokens.hairline2}`,
         borderRadius: 6,
         overflow: "hidden",
         ...style,
@@ -88,7 +88,7 @@ export const DxfEmbed = forwardRef<DxfViewer | null, DxfEmbedProps>(function Dxf
         options={
           themed && options?.background === undefined ? { ...options, background: null } : options
         }
-        style={{ flex: 1, minWidth: 0, ...(themed && observoCanvasBackground) }}
+        style={{ flex: 1, minWidth: 0, ...(themed && aspicioCanvasBackground) }}
         onViewer={(instance) => {
           setViewer(instance);
           onViewer?.(instance);

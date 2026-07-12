@@ -1,5 +1,5 @@
-import { DxfViewer } from "@observo/core";
-import type { DxfSource, DxfViewerOptions, LayerInfo, ViewerStats } from "@observo/core";
+import { DxfViewer } from "@aspicio/core";
+import type { DxfSource, DxfViewerOptions, LayerInfo, ViewerStats } from "@aspicio/core";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
