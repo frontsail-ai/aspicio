@@ -1,6 +1,6 @@
 import DxfParser from "dxf-parser";
 import type { IBlock, IEntity, ILayer } from "dxf-parser";
-import type { BlockDef, DxfDocument, Entity, LayerInfo, Point2 } from "../model/types.ts";
+import type { BlockDef, DxfDocument, Entity, LayerInfo, Point2, Point3 } from "../model/types.ts";
 
 const DEG2RAD = Math.PI / 180;
 const DEFAULT_COLOR = 0xffffff;
@@ -18,6 +18,21 @@ function entityColor(raw: IEntity): number | null {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw parser entities are shape-checked per type */
+
+/**
+ * OCS extrusion normal, or undefined for the default +Z. dxf-parser exposes
+ * it as separate fields (ARC, LWPOLYLINE) or a point (POLYLINE, INSERT).
+ * Note: dxf-parser does not parse 210 codes for CIRCLE — mirrored circles
+ * keep an unmirrored center until that upstream gap is fixed.
+ */
+function extrusionOf(e: any): Point3 | undefined {
+  const x: number = e.extrusionDirectionX ?? e.extrusionDirection?.x ?? 0;
+  const y: number = e.extrusionDirectionY ?? e.extrusionDirection?.y ?? 0;
+  const z: number = e.extrusionDirectionZ ?? e.extrusionDirection?.z ?? 1;
+  if (x === 0 && y === 0 && z === 1) return undefined;
+  return { x, y, z };
+}
+
 function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entity | null {
   const base = { layer: raw.layer ?? "0", color: entityColor(raw) };
   const e = raw as any;
@@ -34,6 +49,7 @@ function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entit
       return {
         ...base,
         type: "POLYLINE",
+        extrusion: extrusionOf(e),
         points: v.map(point2),
         bulges: v.map((p: { bulge?: number }) => p.bulge ?? 0),
         closed: e.shape === true,
@@ -45,6 +61,7 @@ function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entit
       return {
         ...base,
         type: "ARC",
+        extrusion: extrusionOf(e),
         center: point2(e.center),
         radius: e.radius ?? 0,
         startAngle: e.startAngle ?? 0,
@@ -65,6 +82,7 @@ function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entit
       return {
         ...base,
         type: "INSERT",
+        extrusion: extrusionOf(e),
         blockName: e.name,
         position: point2(e.position),
         scale: { x: e.xScale ?? 1, y: e.yScale ?? 1 },
