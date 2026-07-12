@@ -293,7 +293,7 @@ test("unsupported entities inside blocks are counted too", () => {
       3,
       "B",
       0,
-      "POINT",
+      "ATTDEF",
       8,
       "0",
       10,
@@ -314,7 +314,7 @@ test("unsupported entities inside blocks are counted too", () => {
       "EOF",
     ),
   );
-  expect(doc.unsupported.POINT).toBe(1);
+  expect(doc.unsupported.ATTDEF).toBe(1);
 });
 
 test("garbage input throws", () => {

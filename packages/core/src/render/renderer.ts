@@ -2,8 +2,11 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  DoubleSide,
   LineBasicMaterial,
   LineSegments,
+  Mesh,
+  MeshBasicMaterial,
   OrthographicCamera,
   Scene,
   WebGLRenderer,
@@ -27,8 +30,10 @@ export class SceneRenderer {
   private readonly scene = new Scene();
   private readonly camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
   private readonly material = new LineBasicMaterial({ vertexColors: true });
+  private readonly fillMaterial = new MeshBasicMaterial({ vertexColors: true, side: DoubleSide });
   private readonly highlightMaterial: LineMaterial;
   private layerObjects = new Map<string, LineSegments>();
+  private fillObjects = new Map<string, Mesh>();
   private highlightObject: LineSegments2 | null = null;
   private tessellation: Tessellation | null = null;
 
@@ -49,19 +54,34 @@ export class SceneRenderer {
     this.clearGeometry();
     this.tessellation = tessellation;
     for (const [name, layer] of tessellation.layers) {
-      const geometry = new BufferGeometry();
-      geometry.setAttribute("position", new BufferAttribute(layer.positions, 3));
-      geometry.setAttribute("color", new BufferAttribute(layer.colors, 3));
-      const object = new LineSegments(geometry, this.material);
-      object.frustumCulled = false;
-      this.scene.add(object);
-      this.layerObjects.set(name, object);
+      // Fills draw first (renderOrder 0), lines on top (renderOrder 1).
+      if (layer.fillPositions.length > 0) {
+        const fillGeo = new BufferGeometry();
+        fillGeo.setAttribute("position", new BufferAttribute(layer.fillPositions, 3));
+        fillGeo.setAttribute("color", new BufferAttribute(layer.fillColors, 3));
+        const fill = new Mesh(fillGeo, this.fillMaterial);
+        fill.frustumCulled = false;
+        this.scene.add(fill);
+        this.fillObjects.set(name, fill);
+      }
+      if (layer.positions.length > 0) {
+        const geometry = new BufferGeometry();
+        geometry.setAttribute("position", new BufferAttribute(layer.positions, 3));
+        geometry.setAttribute("color", new BufferAttribute(layer.colors, 3));
+        const object = new LineSegments(geometry, this.material);
+        object.frustumCulled = false;
+        object.renderOrder = 1;
+        this.scene.add(object);
+        this.layerObjects.set(name, object);
+      }
     }
   }
 
   setLayerVisible(name: string, visible: boolean): void {
     const object = this.layerObjects.get(name);
     if (object) object.visible = visible;
+    const fill = this.fillObjects.get(name);
+    if (fill) fill.visible = visible;
   }
 
   /** Draw one layer with fat lines on top of everything, or clear with null. */
@@ -112,13 +132,19 @@ export class SceneRenderer {
       this.scene.remove(object);
       object.geometry.dispose();
     }
+    for (const fill of this.fillObjects.values()) {
+      this.scene.remove(fill);
+      fill.geometry.dispose();
+    }
     this.layerObjects = new Map();
+    this.fillObjects = new Map();
     this.tessellation = null;
   }
 
   dispose(): void {
     this.clearGeometry();
     this.material.dispose();
+    this.fillMaterial.dispose();
     this.highlightMaterial.dispose();
     this.renderer.dispose();
   }

@@ -37,15 +37,15 @@ test("starts in the empty state with canvas chrome hidden", async ({ page }) => 
 test("loads the sample with stats, layers, and skip report", async ({ page }) => {
   await loadSample(page);
 
-  await expect(page.locator("#stats")).toHaveText("17 ENT · 445 SEG");
+  await expect(page.locator("#stats")).toHaveText("21 ENT · 485 SEG");
   await expect(page.locator("#skipped-btn")).toContainText("1 SKIPPED");
   await expect(page.locator("#empty-state")).toBeHidden();
   await expect(page.locator("#controls")).toBeVisible();
 
   const probe = await probeViewer(page);
-  expect(probe.entityCount).toBe(17);
-  expect(probe.segmentCount).toBe(445);
-  expect(probe.unsupported).toEqual({ POINT: 1 });
+  expect(probe.entityCount).toBe(21);
+  expect(probe.segmentCount).toBe(485);
+  expect(probe.unsupported).toEqual({ ATTDEF: 1 });
   expect(probe.layers.map((l) => l.name)).toEqual(
     expect.arrayContaining(["WALLS", "DOORS", "FURNITURE", "DECOR", "NOTES"]),
   );
@@ -57,7 +57,7 @@ test("skipped-entities popover opens with detail and closes outside", async ({ p
   await loadSample(page);
   await page.locator("#skipped-btn").click();
   await expect(page.locator("#skipped-pop")).toBeVisible();
-  await expect(page.locator("#skipped-detail")).toContainText("1 POINT");
+  await expect(page.locator("#skipped-detail")).toContainText("1 ATTDEF");
   await page.locator(".brand").click();
   await expect(page.locator("#skipped-pop")).toBeHidden();
 });
@@ -91,6 +91,41 @@ test("renders the SPLINE curve (DECOR layer, soloed)", async ({ page }) => {
   // DECOR carries the ellipse and the spline — both magenta, everything else gone.
   expect(colors.magenta).toBeGreaterThan(80);
   expect(colors.green).toBeLessThan(10);
+});
+
+test("renders SOLID entities as filled regions (DOORS layer, soloed)", async ({ page }) => {
+  await loadSample(page);
+  await row(page, "DOORS").dblclick();
+  await page.waitForTimeout(150);
+  const colors = await canvasColors(page);
+  // DOORS carries a thin arc + a filled SOLID arrowhead. The solid block dwarfs
+  // the outline — proof the fill pipeline runs, not just line tessellation.
+  expect(colors.red).toBeGreaterThan(600);
+  expect(colors.green).toBeLessThan(10);
+});
+
+test("renders a solid HATCH as a filled block (FURNITURE layer, soloed)", async ({ page }) => {
+  await loadSample(page);
+  await row(page, "FURNITURE").dblclick();
+  await page.waitForTimeout(150);
+  const colors = await canvasColors(page);
+  // The cyan HATCH rectangle is a dense fill — far more pixels than any outline.
+  expect(colors.cyan).toBeGreaterThan(3000);
+  expect(colors.green).toBeLessThan(10);
+});
+
+test("renders DIMENSION geometry — block lines, arrowheads, and text (NOTES soloed)", async ({
+  page,
+}) => {
+  await loadSample(page);
+  await row(page, "NOTES").dblclick();
+  await page.waitForTimeout(150);
+  const colors = await canvasColors(page);
+  // NOTES = two text strings PLUS the *D1 dimension block (extension/dim lines,
+  // two filled SOLID arrowheads, and the "100" value). Yellow far exceeds what
+  // the glyphs alone produce, confirming the DIMENSION block was expanded.
+  expect(colors.yellow).toBeGreaterThan(1500);
+  expect(colors.cyan).toBeLessThan(10);
 });
 
 test("toggling a layer hides and restores its geometry", async ({ page }) => {

@@ -33,6 +33,7 @@ export type { GestureOptions } from "./input/gestures.ts";
 
 export { sampleSpline } from "./geom/spline.ts";
 export { dashPolyline } from "./geom/dash.ts";
+export { triangulate } from "./geom/triangulate.ts";
 export { layoutText, stripMText } from "./text/layout.ts";
 export type { TextLayoutOptions } from "./text/layout.ts";
 
@@ -56,4 +57,8 @@ export type {
   TextHAlign,
   TextVAlign,
   SplineEntity,
+  SolidEntity,
+  PointEntity,
+  DimensionEntity,
+  HatchEntity,
 } from "./model/types.ts";

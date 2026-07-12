@@ -1,9 +1,11 @@
 import DxfParser from "dxf-parser";
 import type { IBlock, IEntity, ILayer } from "dxf-parser";
+import { DEFAULT_CURVE_SEGMENTS, sampleArc, sampleBulge } from "../geom/arc.ts";
 import type {
   BlockDef,
   DxfDocument,
   Entity,
+  HatchEntity,
   LayerInfo,
   LineTypeDef,
   Point2,
@@ -12,6 +14,8 @@ import type {
   TextVAlign,
 } from "../model/types.ts";
 import { stripMText } from "../text/layout.ts";
+import { HatchHandler } from "./hatch.ts";
+import type { HatchBoundary, RawHatchEntity } from "./hatch.ts";
 
 const DEG2RAD = Math.PI / 180;
 const DEFAULT_COLOR = 0xffffff;
@@ -178,12 +182,75 @@ function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entit
         closed: e.closed === true,
       };
     }
+    case "SOLID":
+    case "TRACE": {
+      const pts: Point2[] = (e.points ?? []).map(point2);
+      if (pts.length < 3) return null;
+      // DXF SOLID/TRACE order is 0,1,3,2 — reorder to a simple ring.
+      const points = pts.length >= 4 ? [pts[0], pts[1], pts[3], pts[2]] : pts;
+      return { ...base, type: "SOLID", points };
+    }
+    case "3DFACE": {
+      const v: Point2[] = (e.vertices ?? []).map(point2);
+      if (v.length < 3) return null;
+      return { ...base, type: "SOLID", points: v };
+    }
+    case "POINT":
+      return { ...base, type: "POINT", position: point2(e.position) };
+    case "HATCH":
+      return convertHatch(raw as unknown as RawHatchEntity, base);
+    case "DIMENSION": {
+      if (!e.block) return null;
+      return {
+        ...base,
+        type: "DIMENSION",
+        block: e.block,
+        position: point2(e.anchorPoint ?? e.insertionPoint),
+      };
+    }
     default:
       unsupported[raw.type] = (unsupported[raw.type] ?? 0) + 1;
       return null;
   }
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+type EntityBaseFields = { layer: string; color: number | null; lineType?: string };
+
+/** Sample one HATCH boundary loop into a closed polyline. */
+function sampleBoundary(b: HatchBoundary): Point2[] {
+  if (b.kind === "polyline") {
+    const v = b.vertices;
+    if (v.length < 2) return [];
+    const out: Point2[] = [v[0]];
+    const last = b.closed ? v.length : v.length - 1;
+    for (let i = 0; i < last; i++) {
+      const p1 = v[i];
+      const p2 = v[(i + 1) % v.length];
+      if (p1.bulge) out.push(...sampleBulge(p1, p2, p1.bulge, DEFAULT_CURVE_SEGMENTS));
+      else out.push(p2);
+    }
+    return out;
+  }
+  const out: Point2[] = [];
+  for (const e of b.edges) {
+    if (e.type === "line") {
+      out.push({ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 });
+    } else {
+      let sweep = e.end - e.start;
+      if (!e.ccw) sweep = -Math.abs(sweep === 0 ? 2 * Math.PI : sweep);
+      else if (sweep <= 1e-9) sweep += 2 * Math.PI;
+      out.push(...sampleArc(e.cx, e.cy, e.radius, e.start, sweep, DEFAULT_CURVE_SEGMENTS));
+    }
+  }
+  return out;
+}
+
+function convertHatch(raw: RawHatchEntity, base: EntityBaseFields): HatchEntity | null {
+  const loops = raw.boundaries.map(sampleBoundary).filter((loop) => loop.length >= 3);
+  if (loops.length === 0) return null;
+  return { ...base, type: "HATCH", loops, solid: raw.solid };
+}
 
 function parseLineTypes(dxf: {
   tables?: { lineType?: { lineTypes?: Record<string, unknown> } };
@@ -203,6 +270,8 @@ function parseLineTypes(dxf: {
 /** Parse DXF text into the normalized Aspicio document model. */
 export function parseDxf(text: string): DxfDocument {
   const parser = new DxfParser();
+  // dxf-parser has no built-in HATCH handler; register our own.
+  (parser as { registerEntityHandler(h: unknown): void }).registerEntityHandler(HatchHandler);
   const dxf = parser.parseSync(text);
   if (!dxf) throw new Error("Failed to parse DXF: parser returned no document");
 

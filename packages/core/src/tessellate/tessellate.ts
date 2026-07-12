@@ -2,6 +2,7 @@ import { DEFAULT_CURVE_SEGMENTS, sampleArc, sampleBulge, sampleEllipse } from ".
 import { dashPolyline } from "../geom/dash.ts";
 import { ocsToWcs } from "../geom/ocs.ts";
 import { sampleSpline } from "../geom/spline.ts";
+import { triangulate } from "../geom/triangulate.ts";
 import type { Affine2D, Bounds, DxfDocument, Entity, EntityType, Point2 } from "../model/types.ts";
 import { layoutText } from "../text/layout.ts";
 
@@ -10,12 +11,16 @@ type Affine = Affine2D;
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
 const MAX_INSERT_DEPTH = 16;
 
-/** Batched line-segment geometry for one layer. */
+/** Batched line-segment (and optional filled-triangle) geometry for one layer. */
 export interface LayerGeometry {
-  /** xyz triplets, two vertices per segment. */
+  /** xyz triplets, two vertices per line segment. */
   positions: Float32Array;
-  /** rgb (0..1) per vertex. */
+  /** rgb (0..1) per line vertex. */
   colors: Float32Array;
+  /** xyz triplets, three vertices per filled triangle (SOLID, HATCH, …). */
+  fillPositions: Float32Array;
+  /** rgb (0..1) per fill vertex. */
+  fillColors: Float32Array;
 }
 
 export interface Tessellation {
@@ -36,6 +41,11 @@ export interface Tessellation {
 export interface TessellationContext {
   /** Emit a polyline (in entity-local coordinates); transform/color applied. */
   addPolyline(points: Point2[], closed?: boolean): void;
+  /**
+   * Fill a polygon (entity-local coords) with triangles. `rings[0]` is the
+   * outer contour; `rings[1..]` are holes. Used by SOLID, 3DFACE, HATCH.
+   */
+  addFill(rings: Point2[][]): void;
   /** Recurse into a block for INSERT-like entities. */
   addBlock(blockName: string, transform: Affine, layer: string, color: number | null): void;
   readonly curveSegments: number;
@@ -125,6 +135,44 @@ registerEntityHandler("TEXT", (e, ctx) => {
   }
 });
 
+registerEntityHandler("SOLID", (e, ctx) => {
+  if (e.type !== "SOLID") return;
+  ctx.addFill([e.points]);
+});
+
+registerEntityHandler("HATCH", (e, ctx) => {
+  if (e.type !== "HATCH") return;
+  if (e.solid) {
+    // Fill the loops as a polygon with holes (first loop outer, rest holes).
+    ctx.addFill(e.loops);
+  } else {
+    // Pattern hatch: draw the boundary outlines (pattern lines are v-next).
+    for (const loop of e.loops) ctx.addPolyline(loop, true);
+  }
+});
+
+/** POINT marker half-size in drawing units. */
+const POINT_MARK = 0.6;
+
+registerEntityHandler("POINT", (e, ctx) => {
+  if (e.type !== "POINT") return;
+  const { x, y } = e.position;
+  ctx.addPolyline([
+    { x: x - POINT_MARK, y },
+    { x: x + POINT_MARK, y },
+  ]);
+  ctx.addPolyline([
+    { x, y: y - POINT_MARK },
+    { x, y: y + POINT_MARK },
+  ]);
+});
+
+registerEntityHandler("DIMENSION", (e, ctx) => {
+  if (e.type !== "DIMENSION") return;
+  // The anonymous block holds the pre-computed lines, arrowheads, and text.
+  ctx.addBlock(e.block, [1, 0, 0, 1, e.position.x, e.position.y], e.layer, e.color);
+});
+
 registerEntityHandler("INSERT", (e, ctx) => {
   if (e.type !== "INSERT") return;
   const cos = Math.cos(e.rotation);
@@ -155,6 +203,8 @@ function multiply(m: Affine, n: Affine): Affine {
 interface Accumulator {
   positions: number[];
   colors: number[];
+  fillPositions: number[];
+  fillColors: number[];
 }
 
 export interface TessellateOptions {
@@ -202,45 +252,53 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
         ? multiply(transform, ocsToWcs(entity.extrusion))
         : transform;
 
+      const getAcc = (): Accumulator => {
+        let acc = accumulators.get(layer);
+        if (!acc) {
+          acc = { positions: [], colors: [], fillPositions: [], fillColors: [] };
+          accumulators.set(layer, acc);
+        }
+        return acc;
+      };
+      const countColor = (n: number): void => {
+        let colorCounts = layerColors.get(layer);
+        if (!colorCounts) {
+          colorCounts = new Map();
+          layerColors.set(layer, colorCounts);
+        }
+        colorCounts.set(color, (colorCounts.get(color) ?? 0) + n);
+      };
+      const r = ((color >> 16) & 0xff) / 255;
+      const g = ((color >> 8) & 0xff) / 255;
+      const b = (color & 0xff) / 255;
+      const track = (x: number, y: number): void => {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      };
+      const tx = (p: Point2): [number, number] => [
+        entityTransform[0] * p.x + entityTransform[2] * p.y + entityTransform[4],
+        entityTransform[1] * p.x + entityTransform[3] * p.y + entityTransform[5],
+      ];
+
       const ctx: TessellationContext = {
         curveSegments,
         addPolyline(points, closed = false) {
           if (points.length < 2) return;
-          let acc = accumulators.get(layer);
-          if (!acc) {
-            acc = { positions: [], colors: [] };
-            accumulators.set(layer, acc);
-          }
-          let colorCounts = layerColors.get(layer);
-          if (!colorCounts) {
-            colorCounts = new Map();
-            layerColors.set(layer, colorCounts);
-          }
-          const r = ((color >> 16) & 0xff) / 255;
-          const g = ((color >> 8) & 0xff) / 255;
-          const b = (color & 0xff) / 255;
+          const acc = getAcc();
 
           const emit = (pts: Point2[], wrap: boolean): void => {
             const n = wrap ? pts.length : pts.length - 1;
-            colorCounts.set(color, (colorCounts.get(color) ?? 0) + n);
+            countColor(n);
             for (let i = 0; i < n; i++) {
-              const p1 = pts[i];
-              const p2 = pts[(i + 1) % pts.length];
-              const x1 = entityTransform[0] * p1.x + entityTransform[2] * p1.y + entityTransform[4];
-              const y1 = entityTransform[1] * p1.x + entityTransform[3] * p1.y + entityTransform[5];
-              const x2 = entityTransform[0] * p2.x + entityTransform[2] * p2.y + entityTransform[4];
-              const y2 = entityTransform[1] * p2.x + entityTransform[3] * p2.y + entityTransform[5];
+              const [x1, y1] = tx(pts[i]);
+              const [x2, y2] = tx(pts[(i + 1) % pts.length]);
               acc.positions.push(x1, y1, 0, x2, y2, 0);
               acc.colors.push(r, g, b, r, g, b);
               segmentCount += 1;
-              if (x1 < minX) minX = x1;
-              if (x1 > maxX) maxX = x1;
-              if (y1 < minY) minY = y1;
-              if (y1 > maxY) maxY = y1;
-              if (x2 < minX) minX = x2;
-              if (x2 > maxX) maxX = x2;
-              if (y2 < minY) minY = y2;
-              if (y2 > maxY) maxY = y2;
+              track(x1, y1);
+              track(x2, y2);
             }
           };
 
@@ -251,6 +309,18 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
             for (const piece of dashPolyline(full, dashPattern)) emit(piece, false);
           } else {
             emit(points, closed);
+          }
+        },
+        addFill(rings) {
+          const tris = triangulate(rings);
+          if (tris.length < 3) return;
+          const acc = getAcc();
+          countColor(tris.length / 3);
+          for (const p of tris) {
+            const [x, y] = tx(p);
+            acc.fillPositions.push(x, y, 0);
+            acc.fillColors.push(r, g, b);
+            track(x, y);
           }
         },
         addBlock(blockName, local, insertLayer, insertColor) {
@@ -280,15 +350,24 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
     ? { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
     : { x: 0, y: 0 };
 
+  const recenter = (src: number[]): Float32Array => {
+    const out = new Float32Array(src.length);
+    for (let i = 0; i < src.length; i += 3) {
+      out[i] = src[i] - offset.x;
+      out[i + 1] = src[i + 1] - offset.y;
+      out[i + 2] = 0;
+    }
+    return out;
+  };
+
   const layers = new Map<string, LayerGeometry>();
   for (const [name, acc] of accumulators) {
-    const positions = new Float32Array(acc.positions.length);
-    for (let i = 0; i < acc.positions.length; i += 3) {
-      positions[i] = acc.positions[i] - offset.x;
-      positions[i + 1] = acc.positions[i + 1] - offset.y;
-      positions[i + 2] = 0;
-    }
-    layers.set(name, { positions, colors: new Float32Array(acc.colors) });
+    layers.set(name, {
+      positions: recenter(acc.positions),
+      colors: new Float32Array(acc.colors),
+      fillPositions: recenter(acc.fillPositions),
+      fillColors: new Float32Array(acc.fillColors),
+    });
   }
 
   return { layers, bounds, offset, segmentCount, layerColors };

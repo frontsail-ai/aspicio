@@ -75,9 +75,12 @@ LINE, LWPOLYLINE/POLYLINE (including bulge arcs), CIRCLE, ARC, ELLIPSE,
 nested INSERT (block references with transforms, ByBlock color
 inheritance, and the layer-0 rule), TEXT and MTEXT (rendered with a
 built-in single-stroke vector font; MTEXT formatting codes are
-collapsed to plain text), and SPLINE (B-spline sampled to a polyline).
-Everything else — HATCH, DIMENSION, SOLID, POINT, … — is skipped,
-counted in `stats.unsupported`, and never breaks the load.
+collapsed to plain text), SPLINE (B-spline sampled to a polyline),
+SOLID/TRACE/3DFACE and solid HATCH (filled polygons, holes honored;
+pattern HATCH falls back to its boundary outline), POINT (crosshair
+marker), and DIMENSION (its anonymous block is expanded, so dimension
+lines, arrowheads, and the measurement text all draw). Everything else
+is skipped, counted in `stats.unsupported`, and never breaks the load.
 
 Linetypes from the LTYPE table are honored: dashed/hidden/center
 patterns are dashed in drawing units (an entity's linetype, or its

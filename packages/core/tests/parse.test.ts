@@ -53,7 +53,7 @@ const SAMPLE = [
   "51",
   "90",
   "0",
-  "POINT",
+  "ATTDEF",
   "8",
   "WALLS",
   "10",
@@ -82,5 +82,5 @@ test("parses layers, entities, and unsupported counts", () => {
     expect(arc.endAngle).toBeCloseTo(Math.PI / 2); // degrees → radians
   }
 
-  expect(doc.unsupported.POINT).toBe(1);
+  expect(doc.unsupported.ATTDEF).toBe(1);
 });

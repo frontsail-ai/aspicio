@@ -146,6 +146,37 @@ export interface SplineEntity extends EntityBase {
   closed: boolean;
 }
 
+/** Filled triangle/quad: SOLID, TRACE, or a projected 3DFACE. */
+export interface SolidEntity extends EntityBase {
+  type: "SOLID";
+  /** 3 or 4 corners, already reordered to a simple (non-crossing) ring. */
+  points: Point2[];
+}
+
+/** A POINT — rendered as a small crosshair marker. */
+export interface PointEntity extends EntityBase {
+  type: "POINT";
+  position: Point2;
+}
+
+/** DIMENSION — rendered by drawing its anonymous geometry block. */
+export interface DimensionEntity extends EntityBase {
+  type: "DIMENSION";
+  /** Name of the anonymous "*D…" block holding the lines, arrows, and text. */
+  block: string;
+  /** Block insertion point (usually the origin). */
+  position: Point2;
+}
+
+/** HATCH — filled region(s). Boundaries are pre-sampled to polyline loops. */
+export interface HatchEntity extends EntityBase {
+  type: "HATCH";
+  /** Boundary loops in drawing coordinates (outer + holes, unspecified order). */
+  loops: Point2[][];
+  /** Solid fill vs. a line pattern (patterns render as boundary outlines). */
+  solid: boolean;
+}
+
 export type Entity =
   | LineEntity
   | PolylineEntity
@@ -154,7 +185,11 @@ export type Entity =
   | EllipseEntity
   | InsertEntity
   | TextEntity
-  | SplineEntity;
+  | SplineEntity
+  | SolidEntity
+  | PointEntity
+  | DimensionEntity
+  | HatchEntity;
 
 export type EntityType = Entity["type"];
 
