@@ -1,6 +1,6 @@
 import "./style.css";
-import { DxfViewer } from "@aspicio/core";
-import type { EntityInfo, PickedEntity, Point2 } from "@aspicio/core";
+import { DxfViewer, niceLength } from "@aspicio/core";
+import type { EntityInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
 
 /* ---------- SVG fragments ---------- */
 
@@ -25,6 +25,7 @@ const icons = {
   minus: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14"></path></svg>`,
   fit: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>`,
   ruler: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 2.3 2.3 14.7a1 1 0 0 0 0 1.4l5.6 5.6a1 1 0 0 0 1.4 0L21.7 9.3a1 1 0 0 0 0-1.4l-5.6-5.6a1 1 0 0 0-1.4 0Z"></path><path d="M6 12l2 2M9 9l2 2M12 6l2 2M15 15l2 2"></path></svg>`,
+  download: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>`,
   drop: `<svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="var(--crease)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"></path><path d="m7 11 5 5 5-5"></path><path d="M5 21h14"></path></svg>`,
   check: `<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" fill="var(--crease)"></rect><path d="M4.4 8.2 L6.9 10.6 L11.6 5.3" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg>`,
   uncheck: `<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" fill="none" stroke="var(--hairline2)" stroke-width="1.4"></rect></svg>`,
@@ -63,6 +64,13 @@ app.innerHTML = `
     </div>
     <div class="topbar-actions">
       <button id="toggle-layers" class="btn-ghost layers-toggle" type="button">${icons.layers} Layers</button>
+      <div class="export-wrap">
+        <button id="export-btn" class="btn-ghost export-btn" type="button" hidden>${icons.download} Export</button>
+        <div id="export-pop" class="export-pop" hidden>
+          <button id="export-svg" class="export-item" type="button">SVG <span class="export-note">vector · whole drawing</span></button>
+          <button id="export-png" class="export-item" type="button">PNG <span class="export-note">current view</span></button>
+        </div>
+      </div>
       <button id="load-sample" class="btn-ghost sample-btn" type="button">${icons.file} Sample</button>
       <button id="open" class="btn-primary" type="button">${icons.filePlus} Open DXF</button>
     </div>
@@ -135,6 +143,10 @@ app.innerHTML = `
         <span class="readout-chip">ROT <span id="rot-deg">0</span>°</span>
         <span class="readout-chip">X <span id="cur-x">–</span> Y <span id="cur-y">–</span></span>
       </div>
+      <div id="scale-bar" class="scale-bar" hidden>
+        <span id="scale-line" class="scale-line"></span>
+        <span id="scale-label" class="scale-label">—</span>
+      </div>
       <div id="measure-card" class="measure-card" hidden>
         <span class="measure-hint">MEASURE · click to add points · Esc to clear</span>
         <div class="measure-rows">
@@ -192,6 +204,7 @@ let selectedIndex: number | null = null;
 let measureActive = false;
 let measurePoints: Point2[] = [];
 let measureCursor: Point2 | null = null;
+let measureSnap: SnapResult | null = null;
 
 /* ---------- mode / chrome ---------- */
 
@@ -204,6 +217,9 @@ function setMode(next: Mode): void {
   $("#file-status").hidden = !loaded;
   $("#controls").hidden = !loaded;
   $("#readout").hidden = !loaded;
+  $("#scale-bar").hidden = !loaded;
+  $("#export-btn").hidden = !loaded;
+  if (!loaded) $("#export-pop").hidden = true;
   if (!loaded) {
     clearSelection();
     setMeasureActive(false);
@@ -341,6 +357,7 @@ function setMeasureActive(active: boolean): void {
   measureActive = active;
   measurePoints = [];
   measureCursor = null;
+  measureSnap = null;
   $("#measure-btn").classList.toggle("active", active);
   viewerEl.classList.toggle("measuring", active);
   $("#measure-card").hidden = !active;
@@ -376,6 +393,18 @@ function measureTotals(points: Point2[]): { total: number; area: number } {
 }
 
 /** Redraw the measure overlay (points are stored in world space). */
+/** An SVG snap marker at (sx, sy), shaped by the snap kind. */
+function snapMarker(kind: SnapResult["kind"], sx: number, sy: number): string {
+  const c = "measure-snap";
+  if (kind === "center") return `<circle class="${c}" cx="${sx}" cy="${sy}" r="5.5" fill="none" />`;
+  if (kind === "midpoint")
+    return `<path class="${c}" fill="none" d="M${sx - 5} ${sy + 4} L${sx + 5} ${sy + 4} L${sx} ${sy - 5} Z" />`;
+  if (kind === "node")
+    return `<path class="${c}" d="M${sx - 5} ${sy - 5} L${sx + 5} ${sy + 5} M${sx - 5} ${sy + 5} L${sx + 5} ${sy - 5}" />`;
+  // endpoint — a square
+  return `<rect class="${c}" x="${sx - 4.5}" y="${sy - 4.5}" width="9" height="9" fill="none" />`;
+}
+
 function renderMeasure(): void {
   const overlay = measureOverlay;
   if (!measureActive) {
@@ -393,6 +422,11 @@ function renderMeasure(): void {
   }
   for (const p of screen)
     parts.push(`<circle class="measure-dot" cx="${p.x}" cy="${p.y}" r="3.5" />`);
+  // Snap marker under the cursor, shaped by kind.
+  if (measureSnap) {
+    const s = viewer.worldToScreen(measureSnap.point);
+    parts.push(snapMarker(measureSnap.kind, s.x, s.y));
+  }
   // Per-segment length labels at each committed segment midpoint.
   for (let i = 1; i < screen.length; i++) {
     const a = screen[i - 1];
@@ -415,9 +449,11 @@ function renderMeasure(): void {
           measureCursor.y - measurePoints[measurePoints.length - 1].y,
         )
       : null;
-  $("#measure-seg").textContent = live !== null ? fmt(live) : "–";
-  $("#measure-total").textContent = measurePoints.length > 1 ? fmt(totals.total) : "–";
-  $("#measure-area").textContent = measurePoints.length >= 3 ? fmt(totals.area) : "–";
+  const us = unitSuffix();
+  $("#measure-seg").textContent = live !== null ? `${fmt(live)}${us}` : "–";
+  $("#measure-total").textContent = measurePoints.length > 1 ? `${fmt(totals.total)}${us}` : "–";
+  $("#measure-area").textContent =
+    measurePoints.length >= 3 ? `${fmt(totals.area)}${us ? `${us}²` : ""}` : "–";
 }
 
 /* ---------- panel ---------- */
@@ -550,12 +586,28 @@ viewer.on("loaded", () => {
   setMode("loaded");
 });
 
+/** Drawing-unit suffix (" mm"), or "" when the file is unitless. */
+function unitSuffix(): string {
+  const u = viewer.document?.units;
+  return u ? ` ${u}` : "";
+}
+
+/** Redraw the scale bar to a round number of drawing units (~90px target). */
+function updateScaleBar(unitsPerPixel: number): void {
+  const target = 90; // px
+  const length = niceLength(target * unitsPerPixel);
+  const px = length > 0 ? length / unitsPerPixel : 0;
+  $("#scale-line").style.width = `${px}px`;
+  $("#scale-label").textContent = length > 0 ? `${fmt(length)}${unitSuffix()}` : "—";
+}
+
 viewer.on("render", () => {
   if (mode !== "loaded") return;
   const view = viewer.view;
   $("#zoom-pct").textContent = String(Math.round((baselineZoom / view.unitsPerPixel) * 100));
   const deg = Math.round((view.rotation * 180) / Math.PI);
   $("#rot-deg").textContent = String(((deg % 360) + 360) % 360);
+  updateScaleBar(view.unitsPerPixel);
   // Measurement points live in world space — reproject them as the camera moves.
   if (measureActive) renderMeasure();
 });
@@ -610,6 +662,39 @@ document.addEventListener("click", (e) => {
   if (!pop.hidden && !pop.contains(e.target as Node)) pop.hidden = true;
 });
 
+/* Export / download */
+function download(data: Blob | string, filename: string): void {
+  const url = typeof data === "string" ? data : URL.createObjectURL(data);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  if (typeof data !== "string") URL.revokeObjectURL(url);
+}
+const exportBaseName = (): string => currentName.replace(/\.dxf$/i, "") || "drawing";
+
+$("#export-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const pop = $("#export-pop");
+  pop.hidden = !pop.hidden;
+});
+$("#export-svg").addEventListener("click", () => {
+  // Give the SVG the canvas backdrop so it's legible on any viewer.
+  const svg = viewer.toSVG({ background: "#16181d" });
+  download(new Blob([svg], { type: "image/svg+xml" }), `${exportBaseName()}.svg`);
+  $("#export-pop").hidden = true;
+});
+$("#export-png").addEventListener("click", () => {
+  download(viewer.toPNG({ background: 0x16181d }), `${exportBaseName()}.png`);
+  $("#export-pop").hidden = true;
+});
+document.addEventListener("click", (e) => {
+  const pop = $("#export-pop");
+  if (!pop.hidden && !$(".export-wrap").contains(e.target as Node)) pop.hidden = true;
+});
+
 /* Canvas controls */
 $("#zoom-in").addEventListener("click", () => viewer.zoomBy(1.25, { animate: true }));
 $("#zoom-out").addEventListener("click", () => viewer.zoomBy(0.8, { animate: true }));
@@ -636,8 +721,10 @@ let pickQueued = false;
 viewerEl.addEventListener("pointermove", (e) => {
   if (e.pointerType !== "mouse" || mode !== "loaded") return;
   const { x, y } = localPoint(e);
-  // Live world-coordinate readout, always on.
-  const world = viewer.screenToWorld(x, y);
+  // In measure mode the cursor snaps to nearby geometry; the readout then
+  // reflects the snapped point.
+  measureSnap = measureActive ? viewer.snap(x, y) : null;
+  const world = measureSnap ? measureSnap.point : viewer.screenToWorld(x, y);
   $("#cur-x").textContent = fmt(world.x);
   $("#cur-y").textContent = fmt(world.y);
   if (measureActive) {
@@ -672,7 +759,10 @@ viewerEl.addEventListener("pointerup", (e) => {
   downAt = null;
   if (moved > 5) return; // a drag/pan, not a click
   if (measureActive) {
-    measurePoints.push(viewer.screenToWorld(localPoint(e).x, localPoint(e).y));
+    const { x, y } = localPoint(e);
+    // Place the snapped point when snapping, else the raw cursor position.
+    const snap = viewer.snap(x, y);
+    measurePoints.push(snap ? snap.point : viewer.screenToWorld(x, y));
     renderMeasure();
   } else {
     selectAt(e.clientX, e.clientY);
@@ -725,6 +815,7 @@ declare global {
       readonly measureActive: boolean;
       readonly measurePoints: Point2[];
       pickAt(x: number, y: number): PickedEntity | null;
+      snapAt(x: number, y: number): SnapResult | null;
     };
   }
 }
@@ -740,4 +831,5 @@ window.__demo = {
     return measurePoints;
   },
   pickAt: (x, y) => viewer.pickEntity(x, y),
+  snapAt: (x, y) => viewer.snap(x, y),
 };

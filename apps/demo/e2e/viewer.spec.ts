@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { canvasColors, probeViewer } from "./helpers.ts";
 
@@ -197,8 +198,9 @@ test("the measure tool reports segment length, total, and area", async ({ page }
   for (const p of pts) await page.mouse.click(box.x + p.x, box.y + p.y);
   expect(await page.evaluate(() => window.__demo?.measurePoints.length)).toBe(3);
 
-  const total = Number(await page.locator("#measure-total").textContent());
-  const area = Number(await page.locator("#measure-area").textContent());
+  // Values carry a unit suffix ("100 mm") — parseFloat reads the leading number.
+  const total = parseFloat((await page.locator("#measure-total").textContent()) ?? "");
+  const area = parseFloat((await page.locator("#measure-area").textContent()) ?? "");
   expect(Math.abs(total - 100)).toBeLessThan(2);
   expect(Math.abs(area - 1200)).toBeLessThan(50);
 
@@ -209,6 +211,58 @@ test("the measure tool reports segment length, total, and area", async ({ page }
     .toBe(0);
   await page.keyboard.press("Escape");
   expect(await page.evaluate(() => window.__demo?.measureActive)).toBe(false);
+});
+
+test("the measure tool snaps to geometry (exact endpoint and center)", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#measure-btn").click();
+  const box = await canvas(page).boundingBox();
+  if (!box) throw new Error("no canvas box");
+
+  // A few px off the outer wall corner (world 0,0) still snaps exactly to it.
+  const corner = await page.evaluate(() => window.__aspicio!.worldToScreen({ x: 0, y: 0 }));
+  const snap = await page.evaluate((c) => window.__demo!.snapAt(c.x + 4, c.y - 4), corner);
+  expect(snap?.kind).toBe("endpoint");
+  expect(snap?.point).toEqual({ x: 0, y: 0 });
+
+  // Placing records the snapped point, not the raw cursor.
+  await page.mouse.click(box.x + corner.x + 4, box.y + corner.y - 4);
+  const pts = await page.evaluate(() => window.__demo!.measurePoints);
+  expect(pts[0]).toEqual({ x: 0, y: 0 });
+
+  // Hovering the round table's center draws a snap marker.
+  const center = await page.evaluate(() => window.__aspicio!.worldToScreen({ x: 30, y: 45 }));
+  await page.mouse.move(box.x + center.x + 3, box.y + center.y + 3);
+  await expect(page.locator(".measure-snap")).toHaveCount(1);
+});
+
+test("reports drawing units (mm) with a scale bar and measure suffix", async ({ page }) => {
+  await loadSample(page);
+  expect(await page.evaluate(() => window.__aspicio!.document?.units)).toBe("mm");
+  await expect(page.locator("#scale-bar")).toBeVisible();
+  await expect(page.locator("#scale-label")).toContainText("mm");
+});
+
+test("exports the drawing as a downloadable SVG and PNG", async ({ page }) => {
+  await loadSample(page);
+
+  await page.locator("#export-btn").click();
+  const [svg] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator("#export-svg").click(),
+  ]);
+  expect(svg.suggestedFilename()).toBe("sample.svg");
+  const path = await svg.path();
+  const content = await readFile(path, "utf8");
+  expect(content).toContain("<svg");
+  expect(content).toContain("viewBox=");
+
+  await page.locator("#export-btn").click();
+  const [png] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator("#export-png").click(),
+  ]);
+  expect(png.suggestedFilename()).toBe("sample.png");
 });
 
 test("toggling a layer hides and restores its geometry", async ({ page }) => {

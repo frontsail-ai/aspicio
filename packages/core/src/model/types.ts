@@ -218,4 +218,10 @@ export interface DxfDocument {
   lineTypes: Map<string, LineTypeDef>;
   /** Counts of raw DXF entity types that were skipped by the parser stage. */
   unsupported: Record<string, number>;
+  /**
+   * Short drawing-unit label from the header's `$INSUNITS` (e.g. "mm", "in"),
+   * or "" when the drawing is unitless or the code is unknown. `parseDxf`
+   * always sets it; hand-built documents may omit it (treated as "").
+   */
+  units?: string;
 }

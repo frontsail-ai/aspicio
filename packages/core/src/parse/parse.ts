@@ -14,6 +14,7 @@ import type {
   TextVAlign,
 } from "../model/types.ts";
 import { stripMText } from "../text/layout.ts";
+import { unitLabel } from "../units.ts";
 import { HatchHandler } from "./hatch.ts";
 import type { HatchBoundary, RawHatchEntity } from "./hatch.ts";
 
@@ -338,5 +339,8 @@ export function parseDxf(text: string): DxfDocument {
     blocks.set(name, { name, basePoint: point2(block.position), entities: blockEntities });
   }
 
-  return { layers, entities, blocks, lineTypes, unsupported };
+  const insunits = (dxf.header as Record<string, unknown> | undefined)?.["$INSUNITS"];
+  const units = unitLabel(typeof insunits === "number" ? insunits : undefined);
+
+  return { layers, entities, blocks, lineTypes, unsupported, units };
 }

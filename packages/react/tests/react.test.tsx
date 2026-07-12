@@ -33,6 +33,8 @@ const mock = vi.hoisted(() => {
     });
     setLayerHighlight = vi.fn();
     pickLayer = vi.fn((_x: number, _y: number) => "CUT" as string | null);
+    toSVG = vi.fn((_opts?: unknown) => "<svg></svg>");
+    toPNG = vi.fn((_opts?: unknown) => "data:image/png;base64,AAAA");
     dispose = vi.fn(() => {
       this.disposed = true;
     });
@@ -165,7 +167,30 @@ test("exposes the viewer via ref and onViewer", async () => {
   expect(onViewer).toHaveBeenLastCalledWith(null);
 });
 
+test("shows the download control by default and exports on click", async () => {
+  const { container } = render(<DxfPreview />);
+  await flush();
+  const btn = container.querySelector('[aria-label="Download"]') as HTMLElement | null;
+  expect(btn).not.toBeNull();
+  fireEvent.click(btn!); // open the menu
+  const png = [...container.querySelectorAll("button")].find((b) => b.textContent === "PNG");
+  fireEvent.click(png!);
+  expect(lastViewer().toPNG).toHaveBeenCalled();
+});
+
+test("showDownload={false} hides the download control", async () => {
+  const { container } = render(<DxfPreview showDownload={false} />);
+  await flush();
+  expect(container.querySelector('[aria-label="Download"]')).toBeNull();
+});
+
 /* ---------- DxfEmbed ---------- */
+
+test("DxfEmbed forwards showDownload to hide the download control", async () => {
+  const { container } = render(<DxfEmbed showDownload={false} />);
+  await flush();
+  expect(container.querySelector('[aria-label="Download"]')).toBeNull();
+});
 
 test("DxfEmbed renders panel and preview together and loads src", async () => {
   const { container, getByText } = render(<DxfEmbed src="dxf-data" style={{ height: 400 }} />);

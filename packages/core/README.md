@@ -43,16 +43,28 @@ its canvas, tracks container resizes, and renders on demand.
 
 ### Selection & measurement
 
-| Member                           | Notes                                                                                                                      |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `pickEntity(x, y, tolerancePx?)` | hit-test → `{ index, entity, info, layer }` or `null`; edges win within tolerance, else a filled interior under the cursor |
-| `setSelection(index \| null)`    | draw a bright overlay on one entity (its lines and any fill) by its `document.entities` index                              |
-| `screenToWorld(x, y)`            | canvas CSS-pixel coords → world (drawing) coordinates                                                                      |
-| `worldToScreen(point)`           | world coordinates → canvas CSS-pixel coords (place labels, rulers, measure overlays)                                       |
+| Member                           | Notes                                                                                                                       |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `pickEntity(x, y, tolerancePx?)` | hit-test → `{ index, entity, info, layer }` or `null`; edges win within tolerance, else a filled interior under the cursor  |
+| `setSelection(index \| null)`    | draw a bright overlay on one entity (its lines and any fill) by its `document.entities` index                               |
+| `snap(x, y, tolerancePx?)`       | object-snap → `{ point, kind }` (`endpoint`/`node`/`center`/`midpoint`) or `null`; only visible layers; built once per load |
+| `screenToWorld(x, y)`            | canvas CSS-pixel coords → world (drawing) coordinates                                                                       |
+| `worldToScreen(point)`           | world coordinates → canvas CSS-pixel coords (place labels, rulers, measure overlays)                                        |
 
 `describeEntity(entity)` (a free function) summarizes any entity as
 `{ type, layer, color, length?, radius?, area?, points?, position?, text? }`
 for an info panel — reused by the demo and the React bindings.
+
+### Export
+
+| Member                   | Notes                                                                                                    |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `toSVG({ background? })` | the whole drawing as a standalone SVG string (vector, visible layers only, lineweights → `stroke-width`) |
+| `toPNG({ background? })` | the current view (WYSIWYG) as a PNG data URL at native resolution; `background` fills behind the drawing |
+
+`document.units` carries the short unit label from `$INSUNITS` (e.g.
+`"mm"`, or `""` when unitless). `unitLabel(code)` and `niceLength(max)`
+(a 1-2-5 round-number helper for scale bars) are exported too.
 
 ### Camera
 
