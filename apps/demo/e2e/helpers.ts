@@ -30,16 +30,18 @@ export interface ColorCounts {
   red: number;
   cyan: number;
   magenta: number;
+  yellow: number;
 }
 
 export function countColors(buffer: Buffer): ColorCounts {
   const png = PNG.sync.read(buffer);
-  const counts: ColorCounts = { green: 0, red: 0, cyan: 0, magenta: 0 };
+  const counts: ColorCounts = { green: 0, red: 0, cyan: 0, magenta: 0, yellow: 0 };
   for (let i = 0; i < png.data.length; i += 4) {
     const r = png.data[i];
     const g = png.data[i + 1];
     const b = png.data[i + 2];
-    if (g > 140 && r < 90 && b < 90) counts.green += 1;
+    if (r > 140 && g > 140 && b < 90) counts.yellow += 1;
+    else if (g > 140 && r < 90 && b < 90) counts.green += 1;
     else if (r > 140 && g < 90 && b < 90) counts.red += 1;
     else if (g > 140 && b > 140 && r < 90) counts.cyan += 1;
     else if (r > 140 && b > 140 && g < 90) counts.magenta += 1;

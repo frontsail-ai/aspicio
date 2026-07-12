@@ -16,6 +16,7 @@ function makeDoc(
       ]),
     entities,
     blocks: new Map(blocks),
+    lineTypes: new Map(),
     unsupported: {},
   };
 }

@@ -35,6 +35,8 @@ export interface LayerInfo {
   frozen: boolean;
   /** Number of top-level entities on this layer. */
   entityCount: number;
+  /** Layer's default linetype name (resolved against the document map). */
+  lineType?: string;
 }
 
 interface EntityBase {
@@ -47,6 +49,22 @@ interface EntityBase {
    * the default +Z (world coordinates). (0,0,-1) marks mirrored entities.
    */
   extrusion?: Point3;
+  /**
+   * Linetype name, or "BYLAYER"/undefined to inherit the layer's. Resolved
+   * against the document's `lineTypes` map to a dash pattern at render time.
+   */
+  lineType?: string;
+}
+
+/**
+ * Linetype dash pattern: alternating drawn/gap lengths in drawing units.
+ * Positive = dash (pen down), negative = gap (pen up), 0 = dot.
+ */
+export interface LineTypeDef {
+  name: string;
+  pattern: number[];
+  /** Sum of |pattern|; 0 for a continuous line. */
+  patternLength: number;
 }
 
 export interface LineEntity extends EntityBase {
@@ -99,13 +117,44 @@ export interface InsertEntity extends EntityBase {
   rotation: number;
 }
 
+export type TextHAlign = "left" | "center" | "right";
+export type TextVAlign = "baseline" | "bottom" | "middle" | "top";
+
+/** Normalized TEXT and MTEXT. MTEXT format codes are collapsed to plain text. */
+export interface TextEntity extends EntityBase {
+  type: "TEXT";
+  /** Insertion/alignment point. */
+  position: Point2;
+  /** Content; may contain newlines (from MTEXT paragraphs). */
+  text: string;
+  /** Cap height in drawing units. */
+  height: number;
+  /** Radians, CCW. */
+  rotation: number;
+  /** Horizontal scale (DXF xScale). */
+  widthFactor: number;
+  hAlign: TextHAlign;
+  vAlign: TextVAlign;
+}
+
+export interface SplineEntity extends EntityBase {
+  type: "SPLINE";
+  controlPoints: Point2[];
+  /** Knot vector; empty means "generate a clamped uniform vector". */
+  knots: number[];
+  degree: number;
+  closed: boolean;
+}
+
 export type Entity =
   | LineEntity
   | PolylineEntity
   | CircleEntity
   | ArcEntity
   | EllipseEntity
-  | InsertEntity;
+  | InsertEntity
+  | TextEntity
+  | SplineEntity;
 
 export type EntityType = Entity["type"];
 
@@ -119,6 +168,8 @@ export interface DxfDocument {
   layers: Map<string, LayerInfo>;
   entities: Entity[];
   blocks: Map<string, BlockDef>;
+  /** Linetype definitions from the LTYPE table, keyed by name. */
+  lineTypes: Map<string, LineTypeDef>;
   /** Counts of raw DXF entity types that were skipped by the parser stage. */
   unsupported: Record<string, number>;
 }

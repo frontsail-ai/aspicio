@@ -31,6 +31,11 @@ export { Camera2D } from "./camera/camera2d.ts";
 export { attachGestures } from "./input/gestures.ts";
 export type { GestureOptions } from "./input/gestures.ts";
 
+export { sampleSpline } from "./geom/spline.ts";
+export { dashPolyline } from "./geom/dash.ts";
+export { layoutText, stripMText } from "./text/layout.ts";
+export type { TextLayoutOptions } from "./text/layout.ts";
+
 export type {
   Bounds,
   BlockDef,
@@ -38,11 +43,17 @@ export type {
   Entity,
   EntityType,
   LayerInfo,
+  LineTypeDef,
   Point2,
+  Point3,
   LineEntity,
   PolylineEntity,
   CircleEntity,
   ArcEntity,
   EllipseEntity,
   InsertEntity,
+  TextEntity,
+  TextHAlign,
+  TextVAlign,
+  SplineEntity,
 } from "./model/types.ts";

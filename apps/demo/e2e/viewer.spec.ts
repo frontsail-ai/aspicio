@@ -37,15 +37,15 @@ test("starts in the empty state with canvas chrome hidden", async ({ page }) => 
 test("loads the sample with stats, layers, and skip report", async ({ page }) => {
   await loadSample(page);
 
-  await expect(page.locator("#stats")).toHaveText("13 ENT · 226 SEG");
+  await expect(page.locator("#stats")).toHaveText("17 ENT · 445 SEG");
   await expect(page.locator("#skipped-btn")).toContainText("1 SKIPPED");
   await expect(page.locator("#empty-state")).toBeHidden();
   await expect(page.locator("#controls")).toBeVisible();
 
   const probe = await probeViewer(page);
-  expect(probe.entityCount).toBe(13);
-  expect(probe.segmentCount).toBe(226);
-  expect(probe.unsupported).toEqual({ MTEXT: 1 });
+  expect(probe.entityCount).toBe(17);
+  expect(probe.segmentCount).toBe(445);
+  expect(probe.unsupported).toEqual({ POINT: 1 });
   expect(probe.layers.map((l) => l.name)).toEqual(
     expect.arrayContaining(["WALLS", "DOORS", "FURNITURE", "DECOR", "NOTES"]),
   );
@@ -57,7 +57,7 @@ test("skipped-entities popover opens with detail and closes outside", async ({ p
   await loadSample(page);
   await page.locator("#skipped-btn").click();
   await expect(page.locator("#skipped-pop")).toBeVisible();
-  await expect(page.locator("#skipped-detail")).toContainText("1 MTEXT");
+  await expect(page.locator("#skipped-detail")).toContainText("1 POINT");
   await page.locator(".brand").click();
   await expect(page.locator("#skipped-pop")).toBeHidden();
 });
@@ -68,7 +68,29 @@ test("renders every layer's signature color on the canvas", async ({ page }) => 
   expect(colors.green).toBeGreaterThan(100); // walls
   expect(colors.red).toBeGreaterThan(20); // door arc
   expect(colors.cyan).toBeGreaterThan(100); // furniture
-  expect(colors.magenta).toBeGreaterThan(50); // rug ellipse
+  expect(colors.magenta).toBeGreaterThan(50); // rug ellipse + spline
+  expect(colors.yellow).toBeGreaterThan(100); // TEXT / MTEXT on NOTES
+});
+
+test("renders TEXT and MTEXT as stroke glyphs (NOTES layer, soloed)", async ({ page }) => {
+  await loadSample(page);
+  // Solo NOTES: only the text ("ROOM A" + "Floor plan") remains, in yellow.
+  await row(page, "NOTES").dblclick();
+  await page.waitForTimeout(150);
+  const colors = await canvasColors(page);
+  expect(colors.yellow).toBeGreaterThan(100); // glyph strokes present
+  expect(colors.cyan).toBeLessThan(10); // furniture hidden
+  expect(colors.green).toBeLessThan(10); // walls hidden
+});
+
+test("renders the SPLINE curve (DECOR layer, soloed)", async ({ page }) => {
+  await loadSample(page);
+  await row(page, "DECOR").dblclick();
+  await page.waitForTimeout(150);
+  const colors = await canvasColors(page);
+  // DECOR carries the ellipse and the spline — both magenta, everything else gone.
+  expect(colors.magenta).toBeGreaterThan(80);
+  expect(colors.green).toBeLessThan(10);
 });
 
 test("toggling a layer hides and restores its geometry", async ({ page }) => {

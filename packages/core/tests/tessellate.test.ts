@@ -9,6 +9,7 @@ function makeDoc(partial: Partial<DxfDocument>): DxfDocument {
     ]),
     entities: [],
     blocks: new Map(),
+    lineTypes: new Map(),
     unsupported: {},
     ...partial,
   };
