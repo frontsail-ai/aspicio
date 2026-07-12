@@ -5,6 +5,15 @@ export interface Point2 {
   y: number;
 }
 
+export interface Point3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** 2D affine transform: [a, b, c, d, tx, ty] mapping (x,y) → (a·x+c·y+tx, b·x+d·y+ty). */
+export type Affine2D = [number, number, number, number, number, number];
+
 export interface Bounds {
   minX: number;
   minY: number;
@@ -32,6 +41,12 @@ interface EntityBase {
   layer: string;
   /** Resolved 24-bit RGB, or null for ByLayer/ByBlock. */
   color: number | null;
+  /**
+   * OCS extrusion normal (codes 210/220/230) for entity types whose
+   * coordinates are OCS-relative (ARC, POLYLINE, INSERT). Undefined means
+   * the default +Z (world coordinates). (0,0,-1) marks mirrored entities.
+   */
+  extrusion?: Point3;
 }
 
 export interface LineEntity extends EntityBase {

@@ -1,8 +1,8 @@
 import { DEFAULT_CURVE_SEGMENTS, sampleArc, sampleBulge, sampleEllipse } from "../geom/arc.ts";
-import type { Bounds, DxfDocument, Entity, EntityType, Point2 } from "../model/types.ts";
+import { ocsToWcs } from "../geom/ocs.ts";
+import type { Affine2D, Bounds, DxfDocument, Entity, EntityType, Point2 } from "../model/types.ts";
 
-/** 2D affine transform: [a, b, c, d, tx, ty] mapping (x,y) → (a·x+c·y+tx, b·x+d·y+ty). */
-type Affine = [number, number, number, number, number, number];
+type Affine = Affine2D;
 
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
 const MAX_INSERT_DEPTH = 16;
@@ -156,6 +156,11 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
       // CAD rule: block entities on layer "0" belong to the insert's layer.
       const layer = layerOverride !== null && entity.layer === "0" ? layerOverride : entity.layer;
       const color = entity.color ?? colorOverride ?? layerColor(layer);
+      // OCS: entities carrying an extrusion normal (mirrored ARCs, POLYLINEs,
+      // INSERTs) have OCS-relative coordinates — map them to world first.
+      const entityTransform = entity.extrusion
+        ? multiply(transform, ocsToWcs(entity.extrusion))
+        : transform;
 
       const ctx: TessellationContext = {
         curveSegments,
@@ -180,10 +185,10 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
           for (let i = 0; i < n; i++) {
             const p1 = points[i];
             const p2 = points[(i + 1) % points.length];
-            const x1 = transform[0] * p1.x + transform[2] * p1.y + transform[4];
-            const y1 = transform[1] * p1.x + transform[3] * p1.y + transform[5];
-            const x2 = transform[0] * p2.x + transform[2] * p2.y + transform[4];
-            const y2 = transform[1] * p2.x + transform[3] * p2.y + transform[5];
+            const x1 = entityTransform[0] * p1.x + entityTransform[2] * p1.y + entityTransform[4];
+            const y1 = entityTransform[1] * p1.x + entityTransform[3] * p1.y + entityTransform[5];
+            const x2 = entityTransform[0] * p2.x + entityTransform[2] * p2.y + entityTransform[4];
+            const y2 = entityTransform[1] * p2.x + entityTransform[3] * p2.y + entityTransform[5];
             acc.positions.push(x1, y1, 0, x2, y2, 0);
             acc.colors.push(r, g, b, r, g, b);
             segmentCount += 1;
@@ -202,7 +207,7 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
           const block = doc.blocks.get(blockName);
           if (!block) return;
           const base: Affine = [1, 0, 0, 1, -block.basePoint.x, -block.basePoint.y];
-          const combined = multiply(transform, multiply(local, base));
+          const combined = multiply(entityTransform, multiply(local, base));
           walk(
             block.entities,
             combined,
