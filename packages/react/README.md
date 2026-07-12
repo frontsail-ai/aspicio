@@ -10,9 +10,12 @@ npm install @aspicio/react   # @aspicio/core comes along; react 18/19 is a peer
 - `<DxfEmbed>` — batteries included: layer list + interactive preview in one
   component.
 - `<DxfPreview>` — the embeddable canvas alone: pan/zoom/rotate (mouse and
-  multi-touch), animated fit, batched WebGL rendering. No chrome.
-- `<DxfLayerPanel>` — the ready-made layer list alone: visibility toggles,
-  effective-color swatches, entity counts, hover-to-highlight.
+  multi-touch), animated fit, batched WebGL rendering. No chrome. Pass
+  `onHoverLayer` to hit-test the layer under the cursor.
+- `<DxfLayerPanel>` — the ready-made layer list, identical to the demo app:
+  header with layer count, visibility checkboxes, effective-color swatches,
+  entity counts, hover-to-highlight, double-click-to-solo (with a banner),
+  and a gesture-hints footer. `theme="none"` renders a minimal unstyled list.
 
 ## One component
 

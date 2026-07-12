@@ -8,6 +8,7 @@ export const aspicioTokens = {
   bg: "#0f1115",
   canvas: "#16181d",
   panel: "#191c22",
+  panel2: "#1f232b",
   hover: "rgba(255,255,255,.055)",
   hairline: "#282c34",
   hairline2: "#3a3f4a",
@@ -15,6 +16,10 @@ export const aspicioTokens = {
   text2: "#9aa0ab",
   text3: "#6a707b",
   crease: "#4c8dff",
+  creasedim: "rgba(76,141,255,.16)",
+  amber: "#e0a82e",
+  amberdim: "rgba(224,168,46,.16)",
+  amberborder: "rgba(224,168,46,.4)",
   /*
    * Font stacks only — the theme never loads webfonts itself. Load IBM Plex
    * in the host page for the exact demo look; otherwise these degrade to
