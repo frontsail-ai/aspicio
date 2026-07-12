@@ -14,6 +14,9 @@
     "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "isolatedModules": true,
+    "paths": {
+      "@observo/core": ["../core/src/index.ts"]
+    },
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   }
