@@ -77,17 +77,16 @@ jobs:
       - name: Build all packages
         run: bunx vp run -r build
 
-      - name: Configure npm auth
-        # bun publish requires a token even for --dry-run; fall back to a
-        # placeholder so dry runs work before the secret exists.
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN:-dry-run-placeholder}" > ~/.npmrc
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
+      # bun publish reads NPM_CONFIG_TOKEN (it ignores ~/.npmrc), and wants a
+      # token even for --dry-run — hence the placeholder fallback.
       - name: Publish @aspicio/core
         run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         working-directory: packages/core
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
 
       - name: Publish @aspicio/react
         run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         working-directory: packages/react
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
