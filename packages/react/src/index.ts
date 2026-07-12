@@ -6,6 +6,8 @@
  * on the DxfViewer instance exposed via ref/onViewer.
  */
 
+export { DxfEmbed } from "./DxfEmbed.tsx";
+export type { DxfEmbedProps } from "./DxfEmbed.tsx";
 export { DxfPreview } from "./DxfPreview.tsx";
 export type { DxfPreviewProps } from "./DxfPreview.tsx";
 export { DxfLayerPanel } from "./DxfLayerPanel.tsx";

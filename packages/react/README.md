@@ -2,10 +2,26 @@
 
 React bindings for the [Observo](../..) DXF viewer.
 
-- `<DxfPreview>` — the embeddable canvas: pan/zoom/rotate (mouse and
+- `<DxfEmbed>` — batteries included: layer list + interactive preview in one
+  component.
+- `<DxfPreview>` — the embeddable canvas alone: pan/zoom/rotate (mouse and
   multi-touch), animated fit, batched WebGL rendering. No chrome.
-- `<DxfLayerPanel>` — optional ready-made layer list: visibility toggles,
+- `<DxfLayerPanel>` — the ready-made layer list alone: visibility toggles,
   effective-color swatches, entity counts, hover-to-highlight.
+
+## One component
+
+```tsx
+import { DxfEmbed } from "@observo/react";
+
+// file: File | Blob | ArrayBuffer | string (DXF text) — or use srcUrl
+<DxfEmbed src={file} style={{ height: 480 }} />;
+```
+
+Props: `panel="left" | "right" | "none"`, `panelStyle`, `options`,
+`onLoaded`, `onError`, plus a `ref` exposing the full `DxfViewer`.
+
+## Custom layout
 
 ```tsx
 import { useRef, useState } from "react";

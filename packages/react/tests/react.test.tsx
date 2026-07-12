@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { StrictMode, createRef } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import type { DxfViewer } from "@observo/core";
+import { DxfEmbed } from "../src/DxfEmbed.tsx";
 import { DxfLayerPanel } from "../src/DxfLayerPanel.tsx";
 import { DxfPreview } from "../src/DxfPreview.tsx";
 
@@ -159,6 +160,39 @@ test("exposes the viewer via ref and onViewer", async () => {
   expect(onViewer).toHaveBeenCalledWith(lastViewer());
   unmount();
   expect(onViewer).toHaveBeenLastCalledWith(null);
+});
+
+/* ---------- DxfEmbed ---------- */
+
+test("DxfEmbed renders panel and preview together and loads src", async () => {
+  const { container, getByText } = render(<DxfEmbed src="dxf-data" style={{ height: 400 }} />);
+  await flush();
+  expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
+  // Panel lists the loaded layers; preview container exists beside it.
+  expect(getByText("CUT")).toBeTruthy();
+  expect(getByText("MARK")).toBeTruthy();
+  expect(container.querySelectorAll("ul")).toHaveLength(1);
+  expect(lastViewer().container).toBeTruthy();
+});
+
+test("DxfEmbed panel interactions drive the viewer", async () => {
+  const { getByLabelText } = render(<DxfEmbed src="dxf-data" />);
+  await flush();
+  fireEvent.click(getByLabelText("CUT"));
+  expect(lastViewer().setLayerVisible).toHaveBeenCalledWith("CUT", false);
+});
+
+test("DxfEmbed with panel=none renders no layer list", async () => {
+  const { container } = render(<DxfEmbed src="dxf-data" panel="none" />);
+  await flush();
+  expect(container.querySelector("ul")).toBeNull();
+});
+
+test("DxfEmbed exposes the viewer via ref", async () => {
+  const ref = createRef<DxfViewer>();
+  render(<DxfEmbed src="dxf-data" ref={ref} />);
+  await flush();
+  expect(ref.current).toBe(lastViewer() as unknown as DxfViewer);
 });
 
 /* ---------- DxfLayerPanel ---------- */
