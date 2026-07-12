@@ -14,6 +14,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@aspicio/core": "workspace:*",
+        "three": "^0.185.1",
       },
       "devDependencies": {
         "@playwright/test": "^1.61.1",
@@ -29,7 +30,6 @@
       "version": "0.0.0",
       "dependencies": {
         "dxf-parser": "^1.1.2",
-        "three": "^0.185.1",
       },
       "devDependencies": {
         "@types/node": "^26.1.1",
@@ -38,15 +38,19 @@
         "@vitest/coverage-v8": "4.1.10",
         "bumpp": "^11.1.0",
         "happy-dom": "^20.10.6",
+        "three": "^0.185.1",
         "typescript": "^7.0.2",
         "vite-plus": "catalog:",
+      },
+      "peerDependencies": {
+        "three": ">=0.184.0 <1.0.0",
       },
     },
     "packages/react": {
       "name": "@aspicio/react",
       "version": "0.0.0",
       "dependencies": {
-        "@aspicio/core": "workspace:*",
+        "@aspicio/core": "workspace:^",
       },
       "devDependencies": {
         "@testing-library/react": "^16.3.0",
@@ -61,6 +65,7 @@
       },
       "peerDependencies": {
         "react": "^18.0.0 || ^19.0.0",
+        "three": ">=0.184.0 <1.0.0",
       },
     },
   },

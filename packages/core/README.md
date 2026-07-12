@@ -5,6 +5,10 @@ and mobile-grade gestures behind one small facade. Framework-agnostic —
 React bindings live in
 [`@aspicio/react`](https://github.com/frontsail-ai/aspicio/tree/main/packages/react#readme).
 
+```bash
+npm install @aspicio/core three   # three is a peer dependency (>=0.184)
+```
+
 ```ts
 import { DxfViewer } from "@aspicio/core";
 
@@ -99,8 +103,9 @@ are usable stand-alone for custom renderers.
 
 - Geometry is re-centered around the drawing bounds before GPU upload, so
   georeferenced files with huge coordinates don't jitter under float32.
-- Bundle cost: Three.js rides along as a regular dependency (~150 kB
-  gzipped).
+- Bundle cost: Three.js (~150 kB gzipped). It's a **peer dependency**, so
+  your app owns the single `three` instance — no duplicate copies when
+  other three-based libraries share the tree.
 
 ## Development
 

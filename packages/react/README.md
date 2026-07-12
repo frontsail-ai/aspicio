@@ -4,7 +4,7 @@ React bindings for the
 [Aspicio](https://github.com/frontsail-ai/aspicio#readme) DXF viewer.
 
 ```bash
-npm install @aspicio/react   # @aspicio/core comes along; react 18/19 is a peer
+npm install @aspicio/react react three   # @aspicio/core comes along; react 18/19 and three (>=0.184) are peers
 ```
 
 - `<DxfEmbed>` — batteries included: layer list + interactive preview in one

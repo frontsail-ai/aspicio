@@ -10,7 +10,8 @@
     "e2e": "playwright test -c e2e/playwright.config.ts"
   },
   "dependencies": {
-    "@aspicio/core": "workspace:*"
+    "@aspicio/core": "workspace:*",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
