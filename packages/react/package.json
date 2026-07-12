@@ -44,6 +44,7 @@
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0"
+    "react": "^18.0.0 || ^19.0.0",
+    "three": ">=0.184.0 <1.0.0"
   }
 }
