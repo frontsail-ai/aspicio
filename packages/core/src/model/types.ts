@@ -37,6 +37,11 @@ export interface LayerInfo {
   entityCount: number;
   /** Layer's default linetype name (resolved against the document map). */
   lineType?: string;
+  /**
+   * Layer's default lineweight in 1/100 mm (DXF group 370). Negative codes
+   * (-3 default, -2 ByBlock, -1 ByLayer) are dropped to `undefined`.
+   */
+  lineWeight?: number;
 }
 
 interface EntityBase {
@@ -54,6 +59,12 @@ interface EntityBase {
    * against the document's `lineTypes` map to a dash pattern at render time.
    */
   lineType?: string;
+  /**
+   * Lineweight in 1/100 mm (DXF group 370), or undefined to inherit the
+   * layer's. Negative "ByLayer/ByBlock/default" codes are dropped to
+   * undefined so the layer default applies.
+   */
+  lineWeight?: number;
 }
 
 /**

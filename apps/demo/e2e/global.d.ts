@@ -11,8 +11,22 @@ interface AspicioTestHook {
     rotation: number;
   };
   getLayers(): { name: string; visible: boolean }[];
+  document: {
+    entities: { type: string; layer: string; lineWeight?: number }[];
+  } | null;
+  worldToScreen(point: { x: number; y: number }): { x: number; y: number };
+  screenToWorld(x: number, y: number): { x: number; y: number };
+}
+
+/** Demo-level interaction state, exposed for e2e observation. */
+interface DemoTestHook {
+  readonly selectedIndex: number | null;
+  readonly measureActive: boolean;
+  readonly measurePoints: { x: number; y: number }[];
+  pickAt(x: number, y: number): { index: number } | null;
 }
 
 declare interface Window {
   __aspicio?: AspicioTestHook;
+  __demo?: DemoTestHook;
 }

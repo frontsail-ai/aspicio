@@ -17,10 +17,16 @@ export interface LayerGeometry {
   positions: Float32Array;
   /** rgb (0..1) per line vertex. */
   colors: Float32Array;
+  /** Lineweight in 1/100 mm, one value per segment (parallel to `positions`). */
+  widths: Float32Array;
+  /** Top-level entity index, one value per segment (parallel to `positions`). */
+  segmentIds: Int32Array;
   /** xyz triplets, three vertices per filled triangle (SOLID, HATCH, …). */
   fillPositions: Float32Array;
   /** rgb (0..1) per fill vertex. */
   fillColors: Float32Array;
+  /** Top-level entity index, one value per triangle (parallel to `fillPositions`). */
+  fillIds: Int32Array;
 }
 
 export interface Tessellation {
@@ -203,8 +209,11 @@ function multiply(m: Affine, n: Affine): Affine {
 interface Accumulator {
   positions: number[];
   colors: number[];
+  widths: number[];
+  segmentIds: number[];
   fillPositions: number[];
   fillColors: number[];
+  fillIds: number[];
 }
 
 export interface TessellateOptions {
@@ -234,18 +243,34 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
     return lt && lt.pattern.length > 0 && lt.patternLength > 1e-9 ? lt.pattern : null;
   };
 
+  // Resolve a lineweight in 1/100 mm (entity → block override → layer → 0).
+  // 0 means "hairline" — the renderer draws it as a thin 1px line.
+  const resolveWidth = (entity: Entity, layer: string, override: number | null): number => {
+    if (entity.lineWeight !== undefined && entity.lineWeight >= 0) return entity.lineWeight;
+    if (override !== null) return override;
+    const lw = doc.layers.get(layer)?.lineWeight;
+    return lw !== undefined && lw >= 0 ? lw : 0;
+  };
+
   function walk(
     entities: Entity[],
     transform: Affine,
     layerOverride: string | null,
     colorOverride: number | null,
     depth: number,
+    widthOverride: number | null,
+    entityIdOverride: number | null,
   ): void {
-    for (const entity of entities) {
+    for (let idx = 0; idx < entities.length; idx++) {
+      const entity = entities[idx];
+      // Every segment/triangle carries the index of the top-level entity it
+      // belongs to, so a screen pick maps back to `document.entities[id]`.
+      const entityId = entityIdOverride ?? idx;
       // CAD rule: block entities on layer "0" belong to the insert's layer.
       const layer = layerOverride !== null && entity.layer === "0" ? layerOverride : entity.layer;
       const color = entity.color ?? colorOverride ?? layerColor(layer);
       const dashPattern = resolveDash(entity, layer);
+      const weight = resolveWidth(entity, layer, widthOverride);
       // OCS: entities carrying an extrusion normal (mirrored ARCs, POLYLINEs,
       // INSERTs) have OCS-relative coordinates — map them to world first.
       const entityTransform = entity.extrusion
@@ -255,7 +280,15 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
       const getAcc = (): Accumulator => {
         let acc = accumulators.get(layer);
         if (!acc) {
-          acc = { positions: [], colors: [], fillPositions: [], fillColors: [] };
+          acc = {
+            positions: [],
+            colors: [],
+            widths: [],
+            segmentIds: [],
+            fillPositions: [],
+            fillColors: [],
+            fillIds: [],
+          };
           accumulators.set(layer, acc);
         }
         return acc;
@@ -296,6 +329,8 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
               const [x2, y2] = tx(pts[(i + 1) % pts.length]);
               acc.positions.push(x1, y1, 0, x2, y2, 0);
               acc.colors.push(r, g, b, r, g, b);
+              acc.widths.push(weight);
+              acc.segmentIds.push(entityId);
               segmentCount += 1;
               track(x1, y1);
               track(x2, y2);
@@ -316,10 +351,11 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
           if (tris.length < 3) return;
           const acc = getAcc();
           countColor(tris.length / 3);
-          for (const p of tris) {
-            const [x, y] = tx(p);
+          for (let i = 0; i < tris.length; i++) {
+            const [x, y] = tx(tris[i]);
             acc.fillPositions.push(x, y, 0);
             acc.fillColors.push(r, g, b);
+            if (i % 3 === 0) acc.fillIds.push(entityId);
             track(x, y);
           }
         },
@@ -335,6 +371,8 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
             layerOverride !== null && insertLayer === "0" ? layerOverride : insertLayer,
             entity.color ?? insertColor ?? colorOverride,
             depth + 1,
+            weight > 0 ? weight : widthOverride,
+            entityId,
           );
         },
       };
@@ -343,7 +381,7 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
     }
   }
 
-  walk(doc.entities, IDENTITY, null, null, 0);
+  walk(doc.entities, IDENTITY, null, null, 0, null, null);
 
   const bounds: Bounds | null = minX <= maxX ? { minX, minY, maxX, maxY } : null;
   const offset: Point2 = bounds
@@ -365,8 +403,11 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
     layers.set(name, {
       positions: recenter(acc.positions),
       colors: new Float32Array(acc.colors),
+      widths: new Float32Array(acc.widths),
+      segmentIds: Int32Array.from(acc.segmentIds),
       fillPositions: recenter(acc.fillPositions),
       fillColors: new Float32Array(acc.fillColors),
+      fillIds: Int32Array.from(acc.fillIds),
     });
   }
 

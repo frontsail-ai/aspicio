@@ -15,6 +15,76 @@ function distanceSqToSegment(p: Point2, x1: number, y1: number, x2: number, y2: 
   return (p.x - cx) ** 2 + (p.y - cy) ** 2;
 }
 
+/** True if p lies inside triangle (ax,ay)-(bx,by)-(cx,cy) (any winding). */
+function pointInTriangle(
+  p: Point2,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+): boolean {
+  const d1 = (p.x - bx) * (ay - by) - (ax - bx) * (p.y - by);
+  const d2 = (p.x - cx) * (by - cy) - (bx - cx) * (p.y - cy);
+  const d3 = (p.x - ax) * (cy - ay) - (cx - ax) * (p.y - ay);
+  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+  const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+  return !(hasNeg && hasPos);
+}
+
+/** A geometry hit: the top-level entity it belongs to and its layer. */
+export interface EntityHit {
+  /** Index into `document.entities`. */
+  entityId: number;
+  layer: string;
+}
+
+/**
+ * Find the top-level entity whose geometry is closest to `point` (in
+ * tessellation space, i.e. offset-corrected world coordinates). Line
+ * segments within `tolerance` win first (nearest); otherwise a filled
+ * triangle containing the point is returned (so clicking inside a SOLID or
+ * solid HATCH selects it). Returns null when nothing is hit.
+ */
+export function pickEntity(
+  tessellation: Tessellation,
+  point: Point2,
+  tolerance: number,
+  isLayerPickable: (name: string) => boolean = () => true,
+): EntityHit | null {
+  let best: EntityHit | null = null;
+  let bestDistSq = tolerance * tolerance;
+
+  // Pass 1: line segments — edges are clickable and take priority over fills.
+  for (const [name, layer] of tessellation.layers) {
+    if (!isLayerPickable(name)) continue;
+    const p = layer.positions;
+    const ids = layer.segmentIds;
+    for (let i = 0, s = 0; i + 5 < p.length; i += 6, s++) {
+      const distSq = distanceSqToSegment(point, p[i], p[i + 1], p[i + 3], p[i + 4]);
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        best = { entityId: ids[s], layer: name };
+      }
+    }
+  }
+  if (best) return best;
+
+  // Pass 2: filled interiors — first triangle containing the point wins.
+  for (const [name, layer] of tessellation.layers) {
+    if (!isLayerPickable(name)) continue;
+    const fp = layer.fillPositions;
+    const fids = layer.fillIds;
+    for (let i = 0, t = 0; i + 8 < fp.length; i += 9, t++) {
+      if (pointInTriangle(point, fp[i], fp[i + 1], fp[i + 3], fp[i + 4], fp[i + 6], fp[i + 7])) {
+        return { entityId: fids[t], layer: name };
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Find the layer whose geometry is closest to `point` (in tessellation
  * space, i.e. offset-corrected world coordinates), within `tolerance`.

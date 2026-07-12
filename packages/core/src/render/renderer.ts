@@ -22,7 +22,16 @@ export interface SceneRendererOptions {
   background?: number | null;
   /** Pixel width of the layer-highlight overlay lines. */
   highlightWidth?: number;
+  /**
+   * Screen pixels drawn per millimetre of lineweight. DXF weights are in
+   * 1/100 mm; a weight of 50 (0.5 mm) at the default scale draws ~2.5 px.
+   */
+  lineWeightScale?: number;
 }
+
+const DEFAULT_LINEWEIGHT_SCALE = 5;
+/** Selection overlay colours. */
+const SELECT_COLOR = 0x8fc8ff;
 
 /** Three.js-backed renderer drawing batched per-layer line segments. */
 export class SceneRenderer {
@@ -32,9 +41,18 @@ export class SceneRenderer {
   private readonly material = new LineBasicMaterial({ vertexColors: true });
   private readonly fillMaterial = new MeshBasicMaterial({ vertexColors: true, side: DoubleSide });
   private readonly highlightMaterial: LineMaterial;
-  private layerObjects = new Map<string, LineSegments>();
+  private readonly selectLineMaterial: LineMaterial;
+  private readonly selectFillMaterial: MeshBasicMaterial;
+  /** Fat-line materials keyed by rounded pixel width, shared across layers. */
+  private readonly widthMaterials = new Map<number, LineMaterial>();
+  private readonly lineWeightScale: number;
+  private layerObjects = new Map<string, (LineSegments | LineSegments2)[]>();
   private fillObjects = new Map<string, Mesh>();
   private highlightObject: LineSegments2 | null = null;
+  private selectLineObject: LineSegments2 | null = null;
+  private selectFillObject: Mesh | null = null;
+  private width = 1;
+  private height = 1;
   private tessellation: Tessellation | null = null;
 
   constructor(canvas: HTMLCanvasElement, options: SceneRendererOptions = {}) {
@@ -42,11 +60,40 @@ export class SceneRenderer {
     this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: transparent });
     this.renderer.setClearColor(new Color(options.background ?? 0x16181d), transparent ? 0 : 1);
     this.camera.position.z = 10;
+    this.lineWeightScale = options.lineWeightScale ?? DEFAULT_LINEWEIGHT_SCALE;
     this.highlightMaterial = new LineMaterial({
       vertexColors: true,
-      linewidth: options.highlightWidth ?? 3,
+      linewidth: options.highlightWidth ?? 4,
       depthTest: false,
     });
+    this.selectLineMaterial = new LineMaterial({
+      color: SELECT_COLOR,
+      linewidth: 4,
+      depthTest: false,
+    });
+    this.selectFillMaterial = new MeshBasicMaterial({
+      color: SELECT_COLOR,
+      transparent: true,
+      opacity: 0.28,
+      side: DoubleSide,
+      depthTest: false,
+    });
+  }
+
+  /** Pixel width for a DXF lineweight (1/100 mm), clamped to a visible minimum. */
+  private pixelWidth(weight: number): number {
+    return Math.max(1, (weight / 100) * this.lineWeightScale);
+  }
+
+  /** A shared fat-line material for a given rounded pixel width. */
+  private widthMaterial(px: number): LineMaterial {
+    let mat = this.widthMaterials.get(px);
+    if (!mat) {
+      mat = new LineMaterial({ vertexColors: true, linewidth: px });
+      mat.resolution.set(this.width, this.height);
+      this.widthMaterials.set(px, mat);
+    }
+    return mat;
   }
 
   /** Replace scene content with a new tessellation. */
@@ -65,23 +112,99 @@ export class SceneRenderer {
         this.fillObjects.set(name, fill);
       }
       if (layer.positions.length > 0) {
-        const geometry = new BufferGeometry();
-        geometry.setAttribute("position", new BufferAttribute(layer.positions, 3));
-        geometry.setAttribute("color", new BufferAttribute(layer.colors, 3));
-        const object = new LineSegments(geometry, this.material);
-        object.frustumCulled = false;
-        object.renderOrder = 1;
-        this.scene.add(object);
-        this.layerObjects.set(name, object);
+        this.layerObjects.set(name, this.buildLineObjects(layer));
       }
     }
   }
 
+  /**
+   * Build a layer's line objects, grouped by lineweight: hairline/default
+   * segments stay cheap thin lines; each heavier weight becomes one fat
+   * `LineSegments2` sharing a per-pixel-width material.
+   */
+  private buildLineObjects(layer: {
+    positions: Float32Array;
+    colors: Float32Array;
+    widths: Float32Array;
+  }): (LineSegments | LineSegments2)[] {
+    const { positions, colors, widths } = layer;
+    // Partition segment indices by rounded pixel width (0 = thin bucket).
+    const buckets = new Map<number, number[]>();
+    for (let s = 0; s < widths.length; s++) {
+      const px = widths[s] > 0 ? Math.round(this.pixelWidth(widths[s])) : 0;
+      const key = px <= 1 ? 0 : px;
+      let list = buckets.get(key);
+      if (!list) buckets.set(key, (list = []));
+      list.push(s);
+    }
+
+    const objects: (LineSegments | LineSegments2)[] = [];
+    for (const [px, segs] of buckets) {
+      const pos = new Float32Array(segs.length * 6);
+      const col = new Float32Array(segs.length * 6);
+      for (let j = 0; j < segs.length; j++) {
+        pos.set(positions.subarray(segs[j] * 6, segs[j] * 6 + 6), j * 6);
+        col.set(colors.subarray(segs[j] * 6, segs[j] * 6 + 6), j * 6);
+      }
+      if (px === 0) {
+        const geometry = new BufferGeometry();
+        geometry.setAttribute("position", new BufferAttribute(pos, 3));
+        geometry.setAttribute("color", new BufferAttribute(col, 3));
+        const object = new LineSegments(geometry, this.material);
+        object.frustumCulled = false;
+        object.renderOrder = 1;
+        this.scene.add(object);
+        objects.push(object);
+      } else {
+        const geometry = new LineSegmentsGeometry();
+        geometry.setPositions(pos);
+        geometry.setColors(col);
+        const object = new LineSegments2(geometry, this.widthMaterial(px));
+        object.frustumCulled = false;
+        object.renderOrder = 1;
+        this.scene.add(object);
+        objects.push(object);
+      }
+    }
+    return objects;
+  }
+
   setLayerVisible(name: string, visible: boolean): void {
-    const object = this.layerObjects.get(name);
-    if (object) object.visible = visible;
+    for (const object of this.layerObjects.get(name) ?? []) object.visible = visible;
     const fill = this.fillObjects.get(name);
     if (fill) fill.visible = visible;
+  }
+
+  /** Highlight a single entity: its line segments and any filled interior. */
+  setSelection(linePositions: Float32Array | null, fillPositions: Float32Array | null): void {
+    if (this.selectLineObject) {
+      this.scene.remove(this.selectLineObject);
+      this.selectLineObject.geometry.dispose();
+      this.selectLineObject = null;
+    }
+    if (this.selectFillObject) {
+      this.scene.remove(this.selectFillObject);
+      this.selectFillObject.geometry.dispose();
+      this.selectFillObject = null;
+    }
+    if (fillPositions && fillPositions.length > 0) {
+      const geo = new BufferGeometry();
+      geo.setAttribute("position", new BufferAttribute(fillPositions, 3));
+      const mesh = new Mesh(geo, this.selectFillMaterial);
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 2;
+      this.scene.add(mesh);
+      this.selectFillObject = mesh;
+    }
+    if (linePositions && linePositions.length > 0) {
+      const geo = new LineSegmentsGeometry();
+      geo.setPositions(linePositions);
+      const object = new LineSegments2(geo, this.selectLineMaterial);
+      object.frustumCulled = false;
+      object.renderOrder = 3;
+      this.scene.add(object);
+      this.selectLineObject = object;
+    }
   }
 
   /** Draw one layer with fat lines on top of everything, or clear with null. */
@@ -106,10 +229,14 @@ export class SceneRenderer {
   }
 
   resize(width: number, height: number, devicePixelRatio: number): void {
+    this.width = width;
+    this.height = height;
     this.renderer.setPixelRatio(devicePixelRatio);
     this.renderer.setSize(width, height, false);
-    // Fat-line material needs the viewport size to compute pixel widths.
+    // Every fat-line material needs the viewport size to compute pixel widths.
     this.highlightMaterial.resolution.set(width, height);
+    this.selectLineMaterial.resolution.set(width, height);
+    for (const mat of this.widthMaterials.values()) mat.resolution.set(width, height);
   }
 
   render(camera2d: Camera2D): void {
@@ -128,9 +255,12 @@ export class SceneRenderer {
 
   private clearGeometry(): void {
     this.setHighlight(null);
-    for (const object of this.layerObjects.values()) {
-      this.scene.remove(object);
-      object.geometry.dispose();
+    this.setSelection(null, null);
+    for (const objects of this.layerObjects.values()) {
+      for (const object of objects) {
+        this.scene.remove(object);
+        object.geometry.dispose();
+      }
     }
     for (const fill of this.fillObjects.values()) {
       this.scene.remove(fill);
@@ -146,6 +276,10 @@ export class SceneRenderer {
     this.material.dispose();
     this.fillMaterial.dispose();
     this.highlightMaterial.dispose();
+    this.selectLineMaterial.dispose();
+    this.selectFillMaterial.dispose();
+    for (const mat of this.widthMaterials.values()) mat.dispose();
+    this.widthMaterials.clear();
     this.renderer.dispose();
   }
 }
