@@ -38,11 +38,13 @@ export const DxfEmbed = forwardRef<DxfViewer | null, DxfEmbedProps>(function Dxf
     style,
     options,
     onViewer,
+    onHoverLayer,
     ...previewProps
   },
   ref,
 ): ReactElement {
   const [viewer, setViewer] = useState<DxfViewer | null>(null);
+  const [hoveredLayer, setHoveredLayer] = useState<string | null>(null);
   useImperativeHandle(ref, () => viewer as DxfViewer, [viewer]);
   const themed = theme === "aspicio";
 
@@ -51,15 +53,17 @@ export const DxfEmbed = forwardRef<DxfViewer | null, DxfEmbedProps>(function Dxf
       <DxfLayerPanel
         viewer={viewer}
         theme={theme}
+        reverseHighlightLayer={hoveredLayer}
         className={panelClassName}
         style={{
           width: 220,
           flexShrink: 0,
-          overflowY: "auto",
-          ...(themed && {
-            [panel === "left" ? "borderRight" : "borderLeft"]:
-              `1px solid ${aspicioTokens.hairline}`,
-          }),
+          ...(themed
+            ? {
+                [panel === "left" ? "borderRight" : "borderLeft"]:
+                  `1px solid ${aspicioTokens.hairline}`,
+              }
+            : { overflowY: "auto" }),
           ...panelStyle,
         }}
       />
@@ -89,6 +93,10 @@ export const DxfEmbed = forwardRef<DxfViewer | null, DxfEmbedProps>(function Dxf
           themed && options?.background === undefined ? { ...options, background: null } : options
         }
         style={{ flex: 1, minWidth: 0, ...(themed && aspicioCanvasBackground) }}
+        onHoverLayer={(layer) => {
+          if (panel !== "none") setHoveredLayer(layer);
+          onHoverLayer?.(layer);
+        }}
         onViewer={(instance) => {
           setViewer(instance);
           onViewer?.(instance);

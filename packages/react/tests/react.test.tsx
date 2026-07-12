@@ -32,6 +32,7 @@ const mock = vi.hoisted(() => {
       if (layer) layer.visible = visible;
     });
     setLayerHighlight = vi.fn();
+    pickLayer = vi.fn((_x: number, _y: number) => "CUT" as string | null);
     dispose = vi.fn(() => {
       this.disposed = true;
     });
@@ -198,12 +199,14 @@ test("DxfEmbed exposes the viewer via ref", async () => {
 });
 
 test("DxfEmbed is themed like the demo app by default", async () => {
-  const { container, getByRole } = render(<DxfEmbed src="dxf-data" />);
+  const { container } = render(<DxfEmbed src="dxf-data" />);
   await flush();
   const root = container.firstElementChild as HTMLElement;
   expect(root.style.background).toContain("#0f1115");
   expect(root.style.overflow).toBe("hidden");
-  expect((getByRole("list") as HTMLElement).style.background).toContain("#191c22");
+  // The themed panel background lives on the panel wrapper (first child).
+  const panel = root.firstElementChild as HTMLElement;
+  expect(panel.style.background).toContain("#191c22");
   // Themed embeds default to a transparent canvas so the grid shows through.
   expect(lastViewer().options).toMatchObject({ background: null });
 });
@@ -263,4 +266,91 @@ test("re-syncs rows when the viewer loads a new document", () => {
   act(() => viewer.emit("loaded"));
   expect(queryByText("NEW")).toBeTruthy();
   expect(queryByText("CUT")).toBeNull();
+});
+
+test("themed panel shows a header with the layer count and a hints footer", () => {
+  const { getByText } = renderPanel();
+  expect(getByText("LAYERS")).toBeTruthy();
+  expect(getByText("2")).toBeTruthy(); // count badge (CUT + MARK)
+  expect(getByText("solo layer")).toBeTruthy(); // a gesture hint
+});
+
+test("hints footer can be disabled", () => {
+  const viewer = new mock.MockViewer(document.createElement("div"));
+  const { queryByText } = render(
+    <DxfLayerPanel viewer={viewer as unknown as DxfViewer} hints={false} />,
+  );
+  expect(queryByText("solo layer")).toBeNull();
+});
+
+test("double-clicking a row solos it, then EXIT restores all layers", () => {
+  const { viewer, getByText, queryByText } = renderPanel();
+  fireEvent.doubleClick(getByText("CUT").closest("li")!);
+  // Solo hides every other layer and shows the banner (EXIT is unique to it).
+  expect(viewer.setLayerVisible).toHaveBeenCalledWith("MARK", false);
+  expect(viewer.setLayerVisible).toHaveBeenCalledWith("CUT", true);
+  expect(getByText("EXIT")).toBeTruthy();
+
+  viewer.setLayerVisible.mockClear();
+  fireEvent.click(getByText("EXIT"));
+  expect(viewer.setLayerVisible).toHaveBeenCalledWith("MARK", true);
+  expect(queryByText("EXIT")).toBeNull();
+});
+
+test("reverseHighlightLayer marks the matching row", () => {
+  const viewer = new mock.MockViewer(document.createElement("div"));
+  const { getByText } = render(
+    <DxfLayerPanel viewer={viewer as unknown as DxfViewer} reverseHighlightLayer="CUT" />,
+  );
+  const cutRow = getByText("CUT").closest("li") as HTMLElement;
+  const markRow = getByText("MARK").closest("li") as HTMLElement;
+  // The reverse-highlighted row gets the accent border; the other doesn't.
+  expect(cutRow.style.borderColor).toContain("#4c8dff");
+  expect(markRow.style.borderColor).toContain("transparent");
+});
+
+/* ---------- DxfPreview canvas hover-picking ---------- */
+
+test("onHoverLayer reports the picked layer and highlights it", async () => {
+  const onHoverLayer = vi.fn();
+  const { container } = render(<DxfPreview src="dxf-data" onHoverLayer={onHoverLayer} />);
+  await flush();
+  const host = container.firstElementChild as HTMLElement;
+  host.getBoundingClientRect = () => ({ left: 0, top: 0 }) as DOMRect;
+
+  host.dispatchEvent(
+    new PointerEvent("pointermove", {
+      bubbles: true,
+      pointerType: "mouse",
+      clientX: 5,
+      clientY: 5,
+    }),
+  );
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  expect(lastViewer().pickLayer).toHaveBeenCalled();
+  expect(onHoverLayer).toHaveBeenCalledWith("CUT");
+  expect(lastViewer().setLayerHighlight).toHaveBeenCalledWith("CUT");
+});
+
+test("DxfEmbed wires canvas hover to the panel's reverse-highlight", async () => {
+  const { container } = render(<DxfEmbed src="dxf-data" />);
+  await flush();
+  // Panel is on the left, so the preview is the embed root's last child.
+  const host = container.firstElementChild!.lastElementChild as HTMLElement;
+  host.getBoundingClientRect = () => ({ left: 0, top: 0 }) as DOMRect;
+  await act(async () => {
+    host.dispatchEvent(
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        pointerType: "mouse",
+        clientX: 5,
+        clientY: 5,
+      }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  });
+
+  const cutRow = container.querySelector("li") as HTMLElement; // first row = CUT
+  expect(cutRow.style.borderColor).toContain("#4c8dff");
 });
