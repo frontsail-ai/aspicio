@@ -66,6 +66,19 @@ for an info panel — reused by the demo and the React bindings.
 `"mm"`, or `""` when unitless). `unitLabel(code)` and `niceLength(max)`
 (a 1-2-5 round-number helper for scale bars) are exported too.
 
+### Layouts (paper space)
+
+| Member                 | Notes                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `getSpaces()`          | `["Model", ...layoutNames]` — model space plus any paper-space layouts                     |
+| `setActiveSpace(name)` | switch the displayed space; re-tessellates, re-fits, re-renders. Unknown names are ignored |
+| `activeSpaceName`      | the space currently shown (`"Model"` or a layout name)                                     |
+
+A layout renders its own sheet geometry plus each viewport's model content,
+transformed to the sheet scale and clipped to the window — all baked into
+one paper-space tessellation (`tessellateLayout`). Entity picking is limited
+to model space. `document.layouts` holds the parsed `Layout[]`.
+
 ### Camera
 
 | Member                               | Notes                                                    |
@@ -106,6 +119,11 @@ pattern HATCH falls back to its boundary outline), POINT (crosshair
 marker), and DIMENSION (its anonymous block is expanded, so dimension
 lines, arrowheads, and the measurement text all draw). Everything else
 is skipped, counted in `stats.unsupported`, and never breaks the load.
+
+Paper-space layouts are parsed too: model and paper geometry are kept
+apart, and VIEWPORT entities frame the model at a set scale. A layout
+draws its sheet plus each viewport's clipped, scaled model view — switch
+with `setActiveSpace`.
 
 Linetypes from the LTYPE table are honored: dashed/hidden/center
 patterns are dashed in drawing units (an entity's linetype, or its

@@ -265,6 +265,43 @@ test("exports the drawing as a downloadable SVG and PNG", async ({ page }) => {
   expect(png.suggestedFilename()).toBe("sample.png");
 });
 
+test("model-only files show no space tabs", async ({ page }) => {
+  await loadSample(page);
+  expect(await page.evaluate(() => window.__aspicio!.getSpaces())).toEqual(["Model"]);
+  await expect(page.locator("#space-tabs")).toBeHidden();
+});
+
+test("paper-space layouts appear as tabs and switch model ↔ sheet", async ({ page }) => {
+  await page.locator("#file").setInputFiles(fixture("layout.dxf"));
+  await expect(page.locator("#file-chip")).toHaveText("layout.dxf");
+
+  // Model space + one paper layout, offered as two tabs.
+  expect(await page.evaluate(() => window.__aspicio!.getSpaces())).toEqual(["Model", "Layout1"]);
+  await expect(page.locator("#space-tabs")).toBeVisible();
+  await expect(page.locator(".space-tab")).toHaveCount(2);
+  await expect(page.locator(".space-tab.active")).toHaveText("Model");
+
+  // Model space draws its geometry (green MODEL layer).
+  expect((await canvasColors(page)).green).toBeGreaterThan(100);
+
+  // Switching to the layout re-fits and renders the sheet + scaled model.
+  await page.locator(".space-tab", { hasText: "Layout1" }).click();
+  await expect(page.locator(".space-tab.active")).toHaveText("Layout1");
+  expect(await page.evaluate(() => window.__aspicio!.activeSpaceName)).toBe("Layout1");
+  expect((await canvasColors(page)).green).toBeGreaterThan(100); // model inside the viewport
+});
+
+test("parse separates model entities from the layout's paper geometry", async ({ page }) => {
+  await page.locator("#file").setInputFiles(fixture("layout.dxf"));
+  await expect(page.locator("#file-chip")).toHaveText("layout.dxf");
+  const split = await page.evaluate(() => {
+    const doc = window.__aspicio!.document!;
+    return { model: doc.entities.length, layout: doc.layouts?.[0].entities.length };
+  });
+  expect(split.model).toBe(4); // rect, diagonal, circle, overshoot
+  expect(split.layout).toBe(3); // border, titleblock box, text
+});
+
 test("toggling a layer hides and restores its geometry", async ({ page }) => {
   await loadSample(page);
   const furniture = page.getByRole("checkbox", { name: "FURNITURE" });

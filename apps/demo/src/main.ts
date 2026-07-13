@@ -138,6 +138,7 @@ app.innerHTML = `
         </div>
       </div>
       <svg id="measure-overlay" class="measure-overlay" hidden></svg>
+      <div id="space-tabs" class="space-tabs" hidden></div>
       <div id="readout" class="readout" hidden>
         <span class="readout-chip">ZOOM <span id="zoom-pct">100</span>%</span>
         <span class="readout-chip">ROT <span id="rot-deg">0</span>°</span>
@@ -220,6 +221,7 @@ function setMode(next: Mode): void {
   $("#scale-bar").hidden = !loaded;
   $("#export-btn").hidden = !loaded;
   if (!loaded) $("#export-pop").hidden = true;
+  if (!loaded) $("#space-tabs").hidden = true;
   if (!loaded) {
     clearSelection();
     setMeasureActive(false);
@@ -564,6 +566,39 @@ function syncPanel(): void {
   }
 }
 
+/* ---------- paper-space layout tabs ---------- */
+
+function buildSpaceTabs(): void {
+  const tabs = $("#space-tabs");
+  const spaces = viewer.getSpaces();
+  tabs.textContent = "";
+  // Only worth a switcher when the file actually has layouts.
+  tabs.hidden = spaces.length <= 1;
+  if (spaces.length <= 1) return;
+  for (const name of spaces) {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "space-tab";
+    tab.textContent = name;
+    tab.classList.toggle("active", name === viewer.activeSpaceName);
+    tab.addEventListener("click", () => setSpace(name));
+    tabs.appendChild(tab);
+  }
+}
+
+function setSpace(name: string): void {
+  if (name === viewer.activeSpaceName) return;
+  soloLayer = null;
+  clearSelection();
+  setMeasureActive(false);
+  viewer.setActiveSpace(name); // re-tessellates and re-fits synchronously
+  baselineZoom = viewer.view.unitsPerPixel; // re-baseline zoom% for the new fit
+  for (const tab of $("#space-tabs").querySelectorAll<HTMLElement>(".space-tab")) {
+    tab.classList.toggle("active", tab.textContent === name);
+  }
+  syncPanel();
+}
+
 /* ---------- status / readout ---------- */
 
 viewer.on("loaded", () => {
@@ -571,6 +606,7 @@ viewer.on("loaded", () => {
   setHover(null, null);
   baselineZoom = viewer.view.unitsPerPixel;
   buildLayerPanel();
+  buildSpaceTabs();
 
   const { entityCount, segmentCount, unsupported } = viewer.stats;
   $("#file-chip").textContent = currentName;

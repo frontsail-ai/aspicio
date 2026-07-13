@@ -3,7 +3,17 @@ import { dashPolyline } from "../geom/dash.ts";
 import { ocsToWcs } from "../geom/ocs.ts";
 import { sampleSpline } from "../geom/spline.ts";
 import { triangulate } from "../geom/triangulate.ts";
-import type { Affine2D, Bounds, DxfDocument, Entity, EntityType, Point2 } from "../model/types.ts";
+import { clipPolygon, clipSegment, viewportRect, viewportTransform } from "../geom/viewport.ts";
+import type { Rect } from "../geom/viewport.ts";
+import type {
+  Affine2D,
+  Bounds,
+  DxfDocument,
+  Entity,
+  EntityType,
+  Layout,
+  Point2,
+} from "../model/types.ts";
 import { layoutText } from "../text/layout.ts";
 
 type Affine = Affine2D;
@@ -220,8 +230,26 @@ export interface TessellateOptions {
   curveSegments?: number;
 }
 
-/** Tessellate a document into per-layer batched line segments. */
-export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): Tessellation {
+interface Tessellator {
+  /**
+   * Accumulate an entity list. `clip` (paper-space rect) is set only for a
+   * viewport's model content, which is transformed into paper coords and
+   * clipped to the window.
+   */
+  walk(
+    entities: Entity[],
+    transform: Affine,
+    layerOverride: string | null,
+    colorOverride: number | null,
+    depth: number,
+    widthOverride: number | null,
+    entityIdOverride: number | null,
+    clip: Rect | null,
+  ): void;
+  finalize(): Tessellation;
+}
+
+function createTessellator(doc: DxfDocument, options: TessellateOptions): Tessellator {
   const curveSegments = options.curveSegments ?? DEFAULT_CURVE_SEGMENTS;
   const accumulators = new Map<string, Accumulator>();
   const layerColors = new Map<string, Map<number, number>>();
@@ -260,6 +288,7 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
     depth: number,
     widthOverride: number | null,
     entityIdOverride: number | null,
+    clip: Rect | null,
   ): void {
     for (let idx = 0; idx < entities.length; idx++) {
       const entity = entities[idx];
@@ -314,6 +343,7 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
         entityTransform[0] * p.x + entityTransform[2] * p.y + entityTransform[4],
         entityTransform[1] * p.x + entityTransform[3] * p.y + entityTransform[5],
       ];
+      const ptOf = ([x, y]: [number, number]): Point2 => ({ x, y });
 
       const ctx: TessellationContext = {
         curveSegments,
@@ -323,14 +353,26 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
 
           const emit = (pts: Point2[], wrap: boolean): void => {
             const n = wrap ? pts.length : pts.length - 1;
-            countColor(n);
             for (let i = 0; i < n; i++) {
-              const [x1, y1] = tx(pts[i]);
-              const [x2, y2] = tx(pts[(i + 1) % pts.length]);
+              const [ax, ay] = tx(pts[i]);
+              const [bx, by] = tx(pts[(i + 1) % pts.length]);
+              let x1 = ax;
+              let y1 = ay;
+              let x2 = bx;
+              let y2 = by;
+              if (clip) {
+                const seg = clipSegment({ x: ax, y: ay }, { x: bx, y: by }, clip);
+                if (!seg) continue;
+                x1 = seg[0].x;
+                y1 = seg[0].y;
+                x2 = seg[1].x;
+                y2 = seg[1].y;
+              }
               acc.positions.push(x1, y1, 0, x2, y2, 0);
               acc.colors.push(r, g, b, r, g, b);
               acc.widths.push(weight);
               acc.segmentIds.push(entityId);
+              countColor(1);
               segmentCount += 1;
               track(x1, y1);
               track(x2, y2);
@@ -347,12 +389,25 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
           }
         },
         addFill(rings) {
-          const tris = triangulate(rings);
+          // With a clip, transform rings to paper coords and clip each to the
+          // window before triangulating; otherwise triangulate then transform.
+          const tris = clip
+            ? triangulate(
+                rings
+                  .map((ring) =>
+                    clipPolygon(
+                      ring.map((p) => ptOf(tx(p))),
+                      clip,
+                    ),
+                  )
+                  .filter((ring) => ring.length >= 3),
+              )
+            : triangulate(rings);
           if (tris.length < 3) return;
           const acc = getAcc();
           countColor(tris.length / 3);
           for (let i = 0; i < tris.length; i++) {
-            const [x, y] = tx(tris[i]);
+            const [x, y] = clip ? [tris[i].x, tris[i].y] : tx(tris[i]);
             acc.fillPositions.push(x, y, 0);
             acc.fillColors.push(r, g, b);
             if (i % 3 === 0) acc.fillIds.push(entityId);
@@ -373,6 +428,7 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
             depth + 1,
             weight > 0 ? weight : widthOverride,
             entityId,
+            clip,
           );
         },
       };
@@ -381,35 +437,63 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
     }
   }
 
-  walk(doc.entities, IDENTITY, null, null, 0, null, null);
+  const finalize = (): Tessellation => {
+    const bounds: Bounds | null = minX <= maxX ? { minX, minY, maxX, maxY } : null;
+    const offset: Point2 = bounds
+      ? { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
+      : { x: 0, y: 0 };
 
-  const bounds: Bounds | null = minX <= maxX ? { minX, minY, maxX, maxY } : null;
-  const offset: Point2 = bounds
-    ? { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
-    : { x: 0, y: 0 };
+    const recenter = (src: number[]): Float32Array => {
+      const out = new Float32Array(src.length);
+      for (let i = 0; i < src.length; i += 3) {
+        out[i] = src[i] - offset.x;
+        out[i + 1] = src[i + 1] - offset.y;
+        out[i + 2] = 0;
+      }
+      return out;
+    };
 
-  const recenter = (src: number[]): Float32Array => {
-    const out = new Float32Array(src.length);
-    for (let i = 0; i < src.length; i += 3) {
-      out[i] = src[i] - offset.x;
-      out[i + 1] = src[i + 1] - offset.y;
-      out[i + 2] = 0;
+    const layers = new Map<string, LayerGeometry>();
+    for (const [name, acc] of accumulators) {
+      layers.set(name, {
+        positions: recenter(acc.positions),
+        colors: new Float32Array(acc.colors),
+        widths: new Float32Array(acc.widths),
+        segmentIds: Int32Array.from(acc.segmentIds),
+        fillPositions: recenter(acc.fillPositions),
+        fillColors: new Float32Array(acc.fillColors),
+        fillIds: Int32Array.from(acc.fillIds),
+      });
     }
-    return out;
+
+    return { layers, bounds, offset, segmentCount, layerColors };
   };
 
-  const layers = new Map<string, LayerGeometry>();
-  for (const [name, acc] of accumulators) {
-    layers.set(name, {
-      positions: recenter(acc.positions),
-      colors: new Float32Array(acc.colors),
-      widths: new Float32Array(acc.widths),
-      segmentIds: Int32Array.from(acc.segmentIds),
-      fillPositions: recenter(acc.fillPositions),
-      fillColors: new Float32Array(acc.fillColors),
-      fillIds: Int32Array.from(acc.fillIds),
-    });
-  }
+  return { walk, finalize };
+}
 
-  return { layers, bounds, offset, segmentCount, layerColors };
+/** Tessellate a document's model space into per-layer batched geometry. */
+export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): Tessellation {
+  const t = createTessellator(doc, options);
+  t.walk(doc.entities, IDENTITY, null, null, 0, null, null, null);
+  return t.finalize();
+}
+
+/**
+ * Tessellate a paper-space layout: its own geometry in paper coordinates,
+ * plus each viewport's model content transformed into paper coords and
+ * clipped to the window. Everything is baked into one paper-space
+ * tessellation, so the renderer needs no viewport awareness.
+ */
+export function tessellateLayout(
+  doc: DxfDocument,
+  layout: Layout,
+  options: TessellateOptions = {},
+): Tessellation {
+  const t = createTessellator(doc, options);
+  t.walk(layout.entities, IDENTITY, null, null, 0, null, null, null);
+  for (const vp of layout.viewports) {
+    t.walk(doc.entities, viewportTransform(vp), null, null, 0, null, null, viewportRect(vp));
+  }
+  return t.finalize();
 }
