@@ -154,6 +154,40 @@ test("fitView without a document is a no-op that still renders", () => {
   expect(() => viewer.fitView()).not.toThrow();
 });
 
+test("setView restores a pose read from view (round-trip)", async () => {
+  const { viewer } = makeViewer();
+  await viewer.load(SAMPLE);
+  const pose = { center: { x: 12.5, y: -7.25 }, unitsPerPixel: 0.42, rotation: 0.6 };
+  viewer.setView(pose);
+  expect(viewer.view).toEqual(pose);
+  // The returned snapshot is a copy, not a live alias into the camera.
+  expect(viewer.view.center).not.toBe(pose.center);
+});
+
+test("setView rejects a non-positive unitsPerPixel", async () => {
+  const { viewer } = makeViewer();
+  await viewer.load(SAMPLE);
+  const before = viewer.view;
+  viewer.setView({ center: { x: 5, y: 5 }, unitsPerPixel: 0, rotation: 1 });
+  expect(viewer.view).toEqual(before);
+});
+
+test("setView animate path eases to the target pose", async () => {
+  const { viewer } = makeViewer();
+  await viewer.load(SAMPLE);
+  viewer.setView(
+    { center: { x: 3, y: 4 }, unitsPerPixel: 0.9, rotation: 0.2 },
+    {
+      animate: true,
+      durationMs: 60,
+    },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  expect(viewer.view.unitsPerPixel).toBeCloseTo(0.9, 5);
+  expect(viewer.view.center.x).toBeCloseTo(3, 5);
+  expect(viewer.view.rotation).toBeCloseTo(0.2, 5);
+});
+
 test("off removes a listener", async () => {
   const { viewer } = makeViewer();
   const listener = vi.fn();

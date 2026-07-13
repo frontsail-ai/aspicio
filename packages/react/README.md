@@ -80,5 +80,10 @@ Notes:
   callable via the ref regardless.
 - Camera state is deliberately not React state — subscribe to the `render`
   event on the viewer if you need to display it.
+- **Shareable/deep-linked views:** the embed doesn't touch the URL itself.
+  Read `viewer.view` (+ `getLayers()`) on `render` to serialize a pose into
+  your router, and `viewer.setView(saved)` after `onLoaded` to restore it.
+  Since a fixed `srcUrl` already identifies the drawing, this gives embedders
+  "open at this view" links. The demo's `viewurl.ts` is a full reference.
 - StrictMode and SSR safe: the viewer is created in an effect and disposed on
   unmount.

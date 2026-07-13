@@ -14,6 +14,7 @@ interface AspicioTestHook {
   getSpaces(): string[];
   readonly activeSpaceName: string;
   setActiveSpace(name: string): void;
+  zoomBy(factor: number, options?: { animate?: boolean }): void;
   document: {
     entities: { type: string; layer: string; lineWeight?: number }[];
     layouts?: { name: string; entities: unknown[]; viewports: unknown[] }[];

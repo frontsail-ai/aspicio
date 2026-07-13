@@ -81,14 +81,21 @@ to model space. `document.layouts` holds the parsed `Layout[]`.
 
 ### Camera
 
-| Member                               | Notes                                                    |
-| ------------------------------------ | -------------------------------------------------------- |
-| `fitView({ animate?, durationMs? })` | fit the whole drawing; eased when animated               |
-| `zoomBy(factor, { animate? })`       | `>1` zooms in, anchored at the viewport center           |
-| `resetRotation({ animate? })`        | back to 0°, keeping center and zoom                      |
-| `view`                               | read-only `{ center, unitsPerPixel, rotation }` snapshot |
+| Member                               | Notes                                             |
+| ------------------------------------ | ------------------------------------------------- |
+| `fitView({ animate?, durationMs? })` | fit the whole drawing; eased when animated        |
+| `zoomBy(factor, { animate? })`       | `>1` zooms in, anchored at the viewport center    |
+| `resetRotation({ animate? })`        | back to 0°, keeping center and zoom               |
+| `view`                               | `{ center, unitsPerPixel, rotation }` snapshot    |
+| `setView(view, { animate? })`        | restore a `view` snapshot (inverse of the getter) |
 
 User gestures cancel any running camera animation.
+
+`view` / `setView` round-trip a camera pose — the basis for shareable
+"open at this view" deep links. `center` is in the drawing's internal
+offset space, so a snapshot is meaningful only for the same document
+(which is exactly what a per-drawing link needs). See the demo's
+`viewurl.ts` for a URL-hash reference implementation.
 
 ### Events & lifecycle
 
