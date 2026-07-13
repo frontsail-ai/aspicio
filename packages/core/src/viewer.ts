@@ -145,7 +145,9 @@ export class DxfViewer {
           : [layer.color];
       }
     }
-    this.snapIndex = this.document ? buildSnapIndex(tessellation, this.document) : null;
+    // The snap index is expensive on huge drawings and only needed once the
+    // user measures, so build it lazily on the first snap() call.
+    this.snapIndex = null;
     this.selectedIndex = null;
     this.highlightedLayer = null;
     this.renderer.setGeometry(tessellation);
@@ -299,7 +301,9 @@ export class DxfViewer {
    * snapped world point and its kind, or null. Only visible layers snap.
    */
   snap(x: number, y: number, tolerancePx = 10): SnapResult | null {
-    if (!this.snapIndex) return null;
+    if (!this.tessellation || !this.document) return null;
+    // Build the index on first use, then reuse it until the next load/space.
+    this.snapIndex ??= buildSnapIndex(this.tessellation, this.document);
     const world = this.screenToWorld(x, y);
     return this.snapIndex.query(
       world,

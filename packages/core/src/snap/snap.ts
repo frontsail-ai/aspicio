@@ -4,40 +4,48 @@ import type { Tessellation } from "../tessellate/tessellate.ts";
 /** Kinds of object snap, in the order they win ties (endpoint first). */
 export type SnapKind = "endpoint" | "node" | "center" | "midpoint";
 
-const PRIORITY: Record<SnapKind, number> = { endpoint: 0, node: 1, center: 2, midpoint: 3 };
+/** Kind names indexed by priority — a candidate stores the index (a Uint8). */
+const KINDS: SnapKind[] = ["endpoint", "node", "center", "midpoint"];
 
 export interface SnapResult {
   point: Point2;
   kind: SnapKind;
 }
 
-interface Candidate {
-  x: number;
-  y: number;
-  kind: SnapKind;
-  layer: string;
-}
-
 /**
- * A uniform-grid index of snap points in world coordinates. Built once per
- * load; queried per pointer move to latch the cursor onto meaningful points.
+ * A uniform-grid index of snap points in world coordinates. Candidates live in
+ * parallel typed arrays (not objects) so a drawing with millions of vertices
+ * stays cheap to build and hold; the grid maps a cell to candidate indices.
  */
 export class SnapIndex {
-  private readonly cells = new Map<string, Candidate[]>();
+  private readonly cells = new Map<string, number[]>();
+  private readonly xs: Float32Array;
+  private readonly ys: Float32Array;
+  private readonly kinds: Uint8Array;
+  private readonly layerIdx: Int32Array;
+  private readonly layerNames: string[];
   private readonly cell: number;
 
-  constructor(candidates: Candidate[], cell: number) {
-    this.cell = cell > 0 ? cell : 1;
-    for (const c of candidates) {
-      const key = this.key(c.x, c.y);
+  constructor(
+    xs: Float32Array,
+    ys: Float32Array,
+    kinds: Uint8Array,
+    layerIdx: Int32Array,
+    layerNames: string[],
+    cell: number,
+  ) {
+    this.xs = xs;
+    this.ys = ys;
+    this.kinds = kinds;
+    this.layerIdx = layerIdx;
+    this.layerNames = layerNames;
+    this.cell = cell;
+    for (let i = 0; i < xs.length; i++) {
+      const key = `${Math.floor(xs[i] / cell)},${Math.floor(ys[i] / cell)}`;
       let list = this.cells.get(key);
       if (!list) this.cells.set(key, (list = []));
-      list.push(c);
+      list.push(i);
     }
-  }
-
-  private key(x: number, y: number): string {
-    return `${Math.floor(x / this.cell)},${Math.floor(y / this.cell)}`;
   }
 
   /**
@@ -54,83 +62,110 @@ export class SnapIndex {
     const cx = Math.floor(p.x / this.cell);
     const cy = Math.floor(p.y / this.cell);
     const tolSq = tolerance * tolerance;
-    let best: Candidate | null = null;
+    let bestIdx = -1;
     let bestScore = Infinity;
     for (let gx = cx - r; gx <= cx + r; gx++) {
       for (let gy = cy - r; gy <= cy + r; gy++) {
         const list = this.cells.get(`${gx},${gy}`);
         if (!list) continue;
-        for (const c of list) {
-          if (!isPickable(c.layer)) continue;
-          const distSq = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+        for (const i of list) {
+          if (!isPickable(this.layerNames[this.layerIdx[i]])) continue;
+          const dx = this.xs[i] - p.x;
+          const dy = this.ys[i] - p.y;
+          const distSq = dx * dx + dy * dy;
           if (distSq > tolSq) continue;
-          // Rank by kind first, then distance — so a close endpoint beats a
+          // Rank by kind first, then distance — a close endpoint beats a
           // slightly-closer midpoint.
-          const score = PRIORITY[c.kind] * tolSq + distSq;
+          const score = this.kinds[i] * tolSq + distSq;
           if (score < bestScore) {
             bestScore = score;
-            best = c;
+            bestIdx = i;
           }
         }
       }
     }
-    return best ? { point: { x: best.x, y: best.y }, kind: best.kind } : null;
+    if (bestIdx < 0) return null;
+    return {
+      point: { x: this.xs[bestIdx], y: this.ys[bestIdx] },
+      kind: KINDS[this.kinds[bestIdx]],
+    };
   }
 }
 
 /**
  * Collect snap candidates from a tessellation (segment endpoints and
  * midpoints, in world space) and the document (arc/circle/ellipse/insert
- * centers, and POINT nodes), and index them.
+ * centers, and POINT nodes), and index them. Pre-sized typed arrays keep the
+ * build allocation-light even for very large drawings.
  */
 export function buildSnapIndex(tessellation: Tessellation, document: DxfDocument): SnapIndex {
-  const candidates: Candidate[] = [];
   const { offset, bounds } = tessellation;
-  const seen = new Set<string>();
 
-  // Endpoints and midpoints from the batched line buffers (offset space →
-  // add the offset back to get world coordinates).
+  // Pre-count so the typed arrays are allocated once (3 per segment).
+  let count = 0;
+  for (const geo of tessellation.layers.values()) count += (geo.positions.length / 6) * 3;
+  for (const e of document.entities) {
+    if (
+      e.type === "CIRCLE" ||
+      e.type === "ARC" ||
+      e.type === "ELLIPSE" ||
+      e.type === "INSERT" ||
+      e.type === "POINT"
+    ) {
+      count += 1;
+    }
+  }
+
+  const xs = new Float32Array(count);
+  const ys = new Float32Array(count);
+  const kinds = new Uint8Array(count);
+  const layerIdx = new Int32Array(count);
+  const layerNames: string[] = [];
+  const layerId = new Map<string, number>();
+  const idOf = (name: string): number => {
+    let id = layerId.get(name);
+    if (id === undefined) {
+      id = layerNames.length;
+      layerNames.push(name);
+      layerId.set(name, id);
+    }
+    return id;
+  };
+
+  let n = 0;
+  const add = (x: number, y: number, kind: number, li: number): void => {
+    xs[n] = x;
+    ys[n] = y;
+    kinds[n] = kind;
+    layerIdx[n] = li;
+    n++;
+  };
+
   for (const [layer, geo] of tessellation.layers) {
+    const li = idOf(layer);
     const p = geo.positions;
     for (let i = 0; i + 5 < p.length; i += 6) {
       const ax = p[i] + offset.x;
       const ay = p[i + 1] + offset.y;
       const bx = p[i + 3] + offset.x;
       const by = p[i + 4] + offset.y;
-      pushUnique(candidates, seen, ax, ay, "endpoint", layer);
-      pushUnique(candidates, seen, bx, by, "endpoint", layer);
-      pushUnique(candidates, seen, (ax + bx) / 2, (ay + by) / 2, "midpoint", layer);
+      add(ax, ay, 0, li); // endpoint
+      add(bx, by, 0, li); // endpoint
+      add((ax + bx) / 2, (ay + by) / 2, 3, li); // midpoint
     }
   }
-
-  // Centers and nodes come straight from the model (already world space).
   for (const e of document.entities) {
     if (e.type === "CIRCLE" || e.type === "ARC" || e.type === "ELLIPSE") {
-      candidates.push({ x: e.center.x, y: e.center.y, kind: "center", layer: e.layer });
+      add(e.center.x, e.center.y, 2, idOf(e.layer)); // center
     } else if (e.type === "INSERT") {
-      candidates.push({ x: e.position.x, y: e.position.y, kind: "center", layer: e.layer });
+      add(e.position.x, e.position.y, 2, idOf(e.layer)); // center
     } else if (e.type === "POINT") {
-      candidates.push({ x: e.position.x, y: e.position.y, kind: "node", layer: e.layer });
+      add(e.position.x, e.position.y, 1, idOf(e.layer)); // node
     }
   }
 
   // Grid cell sized to the drawing so queries scan only a handful of cells.
   const span = bounds ? Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) : 1;
   const cell = Math.max(span / 128, 1e-6);
-  return new SnapIndex(candidates, cell);
-}
-
-function pushUnique(
-  out: Candidate[],
-  seen: Set<string>,
-  x: number,
-  y: number,
-  kind: SnapKind,
-  layer: string,
-): void {
-  // Dedup coincident points (shared polyline vertices) at ~micron precision.
-  const key = `${kind}:${Math.round(x * 1e4)},${Math.round(y * 1e4)}`;
-  if (seen.has(key)) return;
-  seen.add(key);
-  out.push({ x, y, kind, layer });
+  return new SnapIndex(xs, ys, kinds, layerIdx, layerNames, cell);
 }
