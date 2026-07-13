@@ -39,6 +39,8 @@ export type {
 export { Camera2D } from "./camera/camera2d.ts";
 export { attachGestures } from "./input/gestures.ts";
 export type { GestureOptions } from "./input/gestures.ts";
+export { attachShortcuts } from "./input/shortcuts.ts";
+export type { ShortcutHandlers, ShortcutViewer } from "./input/shortcuts.ts";
 
 export { sampleSpline } from "./geom/spline.ts";
 export { dashPolyline } from "./geom/dash.ts";

@@ -78,6 +78,10 @@ Notes:
 - A built-in **Download** control (SVG / PNG export) shows by default; pass
   `showDownload={false}` to hide it. The viewer's `toSVG()` / `toPNG()` stay
   callable via the ref regardless.
+- `shortcuts` (default off) enables keyboard control on the **focused** embed:
+  `F` fit, `+`/`-` zoom, `R` reset rotation, `A` show all layers. Click the
+  embed to focus it — keys are scoped to the focused container so multiple
+  embeds on a page don't collide. See `apps/react-example` for a full setup.
 - Camera state is deliberately not React state — subscribe to the `render`
   event on the viewer if you need to display it.
 - StrictMode and SSR safe: the viewer is created in an effect and disposed on

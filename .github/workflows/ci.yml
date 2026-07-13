@@ -68,6 +68,10 @@ jobs:
         run: bun run e2e
         working-directory: apps/demo
 
+      - name: E2E the React embed example
+        run: bun run e2e
+        working-directory: apps/react-example
+
       - name: Build all packages
         run: bunx vp run -r build
 

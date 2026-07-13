@@ -164,6 +164,77 @@ test("clicking an entity selects it and shows a measured info panel", async ({ p
   expect(await page.evaluate(() => window.__demo?.selectedIndex)).toBeNull();
 });
 
+/** Screen point of the round table's edge (a CIRCLE at world 30,45, r=8). */
+async function clickTable(page: Page): Promise<void> {
+  const box = await canvas(page).boundingBox();
+  if (!box) throw new Error("no canvas box");
+  const p = await page.evaluate(() => window.__aspicio!.worldToScreen({ x: 30, y: 53 }));
+  await page.mouse.click(box.x + p.x, box.y + p.y);
+}
+
+test("keyboard: ? opens the shortcuts cheat sheet, Esc closes it", async ({ page }) => {
+  await loadSample(page);
+  await page.keyboard.press("?");
+  await expect(page.locator("#shortcuts")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#shortcuts")).toBeHidden();
+});
+
+test("keyboard: F refits and M toggles the measure tool", async ({ page }) => {
+  await loadSample(page);
+  const baseline = (await probeViewer(page)).view.unitsPerPixel;
+  const c = await canvasCenter(page);
+  await page.mouse.move(c.x, c.y);
+  await page.mouse.wheel(0, -300);
+  await page.keyboard.press("f");
+  await expect
+    .poll(async () => (await probeViewer(page)).view.unitsPerPixel, { timeout: 2000 })
+    .toBeCloseTo(baseline, 5);
+
+  await page.keyboard.press("m");
+  expect(await page.evaluate(() => window.__demo?.measureActive)).toBe(true);
+  await page.keyboard.press("m");
+  expect(await page.evaluate(() => window.__demo?.measureActive)).toBe(false);
+});
+
+test("selection shortcuts: I isolates, A shows all, H hides the layer", async ({ page }) => {
+  await loadSample(page);
+  await clickTable(page);
+  await expect(page.locator("#info-type")).toHaveText("CIRCLE");
+
+  await page.keyboard.press("i"); // isolate FURNITURE
+  let probe = await probeViewer(page);
+  for (const l of probe.layers) expect(l.visible, l.name).toBe(l.name === "FURNITURE");
+
+  await page.keyboard.press("a"); // show all
+  probe = await probeViewer(page);
+  for (const l of probe.layers) expect(l.visible, l.name).toBe(true);
+
+  await clickTable(page);
+  await page.keyboard.press("h"); // hide FURNITURE + drop selection
+  await expect(page.locator("#info-panel")).toBeHidden();
+  expect((await probeViewer(page)).layers.find((l) => l.name === "FURNITURE")?.visible).toBe(false);
+});
+
+test("the info-panel action buttons mirror the selection shortcuts", async ({ page }) => {
+  await loadSample(page);
+  await clickTable(page);
+  await page.locator("#info-isolate").click();
+  const probe = await probeViewer(page);
+  for (const l of probe.layers) expect(l.visible, l.name).toBe(l.name === "FURNITURE");
+});
+
+test("keyboard: C copies the selection details to the clipboard", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await loadSample(page);
+  await clickTable(page);
+  await page.keyboard.press("c");
+  const text = await page.evaluate(() => navigator.clipboard.readText());
+  expect(text).toContain("CIRCLE");
+  expect(text).toContain("radius: 8");
+  expect(text).toContain("layer: FURNITURE");
+});
+
 test("the cursor coordinate readout tracks the pointer in world units", async ({ page }) => {
   await loadSample(page);
   const box = await canvas(page).boundingBox();
