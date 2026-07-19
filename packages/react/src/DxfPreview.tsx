@@ -1,4 +1,4 @@
-import { DxfViewer } from "@aspicio/core";
+import { DxfViewer, attachShortcuts } from "@aspicio/core";
 import type { DxfSource, DxfViewerOptions, LayerInfo, ViewerStats } from "@aspicio/core";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { CSSProperties } from "react";
@@ -31,6 +31,12 @@ export interface DxfPreviewProps {
    * the forwarded ref.
    */
   showDownload?: boolean;
+  /**
+   * Enable keyboard shortcuts on the (focused) viewer: `F` fit, `+`/`-` zoom,
+   * `R` reset rotation, `A` show all layers. Default: false. The embed must be
+   * focused (click it) to receive keys, so multiple embeds don't collide.
+   */
+  shortcuts?: boolean;
 }
 
 /**
@@ -51,6 +57,7 @@ export const DxfPreview = forwardRef<DxfViewer | null, DxfPreviewProps>(function
     onViewer,
     onHoverLayer,
     showDownload = true,
+    shortcuts = false,
   },
   ref,
 ) {
@@ -129,6 +136,27 @@ export const DxfPreview = forwardRef<DxfViewer | null, DxfPreviewProps>(function
       report(null);
     };
   }, [viewer, hoverEnabled]);
+
+  // Keyboard shortcuts (camera + show-all), scoped to the focused container so
+  // multiple embeds on a page don't fight over global keys. The canvas isn't
+  // focusable, so clicking the embed focuses the container to receive keys.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!viewer || !container || !shortcuts) return;
+    if (container.tabIndex < 0) container.tabIndex = 0;
+    container.style.outline = "none";
+    const focus = (): void => container.focus();
+    container.addEventListener("pointerdown", focus);
+    const detach = attachShortcuts(container, viewer, {
+      onShowAll: () => {
+        for (const layer of viewer.getLayers()) viewer.setLayerVisible(layer.name, true);
+      },
+    });
+    return () => {
+      container.removeEventListener("pointerdown", focus);
+      detach();
+    };
+  }, [viewer, shortcuts]);
 
   useImperativeHandle(ref, () => viewer as DxfViewer, [viewer]);
 

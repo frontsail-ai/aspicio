@@ -152,6 +152,12 @@ registerEntityHandler("ELLIPSE", (entity, ctx) => {
 `parseDxf`, `tessellate`, `pickLayer`, `Camera2D`, and `attachGestures`
 are usable stand-alone for custom renderers.
 
+`attachShortcuts(target, viewer, handlers)` adds keyboard shortcuts to a
+window or element (returns a detach fn): `F` fit, `+`/`-` zoom, `R` reset
+rotation drive the viewer directly; `M/A/I/H/C/?/Esc` delegate to
+`handlers`. It ignores modifier combos, key repeat, and typing into form
+fields.
+
 ## Notes
 
 - Geometry is re-centered around the drawing bounds before GPU upload, so

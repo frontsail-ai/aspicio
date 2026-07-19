@@ -1,5 +1,5 @@
 import "./style.css";
-import { DxfViewer, niceLength } from "@aspicio/core";
+import { DxfViewer, attachShortcuts, niceLength } from "@aspicio/core";
 import type { EntityInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
 
 /* ---------- SVG fragments ---------- */
@@ -44,6 +44,21 @@ const DESKTOP_HINTS: [string, string][] = [
   ["HOVER", "highlight layer"],
   ["CLICK ROW", "toggle layer"],
   ["2×CLICK ROW", "solo layer"],
+  ["?", "shortcuts"],
+];
+
+/** Keyboard shortcuts shown in the ? cheat sheet. */
+const SHORTCUTS: [string, string][] = [
+  ["F", "Fit to view"],
+  ["+ / −", "Zoom in / out"],
+  ["R", "Reset rotation"],
+  ["M", "Measure tool"],
+  ["A", "Show all layers"],
+  ["I", "Isolate selected layer"],
+  ["H", "Hide selected layer"],
+  ["C", "Copy selection details"],
+  ["Esc", "Cancel / clear selection"],
+  ["?", "Toggle this help"],
 ];
 
 app.innerHTML = `
@@ -162,6 +177,11 @@ app.innerHTML = `
           <button id="info-close" class="info-close" type="button">${icons.close(15)}</button>
         </div>
         <div id="info-rows" class="info-rows"></div>
+        <div class="info-actions">
+          <button id="info-isolate" class="info-action" type="button" title="Isolate layer (I)">Isolate</button>
+          <button id="info-hide" class="info-action" type="button" title="Hide layer (H)">Hide</button>
+          <button id="info-copy" class="info-action" type="button" title="Copy details (C)">Copy</button>
+        </div>
       </aside>
     </main>
   </div>
@@ -171,6 +191,17 @@ app.innerHTML = `
       ${icons.drop}
       <div class="drop-title">DROP DXF TO OPEN</div>
       <div class="drop-sub">.dxf files only · released anywhere</div>
+    </div>
+  </div>
+  <div id="shortcuts" class="shortcuts-overlay" hidden>
+    <div class="shortcuts-card">
+      <div class="shortcuts-head">
+        <span class="shortcuts-title">KEYBOARD SHORTCUTS</span>
+        <button id="shortcuts-close" class="shortcuts-close" type="button">${icons.close(16)}</button>
+      </div>
+      <div class="shortcuts-grid">${SHORTCUTS.map(
+        ([k, v]) => `<kbd class="sc-key">${k}</kbd><span class="sc-desc">${v}</span>`,
+      ).join("")}</div>
     </div>
   </div>
 `;
@@ -202,6 +233,7 @@ const layerRows = new Map<string, HTMLLIElement>();
 
 // Interaction state for entity selection and the measure tool.
 let selectedIndex: number | null = null;
+let selected: PickedEntity | null = null;
 let measureActive = false;
 let measurePoints: Point2[] = [];
 let measureCursor: Point2 | null = null;
@@ -222,6 +254,7 @@ function setMode(next: Mode): void {
   $("#export-btn").hidden = !loaded;
   if (!loaded) $("#export-pop").hidden = true;
   if (!loaded) $("#space-tabs").hidden = true;
+  if (!loaded) $("#shortcuts").hidden = true;
   if (!loaded) {
     clearSelection();
     setMeasureActive(false);
@@ -337,6 +370,7 @@ function showInfo(picked: PickedEntity): void {
 function clearSelection(): void {
   if (selectedIndex === null && $("#info-panel").hidden) return;
   selectedIndex = null;
+  selected = null;
   viewer.setSelection(null);
   $("#info-panel").hidden = true;
 }
@@ -349,8 +383,63 @@ function selectAt(clientX: number, clientY: number): void {
     return;
   }
   selectedIndex = picked.index;
+  selected = picked;
   viewer.setSelection(picked.index);
   showInfo(picked);
+}
+
+/* ---------- selection actions (isolate / hide / copy) ---------- */
+
+/** Show only the given layer (solo it) — used to isolate a selected entity. */
+function isolateLayer(name: string): void {
+  soloLayer = name;
+  for (const layer of viewer.getLayers()) viewer.setLayerVisible(layer.name, layer.name === name);
+  syncPanel();
+}
+
+/** Hide the selected entity's layer and drop the (now invisible) selection. */
+function hideSelectedLayer(): void {
+  if (!selected) return;
+  if (soloLayer) soloLayer = null;
+  viewer.setLayerVisible(selected.layer, false);
+  clearSelection();
+  syncPanel();
+}
+
+/** Show every layer again (leave solo, unhide all). */
+function showAllLayers(): void {
+  exitSolo();
+}
+
+/** Copy the selected entity's details to the clipboard as a plain-text block. */
+function copySelection(): void {
+  if (!selected) return;
+  const { info } = selected;
+  const u = viewer.document?.units;
+  const unit = u ? ` ${u}` : "";
+  const lines = [info.type, `layer: ${info.layer}`];
+  if (info.color !== null) lines.push(`color: #${info.color.toString(16).padStart(6, "0")}`);
+  if (info.length !== undefined) lines.push(`length: ${fmt(info.length)}${unit}`);
+  if (info.radius !== undefined) lines.push(`radius: ${fmt(info.radius)}${unit}`);
+  if (info.area !== undefined) lines.push(`area: ${fmt(info.area)}${unit ? `${unit}²` : ""}`);
+  if (info.points !== undefined) lines.push(`points: ${info.points}`);
+  if (info.position) lines.push(`at: ${fmt(info.position.x)}, ${fmt(info.position.y)}`);
+  if (info.text) lines.push(`text: ${info.text}`);
+  // Best-effort — clipboard needs a secure context and may be unavailable.
+  void navigator.clipboard?.writeText(lines.join("\n")).then(
+    () => flashCopied(),
+    () => {},
+  );
+}
+
+/** Briefly confirm a copy on the info panel's Copy button. */
+function flashCopied(): void {
+  const btn = $<HTMLButtonElement>("#info-copy");
+  const prev = btn.textContent;
+  btn.textContent = "Copied";
+  window.setTimeout(() => {
+    btn.textContent = prev;
+  }, 1100);
 }
 
 /* ---------- measure tool ---------- */
@@ -740,11 +829,45 @@ $("#reset-rot").addEventListener("click", () => viewer.resetRotation({ animate: 
 /* Measure tool + entity selection */
 $("#measure-btn").addEventListener("click", () => setMeasureActive(!measureActive));
 $("#info-close").addEventListener("click", () => clearSelection());
-window.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape" || mode !== "loaded") return;
-  if (measureActive && measurePoints.length > 0) clearMeasure();
-  else if (measureActive) setMeasureActive(false);
-  else clearSelection();
+$("#info-isolate").addEventListener("click", () => {
+  if (selected) isolateLayer(selected.layer);
+});
+$("#info-hide").addEventListener("click", () => hideSelectedLayer());
+$("#info-copy").addEventListener("click", () => copySelection());
+$("#shortcuts-close").addEventListener("click", () => {
+  $("#shortcuts").hidden = true;
+});
+
+function toggleShortcuts(): void {
+  const s = $("#shortcuts");
+  s.hidden = !s.hidden;
+}
+
+/** Esc: close the help first, else back out of measure / selection. */
+function onEscape(): void {
+  if (!$("#shortcuts").hidden) {
+    $("#shortcuts").hidden = true;
+  } else if (measureActive && measurePoints.length > 0) {
+    clearMeasure();
+  } else if (measureActive) {
+    setMeasureActive(false);
+  } else {
+    clearSelection();
+  }
+}
+
+/* Keyboard shortcuts (camera keys drive the viewer; the rest are wired here). */
+attachShortcuts(window, viewer, {
+  isEnabled: () => mode === "loaded",
+  onToggleMeasure: () => setMeasureActive(!measureActive),
+  onShowAll: () => showAllLayers(),
+  onIsolate: () => {
+    if (selected) isolateLayer(selected.layer);
+  },
+  onHide: () => hideSelectedLayer(),
+  onCopy: () => copySelection(),
+  onToggleHelp: () => toggleShortcuts(),
+  onEscape,
 });
 
 const localPoint = (e: PointerEvent): { x: number; y: number } => {

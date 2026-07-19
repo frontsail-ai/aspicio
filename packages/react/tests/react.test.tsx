@@ -33,6 +33,9 @@ const mock = vi.hoisted(() => {
     });
     setLayerHighlight = vi.fn();
     pickLayer = vi.fn((_x: number, _y: number) => "CUT" as string | null);
+    fitView = vi.fn();
+    zoomBy = vi.fn();
+    resetRotation = vi.fn();
     toSVG = vi.fn((_opts?: unknown) => "<svg></svg>");
     toPNG = vi.fn((_opts?: unknown) => "data:image/png;base64,AAAA");
     dispose = vi.fn(() => {
@@ -67,7 +70,26 @@ const mock = vi.hoisted(() => {
   return { MockViewer, instances };
 });
 
-vi.mock("@aspicio/core", () => ({ DxfViewer: mock.MockViewer }));
+vi.mock("@aspicio/core", () => ({
+  DxfViewer: mock.MockViewer,
+  // A faithful attachShortcuts so the shortcuts effect can be exercised.
+  attachShortcuts: (target: EventTarget, viewer: MockShortcutViewer) => {
+    const onKey = (ev: Event): void => {
+      const e = ev as KeyboardEvent;
+      if (e.key === "f" || e.key === "F") viewer.fitView();
+      else if (e.key === "a" || e.key === "A")
+        for (const l of viewer.getLayers()) viewer.setLayerVisible(l.name, true);
+    };
+    target.addEventListener("keydown", onKey);
+    return () => target.removeEventListener("keydown", onKey);
+  },
+}));
+
+interface MockShortcutViewer {
+  fitView: () => void;
+  getLayers: () => { name: string }[];
+  setLayerVisible: (name: string, visible: boolean) => void;
+}
 
 const flush = () => act(() => Promise.resolve());
 const lastViewer = () => mock.instances[mock.instances.length - 1];
@@ -182,6 +204,24 @@ test("showDownload={false} hides the download control", async () => {
   const { container } = render(<DxfPreview showDownload={false} />);
   await flush();
   expect(container.querySelector('[aria-label="Download"]')).toBeNull();
+});
+
+test("shortcuts prop enables keyboard camera + show-all on the container", async () => {
+  const { container } = render(<DxfPreview shortcuts />);
+  await flush();
+  const el = container.querySelector("div") as HTMLElement;
+  el.dispatchEvent(new KeyboardEvent("keydown", { key: "f", bubbles: true }));
+  expect(lastViewer().fitView).toHaveBeenCalled();
+  el.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+  expect(lastViewer().setLayerVisible).toHaveBeenCalled(); // show-all unhides layers
+});
+
+test("shortcuts default off — no keyboard handling", async () => {
+  const { container } = render(<DxfPreview />);
+  await flush();
+  const el = container.querySelector("div") as HTMLElement;
+  el.dispatchEvent(new KeyboardEvent("keydown", { key: "f", bubbles: true }));
+  expect(lastViewer().fitView).not.toHaveBeenCalled();
 });
 
 /* ---------- DxfEmbed ---------- */
