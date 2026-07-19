@@ -1,7 +1,7 @@
 import "./style.css";
 import { DxfViewer, niceLength } from "@aspicio/core";
 import type { EntityInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
-import { decodeView, encodeView } from "./viewurl.ts";
+import { decodeView, encodeView, packLayers } from "./viewurl.ts";
 import type { ViewLink } from "./viewurl.ts";
 
 /* ---------- SVG fragments ---------- */
@@ -656,8 +656,11 @@ function applyLink(link: ViewLink): void {
   const spaces = viewer.getSpaces();
   if (link.spaceIndex > 0 && link.spaceIndex < spaces.length) setSpace(spaces[link.spaceIndex]);
   const layers = viewer.getLayers();
-  const hidden = new Set(link.hiddenLayerIndices);
-  layers.forEach((layer, i) => viewer.setLayerVisible(layer.name, !hidden.has(i)));
+  // Resolve visibility from whichever set the link carried (see `packLayers`).
+  const visSet = link.visibleLayerIndices && new Set(link.visibleLayerIndices);
+  const hidSet = link.hiddenLayerIndices && new Set(link.hiddenLayerIndices);
+  const isVis = (i: number): boolean => (visSet ? visSet.has(i) : hidSet ? !hidSet.has(i) : true);
+  layers.forEach((layer, i) => viewer.setLayerVisible(layer.name, isVis(i)));
   syncPanel();
   viewer.setView(link.view); // last, so it overrides the space-switch re-fit
   restoringView = false;
@@ -670,13 +673,12 @@ function scheduleHashWrite(): void {
   hashWriteTimer = window.setTimeout(() => {
     hashWriteTimer = null;
     const spaces = viewer.getSpaces();
-    const hiddenLayerIndices = viewer
-      .getLayers()
-      .flatMap((layer, i) => (isVisible(layer.name) ? [] : [i]));
+    const layers = viewer.getLayers();
+    const hidden = layers.flatMap((layer, i) => (isVisible(layer.name) ? [] : [i]));
     const link: ViewLink = {
       view: viewer.view,
-      hiddenLayerIndices,
       spaceIndex: Math.max(0, spaces.indexOf(viewer.activeSpaceName)),
+      ...packLayers(hidden, layers.length),
     };
     history.replaceState(null, "", encodeView(link) || location.pathname + location.search);
   }, 300);
