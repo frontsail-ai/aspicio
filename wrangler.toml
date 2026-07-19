@@ -1,9 +1,10 @@
-# Cloudflare Pages config for the Aspicio demo (static, client-only build).
-# Deployed by .github/workflows/deploy.yml via `wrangler pages deploy`.
+# Cloudflare Workers (Static Assets) config for the Aspicio demo.
 #
-# `name` must match the Cloudflare Pages project. Create it once with:
-#   wrangler pages project create aspicio --production-branch=master
-# (or in the dashboard as a "Direct Upload" project).
+# Assets-only: there is no `main` entry script, so nothing runs server-side —
+# the built files are served straight from Cloudflare's edge, exactly like a
+# static host. Deployed by .github/workflows/deploy.yml via `wrangler deploy`.
 name = "aspicio"
-pages_build_output_dir = "apps/demo/dist"
 compatibility_date = "2025-06-01"
+
+[assets]
+directory = "apps/demo/dist"

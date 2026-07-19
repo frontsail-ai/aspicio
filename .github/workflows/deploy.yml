@@ -1,12 +1,12 @@
-# Builds the demo and deploys it to Cloudflare Pages.
-#   push → master : production deploy
-#   pull_request  : preview deploy (unique URL per PR)
+# Builds the demo and deploys it to a Cloudflare Worker (Static Assets).
+#   push → master : production deploy (`wrangler deploy`)
+#   pull_request  : preview version with its own URL (`wrangler versions upload`)
 #
-# One-time setup (see wrangler.toml for the project name):
-#   1. Create the Pages project:  wrangler pages project create aspicio --production-branch=master
-#   2. Create a Cloudflare API token with the "Cloudflare Pages: Edit" permission.
-#   3. Add repo secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
-name: Deploy demo (Cloudflare Pages)
+# One-time setup:
+#   1. Create a Cloudflare API token with the "Workers Scripts: Edit" permission.
+#   2. Add repo secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
+#   (No resource to pre-create — `wrangler deploy` creates the Worker on first run.)
+name: Deploy demo (Cloudflare Workers)
 
 on:
   push:
@@ -15,7 +15,7 @@ on:
 
 # Supersede in-flight deploys for the same branch/PR.
 concurrency:
-  group: cf-pages-${{ github.ref }}
+  group: cf-deploy-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -48,12 +48,12 @@ jobs:
       - name: Build the demo
         run: bunx vp run @aspicio/demo#build
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          # Project name + output dir come from wrangler.toml. The branch decides
-          # production (matches the project's production branch) vs. preview.
-          command: pages deploy --branch=${{ github.head_ref || github.ref_name }}
+          # Name + assets dir come from wrangler.toml. Production on master; a
+          # preview version (with its own URL) on pull requests.
+          command: ${{ github.event_name == 'pull_request' && 'versions upload' || 'deploy' }}
