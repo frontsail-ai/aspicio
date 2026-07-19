@@ -1,7 +1,9 @@
-# Aspicio
-
-_Aspicio_ (Latin: "I look at") — a TypeScript-first 2D DXF viewer for the
-web.
+<div align="center">
+  <img src="apps/demo/public/favicon.svg" width="72" height="72" alt="Aspicio logo" />
+  <h1>Aspicio</h1>
+  <p><em>Aspicio</em> (Latin: "I look at") — a TypeScript-first 2D DXF viewer for the web.</p>
+  <p><a href="https://aspicio.dmitri-66a.workers.dev"><strong>▶ Live demo</strong></a></p>
+</div>
 
 - WebGL rendering (Three.js) with batched geometry — one draw call per
   layer, large drawings stay interactive
