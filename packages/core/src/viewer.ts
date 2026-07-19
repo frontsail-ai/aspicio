@@ -436,7 +436,9 @@ export class DxfViewer {
       // Interpolate zoom logarithmically so it feels uniform.
       this.camera.unitsPerPixel = Math.exp(lerp(startLogZoom, endLogZoom, e));
       this.camera.rotation = lerp(start.rotation, target.rotation, e);
-      this.requestRender();
+      // Render inline — we're already in an animation frame, so going through
+      // requestRender would schedule a second rAF and render a frame late.
+      this.renderNow();
       this.animationFrame = t < 1 ? requestAnimationFrame(step) : null;
     };
     this.animationFrame = requestAnimationFrame(step);
@@ -474,14 +476,21 @@ export class DxfViewer {
     this.requestRender();
   }
 
-  /** Render on demand, coalesced to animation frames. */
+  /** Render immediately (once): draw the current camera and notify listeners. */
+  private renderNow(): void {
+    this.renderQueued = false;
+    this.renderer.render(this.camera);
+    this.emit("render");
+  }
+
+  /** Render on demand, coalesced to one animation frame. */
   private requestRender(): void {
     if (this.renderQueued) return;
     this.renderQueued = true;
     requestAnimationFrame(() => {
-      this.renderQueued = false;
-      this.renderer.render(this.camera);
-      this.emit("render");
+      // A direct renderNow() (e.g. an animation frame) may have cleared the
+      // flag first — skip the redundant paint.
+      if (this.renderQueued) this.renderNow();
     });
   }
 
