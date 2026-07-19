@@ -7,17 +7,22 @@
 
 - WebGL rendering (Three.js) with batched geometry — one draw call per
   layer, large drawings stay interactive
+- Broad entity coverage — lines, arcs, circles, ellipses, polylines (with
+  bulges), splines, TEXT/MTEXT, DIMENSION, SOLID/HATCH fills, and nested
+  INSERT blocks; anything unsupported is counted and reported, never fatal
 - Layer list with visibility toggles, hover highlight (3× fat lines),
   double-click solo, and effective colors (what's actually drawn, not
   just the layer table)
 - Pan, zoom, rotate, animated fit-to-view — mouse and multi-touch
   (pinch zoom, twist rotate) are equally first-class
+- Tools: distance/area measure with object snap, click-to-select with an
+  entity info panel, and keyboard shortcuts
+- SVG (vector) and PNG export, paper-space layouts, and both ASCII and
+  binary DXF
 - Hit-testing (`pickLayer`), camera state access, extensible
   entity-handler registry
-- Unsupported entity types are counted and reported, never fatal
 
-Out of scope for now: editing, 3D, text rendering (TEXT/MTEXT/SPLINE/HATCH
-are skipped and reported).
+Out of scope for now: editing and 3D.
 
 <img src="docs/sample-demo.png" alt="Aspicio viewing a sample floor-plan DXF — layer panel, colored geometry, text, and a dimension" />
 
