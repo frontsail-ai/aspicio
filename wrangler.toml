@@ -1,0 +1,9 @@
+# Cloudflare Pages config for the Aspicio demo (static, client-only build).
+# Deployed by .github/workflows/deploy.yml via `wrangler pages deploy`.
+#
+# `name` must match the Cloudflare Pages project. Create it once with:
+#   wrangler pages project create aspicio --production-branch=master
+# (or in the dashboard as a "Direct Upload" project).
+name = "aspicio"
+pages_build_output_dir = "apps/demo/dist"
+compatibility_date = "2025-06-01"

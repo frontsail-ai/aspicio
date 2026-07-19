@@ -1,0 +1,59 @@
+# Builds the demo and deploys it to Cloudflare Pages.
+#   push → master : production deploy
+#   pull_request  : preview deploy (unique URL per PR)
+#
+# One-time setup (see wrangler.toml for the project name):
+#   1. Create the Pages project:  wrangler pages project create aspicio --production-branch=master
+#   2. Create a Cloudflare API token with the "Cloudflare Pages: Edit" permission.
+#   3. Add repo secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
+name: Deploy demo (Cloudflare Pages)
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Supersede in-flight deploys for the same branch/PR.
+concurrency:
+  group: cf-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: write # let wrangler-action record a GitHub deployment
+  pull-requests: write # and comment the preview URL on PRs
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    # Fork PRs can't read secrets — skip them (no preview) instead of failing.
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build the demo
+        run: bunx vp run @aspicio/demo#build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          # Project name + output dir come from wrangler.toml. The branch decides
+          # production (matches the project's production branch) vs. preview.
+          command: pages deploy --branch=${{ github.head_ref || github.ref_name }}
