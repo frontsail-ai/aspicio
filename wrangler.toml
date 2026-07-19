@@ -5,6 +5,9 @@
 # static host. Deployed by .github/workflows/deploy.yml via `wrangler deploy`.
 name = "aspicio"
 compatibility_date = "2025-06-01"
+# Give each uploaded version a preview URL, so pull-request deploys
+# (`wrangler versions upload`) get a shareable link the workflow posts back.
+preview_urls = true
 
 [assets]
 directory = "apps/demo/dist"
