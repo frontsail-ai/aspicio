@@ -19,7 +19,7 @@
 Out of scope for now: editing, 3D, text rendering (TEXT/MTEXT/SPLINE/HATCH
 are skipped and reported).
 
-<img width="1543" height="756" alt="Screenshot 2026-07-11 at 23 06 21" src="https://github.com/user-attachments/assets/60d5487b-b090-4379-9189-703b63805bfd" />
+<img src="docs/sample-demo.png" alt="Aspicio viewing a sample floor-plan DXF — layer panel, colored geometry, text, and a dimension" />
 
 ## Packages
 
