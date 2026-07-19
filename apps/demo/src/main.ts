@@ -1,6 +1,8 @@
 import "./style.css";
 import { DxfViewer, attachShortcuts, niceLength } from "@aspicio/core";
 import type { EntityInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
+import { decodeView, encodeView, packLayers } from "./viewurl.ts";
+import type { ViewLink } from "./viewurl.ts";
 
 /* ---------- SVG fragments ---------- */
 
@@ -229,6 +231,12 @@ let soloLayer: string | null = null;
 let hoveredLayer: string | null = null;
 let hoverSource: "row" | "canvas" | null = null;
 let baselineZoom = 1;
+// Deep-link view state. Only the bundled sample is URL-addressable, so we only
+// share/restore links for it; a drag-dropped file can't be re-fetched from a URL.
+let currentSourceLinkable = false;
+let pendingLink: ViewLink | null = null;
+let restoringView = false;
+let hashWriteTimer: number | null = null;
 const layerRows = new Map<string, HTMLLIElement>();
 
 // Interaction state for entity selection and the measure tool.
@@ -709,6 +717,11 @@ viewer.on("loaded", () => {
   $("#skipped-pop").hidden = true;
 
   setMode("loaded");
+
+  // Restore a deep-linked view once, after the panel/tabs exist. Only valid for
+  // the sample (the source the link implicitly refers to).
+  if (pendingLink && currentSourceLinkable) applyLink(pendingLink);
+  pendingLink = null;
 });
 
 /** Drawing-unit suffix (" mm"), or "" when the file is unitless. */
@@ -726,8 +739,43 @@ function updateScaleBar(unitsPerPixel: number): void {
   $("#scale-label").textContent = length > 0 ? `${fmt(length)}${unitSuffix()}` : "—";
 }
 
+/** Restore a shared view: space, then layer visibility, then the camera pose. */
+function applyLink(link: ViewLink): void {
+  restoringView = true;
+  const spaces = viewer.getSpaces();
+  if (link.spaceIndex > 0 && link.spaceIndex < spaces.length) setSpace(spaces[link.spaceIndex]);
+  const layers = viewer.getLayers();
+  // Resolve visibility from whichever set the link carried (see `packLayers`).
+  const visSet = link.visibleLayerIndices && new Set(link.visibleLayerIndices);
+  const hidSet = link.hiddenLayerIndices && new Set(link.hiddenLayerIndices);
+  const isVis = (i: number): boolean => (visSet ? visSet.has(i) : hidSet ? !hidSet.has(i) : true);
+  layers.forEach((layer, i) => viewer.setLayerVisible(layer.name, isVis(i)));
+  syncPanel();
+  viewer.setView(link.view); // last, so it overrides the space-switch re-fit
+  restoringView = false;
+}
+
+/** Debounced write of the current view to the URL hash (linkable sources only). */
+function scheduleHashWrite(): void {
+  if (!currentSourceLinkable || restoringView) return;
+  if (hashWriteTimer !== null) clearTimeout(hashWriteTimer);
+  hashWriteTimer = window.setTimeout(() => {
+    hashWriteTimer = null;
+    const spaces = viewer.getSpaces();
+    const layers = viewer.getLayers();
+    const hidden = layers.flatMap((layer, i) => (isVisible(layer.name) ? [] : [i]));
+    const link: ViewLink = {
+      view: viewer.view,
+      spaceIndex: Math.max(0, spaces.indexOf(viewer.activeSpaceName)),
+      ...packLayers(hidden, layers.length),
+    };
+    history.replaceState(null, "", encodeView(link) || location.pathname + location.search);
+  }, 300);
+}
+
 viewer.on("render", () => {
   if (mode !== "loaded") return;
+  scheduleHashWrite();
   const view = viewer.view;
   $("#zoom-pct").textContent = String(Math.round((baselineZoom / view.unitsPerPixel) * 100));
   const deg = Math.round((view.rotation * 180) / Math.PI);
@@ -741,6 +789,12 @@ viewer.on("render", () => {
 
 async function openSource(source: File | string, name: string): Promise<void> {
   currentName = name;
+  currentSourceLinkable = source === "/sample.dxf";
+  // A drag-dropped file isn't URL-addressable — drop any stale view hash so we
+  // don't imply the link still points at this drawing.
+  if (!currentSourceLinkable && location.hash) {
+    history.replaceState(null, "", location.pathname + location.search);
+  }
   $("#error-toast").hidden = true;
   $("#loading-text").textContent = `LOADING ${name.toUpperCase()}…`;
   setMode("loading");
@@ -963,7 +1017,11 @@ window.addEventListener("drop", (e) => {
   if (file) void openSource(file, file.name);
 });
 
-setMode("empty");
+// A view hash on first load implies a shared link to the sample — open it, then
+// the "loaded" handler restores the pose. Otherwise start on the empty screen.
+pendingLink = decodeView(location.hash);
+if (pendingLink) loadSample();
+else setMode("empty");
 
 /* Test hook: lets e2e tests observe viewer + demo interaction state. */
 declare global {

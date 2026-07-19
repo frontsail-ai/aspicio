@@ -345,6 +345,26 @@ export class DxfViewer {
     };
   }
 
+  /**
+   * Restore a pose previously read from `view` (the inverse of the getter).
+   * `center` is in the drawing's offset space, so a snapshot is only meaningful
+   * for the same document — which is exactly the deep-link use case. A
+   * non-positive `unitsPerPixel` is rejected so a malformed link can't blank
+   * the canvas.
+   */
+  setView(state: ViewState, options: { animate?: boolean; durationMs?: number } = {}): void {
+    if (!(state.unitsPerPixel > 0)) return;
+    this.cancelViewAnimation();
+    if (options.animate) {
+      this.animateView({ ...state, center: { ...state.center } }, options.durationMs ?? 400);
+    } else {
+      this.camera.center = { ...state.center };
+      this.camera.unitsPerPixel = state.unitsPerPixel;
+      this.camera.rotation = state.rotation;
+      this.requestRender();
+    }
+  }
+
   get stats(): ViewerStats {
     return {
       entityCount: this.document?.entities.length ?? 0,

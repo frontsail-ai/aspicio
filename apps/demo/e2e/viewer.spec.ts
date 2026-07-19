@@ -813,3 +813,54 @@ test("canvas resizes with the window without breaking rendering", async ({ page 
   const colors = await canvasColors(page);
   expect(colors.green).toBeGreaterThan(50);
 });
+
+test("shares the view via the URL hash and restores it on reload", async ({ page }) => {
+  await loadSample(page);
+
+  // Change the camera and hide a layer — the hash should capture both.
+  await page.evaluate(() => window.__aspicio!.zoomBy(2));
+  await row(page, "WALLS").locator(".layer-check").click();
+  await expect(row(page, "WALLS").locator(".layer-check")).toHaveAttribute("aria-checked", "false");
+
+  await expect.poll(() => page.evaluate(() => location.hash)).toContain("v=");
+  await expect.poll(() => page.evaluate(() => location.hash)).toContain("h=");
+  const zoomed = (await probeViewer(page)).view.unitsPerPixel;
+
+  await page.reload();
+  await expect(page.locator("#file-chip")).toHaveText("sample.dxf");
+
+  const restored = await probeViewer(page);
+  expect(Math.abs(restored.view.unitsPerPixel - zoomed) / zoomed).toBeLessThan(0.01);
+  expect(restored.layers.find((l) => l.name === "WALLS")?.visible).toBe(false);
+  // The panel — not just the viewer — must reflect the restored hidden layer.
+  await expect(row(page, "WALLS").locator(".layer-check")).toHaveAttribute("aria-checked", "false");
+  await expect(row(page, "WALLS")).toHaveClass(/\boff\b/);
+  expect(page.url()).toContain("v=");
+});
+
+test("solo encodes the visible set (V=) to keep the URL compact, and restores it", async ({
+  page,
+}) => {
+  await loadSample(page);
+  // Solo WALLS: only it stays visible. Rather than list every hidden layer, the
+  // hash stores just the visible one.
+  await row(page, "WALLS").dblclick();
+  await expect.poll(() => page.evaluate(() => location.hash)).toContain("V=");
+  const hash = await page.evaluate(() => location.hash);
+  expect(hash).not.toContain("h=");
+
+  await page.reload();
+  await expect(page.locator("#file-chip")).toHaveText("sample.dxf");
+  const restored = await probeViewer(page);
+  expect(restored.layers.filter((l) => l.visible).map((l) => l.name)).toEqual(["WALLS"]);
+});
+
+test("opening a drag-dropped file clears a stale view hash", async ({ page }) => {
+  await loadSample(page);
+  await page.evaluate(() => window.__aspicio!.zoomBy(2));
+  await expect.poll(() => page.evaluate(() => location.hash)).toContain("v=");
+
+  await page.locator("#file").setInputFiles(fixture("box.dxf"));
+  await expect(page.locator("#file-chip")).toHaveText("box.dxf");
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
+});
