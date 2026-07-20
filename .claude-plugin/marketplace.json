@@ -1,0 +1,11 @@
+{
+  "name": "aspicio",
+  "owner": { "name": "FrontSail", "url": "https://github.com/frontsail-ai" },
+  "plugins": [
+    {
+      "name": "aspicio",
+      "source": "./",
+      "description": "Open, inspect, and render DXF/CAD drawings — MCP tools (describe_dxf, render_dxf) plus skills for reading drawings and embedding the viewer."
+    }
+  ]
+}

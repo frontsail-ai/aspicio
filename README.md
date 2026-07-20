@@ -36,6 +36,25 @@ Out of scope for now: editing and 3D.
 | [`@aspicio/api`](apps/api)         | DXF HTTP API Worker (private): `/describe`, `/render`               |
 | [`@aspicio/demo`](apps/demo)       | Standalone demo app (private) — also the reference integration      |
 
+## For agents
+
+Aspicio speaks MCP: `describe_dxf` returns structured JSON facts about a
+drawing (layers, units, bounds, entity counts) and `render_dxf` returns a
+PNG the model can look at.
+
+- **Claude Code** — one step installs the MCP server plus the bundled
+  skills (`aspicio-inspect-dxf`, `aspicio-embed`):
+  `/plugin marketplace add frontsail-ai/aspicio` then `/plugin install aspicio@aspicio`
+- **Codex** — same repo doubles as a Codex marketplace:
+  `codex plugin marketplace add https://github.com/frontsail-ai/aspicio`,
+  `codex plugin add aspicio@aspicio`, and wire the tools with
+  `codex mcp add aspicio -- npx -y @aspicio/mcp`
+- **Any MCP client** (Cursor, ChatGPT, …) — register the stdio server:
+  `npx -y @aspicio/mcp`
+
+The HTTP equivalents live on the API Worker: `GET /describe?src=<dxf-url>`
+and `GET /render?src=<dxf-url>&format=png|svg`.
+
 ## Quick start
 
 React (one component — layer list + interactive preview):

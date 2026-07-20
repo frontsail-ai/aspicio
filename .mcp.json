@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aspicio": {
+      "command": "npx",
+      "args": ["-y", "@aspicio/mcp"]
+    }
+  }
+}
