@@ -12,8 +12,9 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
-      "@aspicio/core": ["../../packages/core/src/index.ts"]
+      "@aspicio/core": ["../../packages/core/src/index.ts"],
+      "@aspicio/widget/meta": ["../widget/src/meta.ts"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "../widget/src/meta.ts"]
 }

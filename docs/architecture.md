@@ -15,16 +15,16 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
 
 ## Layers
 
-| Layer           | Lives in                                                    | Why it exists                                                                                                                                                                             |
-| --------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Parse           | `packages/core/src/parse/`                                  | Turn messy DXF into one normalized document (layers, entities, blocks, layouts, units); count what it can't handle (INV-3)                                                                |
-| Tessellate      | `packages/core/src/tessellate/`                             | Flatten entities into batched line/fill geometry, one accumulator per layer — one draw call per layer keeps huge drawings interactive. Extensible via the entity-handler registry (INV-6) |
-| Render          | `packages/core/src/render/`                                 | Three.js/WebGL presentation of tessellation; render-on-demand only (INV-4)                                                                                                                |
-| Viewer facade   | `packages/core/src/viewer.ts`                               | The one public object: load, camera, layers, picking, snap, export, events                                                                                                                |
-| Input           | `packages/core/src/input/`                                  | Attachable, framework-free gesture + keyboard routers                                                                                                                                     |
-| Bindings & apps | `packages/react/`, `apps/demo/`                             | UI opinion lives here, never in core (INV-1)                                                                                                                                              |
-| Agent surface   | `apps/api/` (Worker), `packages/mcp/` (stdio)               | The same headless pipeline exposed over HTTP and MCP; shared guard semantics (INV-5)                                                                                                      |
-| Packaging       | `skills/`, `.claude-plugin/`, `.codex-plugin/`, `.mcp.json` | One skills source consumed by both Claude Code and Codex plugin wrappers                                                                                                                  |
+| Layer           | Lives in                                                      | Why it exists                                                                                                                                                                             |
+| --------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parse           | `packages/core/src/parse/`                                    | Turn messy DXF into one normalized document (layers, entities, blocks, layouts, units); count what it can't handle (INV-3)                                                                |
+| Tessellate      | `packages/core/src/tessellate/`                               | Flatten entities into batched line/fill geometry, one accumulator per layer — one draw call per layer keeps huge drawings interactive. Extensible via the entity-handler registry (INV-6) |
+| Render          | `packages/core/src/render/`                                   | Three.js/WebGL presentation of tessellation; render-on-demand only (INV-4)                                                                                                                |
+| Viewer facade   | `packages/core/src/viewer.ts`                                 | The one public object: load, camera, layers, picking, snap, export, events                                                                                                                |
+| Input           | `packages/core/src/input/`                                    | Attachable, framework-free gesture + keyboard routers                                                                                                                                     |
+| Bindings & apps | `packages/react/`, `apps/demo/`                               | UI opinion lives here, never in core (INV-1)                                                                                                                                              |
+| Agent surface   | `apps/api/` (Worker), `packages/mcp/` (stdio), `apps/widget/` | The same headless pipeline exposed over HTTP and MCP; shared guard semantics (INV-5). The widget is the viewer repackaged as an MCP Apps resource the api Worker serves in-chat (AGT-14)  |
+| Packaging       | `skills/`, `.claude-plugin/`, `.codex-plugin/`, `.mcp.json`   | One skills source consumed by both Claude Code and Codex plugin wrappers                                                                                                                  |
 
 ## Key technical assumptions
 
@@ -48,14 +48,15 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
 
 ## Tech choices
 
-| Choice                       | Reason                                                                                                                 |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Vite+ (`vp`) on bun          | One CLI for dev/build/test/lint/format; bun only as package manager/runtime backend                                    |
-| Three.js                     | Batched WebGL lines/fills without hand-rolled GL; tree-shakes acceptably for headless use (ear-clipping only)          |
-| dxf-parser + custom handlers | Battle-tested group-code parsing; HATCH/VIEWPORT and other gaps filled via our registry                                |
-| Cloudflare Workers           | Static demo hosting and the API on the same infra; deploys via `wrangler` from GitHub Actions (status stays in the PR) |
-| resvg                        | The one rasterizer with both WASM (Worker) and native (Node) builds producing identical output                         |
-| MCP (stdio, official SDK)    | Vendor-neutral agent protocol — one server serves Claude, Codex, Cursor; contract-tested against the wire protocol     |
+| Choice                       | Reason                                                                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vite+ (`vp`) on bun          | One CLI for dev/build/test/lint/format; bun only as package manager/runtime backend                                                               |
+| Three.js                     | Batched WebGL lines/fills without hand-rolled GL; tree-shakes acceptably for headless use (ear-clipping only)                                     |
+| dxf-parser + custom handlers | Battle-tested group-code parsing; HATCH/VIEWPORT and other gaps filled via our registry                                                           |
+| Cloudflare Workers           | Static demo hosting and the API on the same infra; deploys via `wrangler` from GitHub Actions (status stays in the PR)                            |
+| resvg                        | The one rasterizer with both WASM (Worker) and native (Node) builds producing identical output                                                    |
+| MCP (stdio, official SDK)    | Vendor-neutral agent protocol — one server serves Claude, Codex, Cursor; contract-tested against the wire protocol                                |
+| MCP Apps (`ext-apps` SDK)    | The real viewer shipped as one self-contained in-chat widget from the api Worker — a single implementation for ChatGPT, Claude, and any spec host |
 
 ## Intentionally simple (for now)
 

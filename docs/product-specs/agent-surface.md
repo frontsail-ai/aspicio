@@ -83,6 +83,21 @@ remote MCP connectors can use it with no local install. The rate limit
 counts protocol messages (each initialize/list/call is one request), so a
 chatty session consumes the per-IP budget faster than plain HTTP calls.
 
+### AGT-14: In-chat viewer widget
+
+The remote MCP endpoint offers an interactive in-chat viewer through the
+MCP Apps extension: a `view_dxf` tool whose definition links a `ui://`
+HTML resource carrying the bundled WebGL viewer. The widget renders
+exactly the drawing delivered by the tool call — the DXF travels
+widget-only in the result metadata, never to the model — and offers no
+way to open other files unless the tool call explicitly enabled file
+controls. The widget makes no network requests. It follows the host's
+light/dark theme and inline/fullscreen display modes; the drawing canvas
+stays dark in both. Drawings over the embed cap degrade to the
+structured summary plus an explicit too-large notice. Hosts without the
+extension ignore the UI metadata and still get a usable text-and-facts
+result.
+
 ### AGT-10: One-step plugin install
 
 The repo doubles as a plugin marketplace for both Claude Code and Codex:

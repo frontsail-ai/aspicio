@@ -46,8 +46,9 @@ jobs:
             label: "🚀 **Preview deployed**"
           - target: api
             # wrangler bundles the API Worker itself, but resolves
-            # @aspicio/core through node_modules → its built dist.
-            build: "@aspicio/core#build"
+            # @aspicio/core through node_modules → its built dist, and
+            # imports the widget's built dist/widget.html as text.
+            build: "-F @aspicio/core -F @aspicio/widget build"
             workdir: apps/api
             marker: aspicio-api-preview
             label: "🛠️ **API preview deployed**"

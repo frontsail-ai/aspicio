@@ -238,7 +238,7 @@ test("/mcp speaks Streamable-HTTP MCP: initialize, tools/list, tools/call", asyn
   await client.connect(transport);
 
   const { tools } = await client.listTools();
-  expect(tools.map((t) => t.name).sort()).toEqual(["describe_dxf", "render_dxf"]);
+  expect(tools.map((t) => t.name).sort()).toEqual(["describe_dxf", "render_dxf", "view_dxf"]);
 
   const d = await client.callTool({ name: "describe_dxf", arguments: { source: SAMPLE } });
   const summary = JSON.parse((d.content as Array<{ text: string }>)[0].text) as {

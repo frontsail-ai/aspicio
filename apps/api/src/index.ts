@@ -1,6 +1,10 @@
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 // wrangler compiles a `.wasm` import to a ready WebAssembly.Module.
 import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
+// wrangler's default Text rule imports the built widget as a string. Must be
+// a relative path: wrangler resolves rule-matched modules as files, not
+// package specifiers — and build @aspicio/widget before dev/deploy.
+import widgetHtml from "../../widget/dist/widget.html";
 import { type CheckRateLimit, handleRequest, type RenderPng } from "./handler.ts";
 
 interface Env {
@@ -24,6 +28,6 @@ export default {
     const checkRateLimit: CheckRateLimit | undefined = env.RATE_LIMITER
       ? async (key) => (await env.RATE_LIMITER!.limit({ key })).success
       : undefined;
-    return handleRequest(req, renderPng, checkRateLimit);
+    return handleRequest(req, renderPng, checkRateLimit, widgetHtml);
   },
 };

@@ -15,7 +15,7 @@ MCP server, and installable skills/plugins. Live demo:
 | Parsing            | dxf-parser + custom entity handlers                                                 |
 | E2E                | Playwright (`apps/demo/e2e`, `apps/react-example/e2e`)                              |
 | Hosting / deploy   | Cloudflare Workers via `wrangler`, deployed from GitHub Actions                     |
-| Agent protocol     | MCP (official SDK, stdio)                                                           |
+| Agent protocol     | MCP (official SDK; stdio + Streamable HTTP) + MCP Apps in-chat viewer               |
 
 ## Architecture in 30 seconds
 
@@ -32,7 +32,8 @@ packages/core     the library: parse → tessellate → render, camera, input
 packages/react    <DxfEmbed> / <DxfPreview> / <DxfLayerPanel>
 packages/mcp      stdio MCP server (describe_dxf, render_dxf)
 apps/demo         standalone demo + main Playwright e2e suite
-apps/api          Cloudflare Worker: /describe, /render
+apps/api          Cloudflare Worker: /describe, /render, /mcp
+apps/widget       MCP Apps in-chat viewer widget, served by the api Worker
 apps/react-example  real embed integration + its e2e suite
 skills/           Agent Skills shared by the Claude and Codex plugins
 .claude-plugin/ .codex-plugin/ .mcp.json   plugin + marketplace manifests

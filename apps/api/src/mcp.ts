@@ -1,6 +1,13 @@
 import { describeDrawing, parseDxfBytes, tessellate, tessellationToSvg } from "@aspicio/core";
+import {
+  registerAppResource,
+  registerAppTool,
+  RESOURCE_MIME_TYPE,
+} from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { MAX_EMBED_BYTES, VIEWER_META_KEY, VIEWER_RESOURCE_URI } from "@aspicio/widget/meta";
+import type { ViewerMeta } from "@aspicio/widget/meta";
 import { z } from "zod";
 import { fetchDxf } from "./fetch.ts";
 import type { RenderPng } from "./handler.ts";
@@ -19,8 +26,18 @@ async function loadDxf(source: string): Promise<Uint8Array> {
   return new TextEncoder().encode(source);
 }
 
-/** Build the same describe/render tools as the local server, Worker-flavored. */
-function createServer(renderPng: RenderPng): McpServer {
+/** Chunked encode — String.fromCharCode(...4MB) would blow the arg limit. */
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+
+/** Build the same describe/render tools as the local server, Worker-flavored,
+ * plus the MCP Apps viewer (AGT-14). `widgetHtml` is the built widget bundle;
+ * tests inject a stub so they never depend on the widget build. */
+function createServer(renderPng: RenderPng, widgetHtml?: string): McpServer {
   const server = new McpServer({ name: "aspicio", version: "1.0.0" });
 
   server.registerTool(
@@ -59,9 +76,82 @@ function createServer(renderPng: RenderPng): McpServer {
       const doc = parseDxfBytes(await loadDxf(source));
       const svg = tessellationToSvg(tessellate(doc, {}), undefined, { background: DEFAULT_BG });
       const png = await renderPng(svg, width ?? 1200);
-      let binary = "";
-      for (const byte of png) binary += String.fromCharCode(byte);
-      return { content: [{ type: "image", data: btoa(binary), mimeType: "image/png" }] };
+      return { content: [{ type: "image", data: toBase64(png), mimeType: "image/png" }] };
+    },
+  );
+
+  // The in-chat interactive viewer (MCP Apps, AGT-14). Hosts without the
+  // extension ignore the UI metadata and still get a usable text result.
+  registerAppResource(
+    server,
+    "aspicio-viewer",
+    VIEWER_RESOURCE_URI,
+    {
+      title: "Aspicio DXF viewer",
+      description: "Interactive in-chat DXF viewer (pan, zoom, layer toggles).",
+      // No `_meta.ui.csp`: the widget parses the drawing in-iframe and makes
+      // no network requests, so the spec's restrictive default CSP is exact.
+    },
+    async () => ({
+      contents: [
+        {
+          uri: VIEWER_RESOURCE_URI,
+          mimeType: RESOURCE_MIME_TYPE,
+          text: widgetHtml ?? "<!doctype html><!-- widget bundle not provided -->",
+        },
+      ],
+    }),
+  );
+
+  registerAppTool(
+    server,
+    "view_dxf",
+    {
+      title: "Open a DXF in the interactive viewer",
+      description:
+        "Open an interactive DXF viewer the user can pan, zoom, and toggle layers in (renders in-chat on MCP Apps-capable hosts). Use this when the user wants to see or explore the drawing themselves; for your own analysis use describe_dxf (facts) or render_dxf (image). The viewer shows only the drawing from this call.",
+      inputSchema: {
+        source: z.string().describe(SOURCE_DESC),
+        allow_file_open: z
+          .boolean()
+          .optional()
+          .describe(
+            "Show open-file controls in the viewer (default false: viewer is locked to this drawing)",
+          ),
+      },
+      _meta: { ui: { resourceUri: VIEWER_RESOURCE_URI } },
+    },
+    async ({ source, allow_file_open }) => {
+      const bytes = await loadDxf(source);
+      const doc = parseDxfBytes(bytes);
+      const summary = describeDrawing(doc, tessellate(doc, {}));
+      // The drawing itself travels widget-only in `_meta` (invisible to the
+      // model); the model narrates from structuredContent.
+      const viewerMeta: ViewerMeta =
+        bytes.byteLength <= MAX_EMBED_BYTES
+          ? {
+              dxfBase64: toBase64(bytes),
+              byteLength: bytes.byteLength,
+              allowFilePicker: allow_file_open === true,
+            }
+          : {
+              tooLarge: true,
+              byteLength: bytes.byteLength,
+              allowFilePicker: allow_file_open === true,
+            };
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              bytes.byteLength <= MAX_EMBED_BYTES
+                ? "Opened the drawing in the interactive viewer."
+                : "Drawing exceeds the inline-viewer size cap; returned the structured summary instead.",
+          },
+        ],
+        structuredContent: summary as unknown as Record<string, unknown>,
+        _meta: { [VIEWER_META_KEY]: viewerMeta },
+      };
     },
   );
 
@@ -74,8 +164,12 @@ function createServer(renderPng: RenderPng): McpServer {
  * where any isolate may serve any request). JSON responses are enabled so
  * plain request/response clients need no SSE.
  */
-export async function handleMcp(req: Request, renderPng: RenderPng): Promise<Response> {
-  const server = createServer(renderPng);
+export async function handleMcp(
+  req: Request,
+  renderPng: RenderPng,
+  widgetHtml?: string,
+): Promise<Response> {
+  const server = createServer(renderPng, widgetHtml);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

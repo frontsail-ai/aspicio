@@ -3,6 +3,8 @@ name = "aspicio-api"
 main = "src/index.ts"
 compatibility_date = "2025-06-01"
 preview_urls = true
+# No [[rules]] needed for the widget: wrangler's default rules already import
+# .html files as Text modules (see src/index.ts).
 
 # Per-IP rate limiting (token bucket at the edge). The limit applies to the
 # DXF endpoints only — /health and / stay exempt.
