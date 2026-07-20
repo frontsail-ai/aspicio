@@ -15,7 +15,7 @@ MCP server, and installable skills/plugins. Live demo:
 | Parsing            | dxf-parser + custom entity handlers                                                 |
 | E2E                | Playwright (`apps/demo/e2e`, `apps/react-example/e2e`)                              |
 | Hosting / deploy   | Cloudflare Workers via `wrangler`, deployed from GitHub Actions                     |
-| Agent protocol     | MCP (official SDK, stdio)                                                           |
+| Agent protocol     | MCP (official SDK; stdio + Streamable HTTP) + MCP Apps in-chat viewer               |
 
 ## Architecture in 30 seconds
 

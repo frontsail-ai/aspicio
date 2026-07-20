@@ -24,9 +24,11 @@ vp run ready     # check + test + build everything (the repo gate)
   gestures (happy-dom), the viewer facade (mocked renderer), and the
   React component lifecycle (mocked core).
 - **Agent-surface tests** (`apps/api/tests/`, `packages/mcp/tests/`,
-  Vitest): the Worker's routing, fetch guards, rate limiting, and remote
-  MCP contract (in-memory Streamable HTTP round-trips); the stdio MCP
-  tools; and the manifest/README drift guards.
+  `apps/widget/tests/`, Vitest): the Worker's routing, fetch guards,
+  rate limiting, and remote MCP contract (in-memory Streamable HTTP
+  round-trips — including the MCP Apps viewer resource and `view_dxf`
+  payload); the stdio MCP tools; the widget's state logic; and the
+  manifest/README drift guards.
 - **E2E tests** (`apps/demo/e2e/` and `apps/react-example/e2e/`,
   Playwright): real-browser coverage of the WebGL renderer, the demo
   app — pixel-level render checks, layer toggling, zoom/pan/rotate/fit,

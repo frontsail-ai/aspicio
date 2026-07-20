@@ -84,6 +84,13 @@ instead of guessing at it:
   entity counts, and the drawing's text content. An agent reads a title
   block or a dimension value directly — no OCR, no vision round-trip.
 - **`render_dxf`** — a PNG of the drawing the model can look at.
+- **`view_dxf`** (hosted server) — an interactive in-chat viewer for the
+  _person_ in the conversation, via the open [MCP Apps
+  extension](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp):
+  pan, zoom, layer toggles, fullscreen, host light/dark theming. The
+  widget is locked to the drawing the tool call delivered and makes no
+  network requests; hosts without MCP Apps still get the structured
+  facts.
 
 | Surface                                               | Local files | URLs | Inline DXF |
 | ----------------------------------------------------- | ----------- | ---- | ---------- |
@@ -118,14 +125,14 @@ model provider.
 ## Available today · direction
 
 Everything above is shipped and live: viewer + demo, React and core
-packages, headless describe/render, stdio and hosted MCP, the HTTP API
-with OpenAPI, and plugin packaging for Claude Code and Codex.
+packages, headless describe/render, stdio and hosted MCP, the in-chat
+MCP Apps viewer, the HTTP API with OpenAPI, and plugin packaging for
+Claude Code and Codex.
 
 Direction (intent, not commitments — see
 [issues](https://github.com/frontsail-ai/aspicio/issues)): MCP registry
-listings, an in-chat viewer for conversational clients (MCP Apps),
-structured entity queries and focused rendering, and an upload flow so
-remote surfaces can handle local files.
+listings, structured entity queries and focused rendering, and an
+upload flow so remote surfaces can handle local files.
 
 ## Packages
 
@@ -135,6 +142,7 @@ remote surfaces can handle local files.
 | [`@aspicio/react`](packages/react) | React bindings: `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`     |
 | [`@aspicio/mcp`](packages/mcp)     | MCP server for AI agents: `describe_dxf` + `render_dxf`             |
 | [`@aspicio/api`](apps/api)         | DXF HTTP API Worker (private): `/describe`, `/render`, `/mcp`       |
+| [`@aspicio/widget`](apps/widget)   | MCP Apps in-chat viewer widget (private), served by the api Worker  |
 | [`@aspicio/demo`](apps/demo)       | Standalone demo app (private) — also the reference integration      |
 
 ## Development
