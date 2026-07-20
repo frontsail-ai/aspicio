@@ -1,0 +1,29 @@
+{
+  "name": "@aspicio/mcp",
+  "version": "0.0.0",
+  "bin": {
+    "aspicio-mcp": "./dist/index.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "vp pack",
+    "check": "vp check",
+    "test": "vp test",
+    "prepublishOnly": "bunx vp run build"
+  },
+  "dependencies": {
+    "@aspicio/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "three": "^0.185.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "~6.0.2",
+    "vite-plus": "catalog:"
+  }
+}
