@@ -32,6 +32,7 @@ Out of scope for now: editing and 3D.
 | ---------------------------------- | ------------------------------------------------------------------- |
 | [`@aspicio/core`](packages/core)   | The viewer library: parsing, tessellation, rendering, camera, input |
 | [`@aspicio/react`](packages/react) | React bindings: `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`     |
+| [`@aspicio/api`](apps/api)         | DXF HTTP API Worker (private): `/describe`, `/render`               |
 | [`@aspicio/demo`](apps/demo)       | Standalone demo app (private) — also the reference integration      |
 
 ## Quick start

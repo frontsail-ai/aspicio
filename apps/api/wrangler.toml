@@ -1,0 +1,5 @@
+# Cloudflare Worker for the Aspicio DXF API (/describe, /render).
+name = "aspicio-api"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+preview_urls = true
