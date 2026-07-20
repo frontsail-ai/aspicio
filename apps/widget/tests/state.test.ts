@@ -1,6 +1,12 @@
 import { expect, test } from "vite-plus/test";
 import { MAX_EMBED_BYTES, VIEWER_META_KEY, type ViewerMeta } from "../src/meta.ts";
-import { actionForToolResult, base64ToBytes, cssColor } from "../src/state.ts";
+import {
+  actionForToolResult,
+  base64ToBytes,
+  cssColor,
+  formatBytes,
+  statusChip,
+} from "../src/state.ts";
 
 const meta = (m: ViewerMeta) => ({ _meta: { [VIEWER_META_KEY]: m } });
 
@@ -46,4 +52,15 @@ test("layer swatch colors render as CSS hex", () => {
   expect(cssColor(0xff0000)).toBe("#ff0000");
   expect(cssColor(0x0000ff)).toBe("#0000ff");
   expect(cssColor(0)).toBe("#000000");
+});
+
+test("byte sizes format as KB below 1 MB and one-decimal MB above", () => {
+  expect(formatBytes(500)).toBe("1 KB");
+  expect(formatBytes(128 * 1024)).toBe("128 KB");
+  expect(formatBytes(7 * 1024 * 1024)).toBe("7.0 MB");
+});
+
+test("the status chip is singular-safe", () => {
+  expect(statusChip(6, 128 * 1024)).toBe("6 LAYERS · 128 KB");
+  expect(statusChip(1, 2048)).toBe("1 LAYER · 2 KB");
 });

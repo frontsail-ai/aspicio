@@ -1,98 +1,419 @@
 /**
- * The in-chat DXF viewer widget (AGT-14). Runs inside a host-sandboxed
- * iframe; receives the drawing via the MCP Apps `ui/notifications/tool-result`
- * notification and renders it with the real WebGL viewer. It shows exactly
- * the drawing the tool call delivered — there is no way to open another file
- * unless the server set `allowFilePicker` (no picker UI exists yet; the flag
- * is the reserved gate).
+ * The in-chat DXF viewer widget (AGT-14), implementing the approved design
+ * spec ("DXF Viewer Widget.dc.html"): inline mode is a full-bleed canvas with
+ * a floating control cluster and a status chip; fullscreen adds host-themed
+ * chrome and a docked layer sidebar; non-happy states replace the canvas
+ * entirely. Chrome follows host theme tokens with per-theme fallbacks; the
+ * canvas and everything floating on it stay dark in both themes.
+ *
+ * The widget shows exactly the drawing the tool call delivered — there is no
+ * way to open another file unless the server sets `allowFilePicker` (the flag
+ * is the reserved gate; no picker UI exists yet).
  */
 import { DxfViewer } from "@aspicio/core";
 import { App } from "@modelcontextprotocol/ext-apps";
-import { actionForToolResult, cssColor, type ViewerAction } from "./state.ts";
+import type { McpUiDisplayMode } from "@modelcontextprotocol/ext-apps";
+import { MAX_EMBED_BYTES } from "./meta.ts";
+import { actionForToolResult, cssColor, statusChip, type ViewerAction } from "./state.ts";
 
-const BACKGROUND = 0x16181d; // matches the API's default render background
+const CANVAS_BG = 0x16181d; // theme-fixed: CAD linework needs a dark canvas
+
+// ---------------------------------------------------------------------------
+// Styles — host tokens with per-theme fallbacks (design spec, section 06).
+// ---------------------------------------------------------------------------
 
 const STYLE = `
+  :root {
+    --w-sans: var(--font-sans, system-ui, -apple-system, sans-serif);
+    --w-mono: var(--font-mono, ui-monospace, Menlo, monospace);
+    --w-r-sm: var(--border-radius-sm, 2px);
+    --w-r-md: var(--border-radius-md, 5px);
+  }
+  :root[data-theme="light"] {
+    --w-frame-bg: var(--color-background-primary, #FCFAF4);
+    --w-panel-bg: var(--color-background-secondary, #FFFFFF);
+    --w-hover-bg: var(--color-background-tertiary, #F1ECDE);
+    --w-text: var(--color-text-primary, #1B1812);
+    --w-text-2: var(--color-text-secondary, #5A5345);
+    --w-border: var(--color-border-primary, #C2BAA8);
+    --w-hairline: var(--color-border-primary, #DCD5C5);
+    --w-link: #1F52B5;
+    --w-shadow: var(--shadow-md, 0 2px 6px rgba(27,24,18,0.16), 0 1px 2px rgba(27,24,18,0.10));
+  }
+  :root[data-theme="dark"] {
+    --w-frame-bg: var(--color-background-primary, #211E17);
+    --w-panel-bg: var(--color-background-secondary, #24211B);
+    --w-hover-bg: var(--color-background-tertiary, #2A261D);
+    --w-text: var(--color-text-primary, #EDE9DE);
+    --w-text-2: var(--color-text-secondary, #A69D8B);
+    --w-border: var(--color-border-primary, #4A4436);
+    --w-hairline: var(--color-border-primary, #3D382C);
+    --w-link: #8FB0EC;
+    --w-shadow: var(--shadow-md, 0 2px 8px rgba(0,0,0,0.4));
+  }
   html, body { margin: 0; height: 100%; }
-  body { background: #16181d; color: #cfd3dc; font: 13px/1.4 system-ui, sans-serif; }
-  #root { display: flex; flex-direction: column; height: 100%; min-height: 320px; }
-  #toolbar { display: flex; gap: 8px; align-items: center; padding: 6px 8px; }
-  #toolbar button {
-    background: #262a33; color: inherit; border: 1px solid #3a3f4b;
-    border-radius: 6px; padding: 3px 10px; cursor: pointer;
-  }
-  #toolbar button:hover { background: #2f3440; }
-  #status { margin-left: auto; opacity: 0.7; }
-  #stage { position: relative; flex: 1; min-height: 0; }
+  body { font-family: var(--w-sans); }
+  button { font-family: inherit; }
+
+  #root { display: flex; flex-direction: column; height: 100%; min-height: 220px; background: var(--w-frame-bg); }
+
+  /* Fullscreen top bar (hidden inline) */
+  #chrome { height: 44px; flex: none; display: none; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--w-hairline); }
+  #root[data-mode="fullscreen"] #chrome { display: flex; }
+  #chrome .label { font-family: var(--w-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--w-text-2); }
+  #chrome .vsep { width: 1px; height: 16px; background: var(--w-hairline); }
+  #chrome .mono { font-family: var(--w-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--w-text-2); font-feature-settings: 'tnum' 1, 'zero' 1; }
+  #chrome .actions { margin-left: auto; display: flex; gap: 6px; }
+  .chrome-btn { height: 28px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; background: var(--w-panel-bg); border: 1px solid var(--w-border); border-radius: var(--w-r-sm); color: var(--w-text); font: 500 12px var(--w-sans); cursor: pointer; }
+  .chrome-btn:hover { border-color: var(--w-text-2); }
+  .chrome-btn.icon { width: 28px; padding: 0; }
+
+  #body { flex: 1; min-height: 0; display: flex; }
+  #stage { flex: 1; min-width: 0; position: relative; background: #16181d; }
   #viewer { position: absolute; inset: 0; }
-  #layers {
-    position: absolute; top: 8px; left: 8px; max-height: calc(100% - 16px);
-    overflow-y: auto; background: #1d2027ee; border: 1px solid #3a3f4b;
-    border-radius: 8px; padding: 6px 10px; display: none;
+  #root:not([data-state="loaded"]) #viewer { visibility: hidden; }
+
+  /* State card — replaces the canvas, theme-fixed on dark */
+  #state { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: #16181d; text-align: center; }
+  #root:not([data-state="loaded"]) #state { display: flex; }
+  #state .card { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 380px; padding: 0 20px; }
+  #state .title { font-family: var(--w-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9AA1AD; }
+  #state .title.danger { color: #E8756B; }
+  #state .figure { font-family: var(--w-mono); font-size: 22px; font-weight: 500; color: #DFE3EA; font-feature-settings: 'tnum' 1, 'zero' 1; }
+  #state .figure .dim { color: #5A6270; font-size: 14px; }
+  #state .msg { font-size: 13.5px; color: #C6CBD4; line-height: 1.5; }
+  #state .sub { font-size: 12.5px; color: #6B7280; }
+  #state .oc-btn { margin-top: 4px; }
+  #state .compact-size { display: none; }
+  @media (max-width: 400px) {
+    #state .card { gap: 10px; }
+    #state .msg { font-size: 12.5px; line-height: 1.45; }
+    #state .sub, #state .figure { display: none; }
+    #state .compact-size { display: inline; }
   }
-  #layers.open { display: block; }
-  #layers label { display: flex; gap: 6px; align-items: center; padding: 2px 0; cursor: pointer; }
-  #layers .swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  @keyframes crease-march { to { stroke-dashoffset: -12; } }
+  @keyframes dot-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+  #state .dots { display: flex; gap: 6px; }
+  #state .dots span { width: 5px; height: 5px; background: #5A6270; }
+  #state .dots span:nth-child(1) { animation: dot-pulse 1.2s ease-in-out 0s infinite; }
+  #state .dots span:nth-child(2) { animation: dot-pulse 1.2s ease-in-out 0.2s infinite; }
+  #state .dots span:nth-child(3) { animation: dot-pulse 1.2s ease-in-out 0.4s infinite; }
+
+  /* On-canvas controls — theme-fixed dark translucent (design 1a) */
+  .oc-btn { height: 30px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; background: rgba(22,24,29,0.82); border: 1px solid rgba(255,255,255,0.14); border-radius: var(--w-r-sm); color: #DFE3EA; font: 500 12px var(--w-sans); cursor: pointer; }
+  .oc-btn:hover { border-color: rgba(255,255,255,0.35); }
+  .oc-btn.icon { width: 30px; padding: 0; }
+  .oc-btn[aria-expanded="true"] { background: rgba(45,108,223,0.22); border-color: #2D6CDF; color: #9DBCF3; }
+
+  #cluster { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+  #root[data-mode="fullscreen"] #cluster, #root:not([data-state="loaded"]) #cluster { display: none; }
+  #expand-btn { margin-left: 4px; }
+  @media (hover: hover) {
+    #root[data-mode="inline"] #layers-btn, #root[data-mode="inline"] #fit-btn { opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+    #root:hover #layers-btn, #root:hover #fit-btn, #root:focus-within #layers-btn, #root:focus-within #fit-btn { opacity: 1; pointer-events: auto; }
+  }
+
+  #chip { position: absolute; left: 10px; bottom: 10px; font-family: var(--w-mono); font-size: 10.5px; letter-spacing: 0.06em; color: #9AA1AD; background: rgba(22,24,29,0.78); border: 1px solid rgba(255,255,255,0.12); border-radius: var(--w-r-sm); padding: 4px 9px; font-feature-settings: 'tnum' 1, 'zero' 1; }
+  #root[data-mode="fullscreen"] #chip, #root:not([data-state="loaded"]) #chip { display: none; }
+
+  /* Layer list — shared row markup, two homes (overlay card / docked sidebar) */
+  .layers-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 7px; border-bottom: 1px solid var(--w-hairline); flex: none; }
+  .layers-head .h { font-family: var(--w-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--w-text-2); }
+  .layers-head .links { display: flex; gap: 8px; }
+  .layers-head .links button { background: none; border: none; padding: 0; color: var(--w-link); cursor: pointer; font: 500 11px var(--w-sans); }
+  .layer-rows { overflow-y: auto; padding: 4px 0; }
+  .layer-rows label { display: flex; align-items: center; gap: 8px; padding: 5px 10px; cursor: pointer; }
+  .layer-rows label:hover { background: var(--w-hover-bg); }
+  .layer-rows label.off { opacity: 0.55; }
+  .layer-rows input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .layer-rows .box { width: 14px; height: 14px; flex: none; border-radius: var(--w-r-sm); background: #2D6CDF; display: flex; align-items: center; justify-content: center; }
+  .layer-rows label.off .box { background: transparent; border: 1.5px solid var(--w-border); }
+  .layer-rows label.off .box svg { display: none; }
+  .layer-rows input:focus-visible + .box { outline: 2px solid #2D6CDF; outline-offset: 1px; }
+  .layer-rows .swatch { width: 18px; flex: none; border-top: 3px solid transparent; }
+  .layer-rows .name { font: 400 13px var(--w-sans); color: var(--w-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  #panel { position: absolute; top: 46px; right: 10px; width: 216px; max-height: calc(100% - 56px); background: var(--w-panel-bg); border: 1px solid var(--w-border); border-radius: var(--w-r-md); box-shadow: var(--w-shadow); overflow: hidden; display: none; flex-direction: column; }
+  #root[data-mode="inline"][data-state="loaded"] #panel.open { display: flex; }
+
+  #sidebar { width: 240px; flex: none; border-left: 1px solid var(--w-hairline); display: none; flex-direction: column; background: var(--w-frame-bg); }
+  #root[data-mode="fullscreen"][data-state="loaded"] #sidebar { display: flex; }
+  #sidebar .layers-head { padding: 10px 12px 9px; }
+  #sidebar .layer-rows { flex: 1; }
+  #sidebar .layer-rows label { padding: 6px 12px; }
+  #sidebar .hint { flex: none; padding: 10px 12px; border-top: 1px solid var(--w-hairline); font-family: var(--w-mono); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--w-text-2); line-height: 1.7; }
 `;
 
+// ---------------------------------------------------------------------------
+// Icons (inline SVG, stroke = currentColor)
+// ---------------------------------------------------------------------------
+
+const svg = (paths: string, size = 14): string =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+
+const ICONS = {
+  layers: svg(
+    '<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 12l10 5 10-5"/><path d="M2 17l10 5 10-5"/>',
+  ),
+  fit: svg(
+    '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/>',
+  ),
+  expand: svg(
+    '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>',
+    15,
+  ),
+  collapse: svg(
+    '<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="M14 10l7-7"/><path d="M3 21l7-7"/>',
+  ),
+  check:
+    '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+  warn: `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E8756B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
+  box: `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5A6270" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`,
+  drawing: `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#5A6270" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14" stroke="#2D6CDF" stroke-dasharray="3 3" style="animation: crease-march 1.2s linear infinite"/></svg>`,
+  copy: svg(
+    '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  ),
+};
+
+// ---------------------------------------------------------------------------
+// DOM scaffold
+// ---------------------------------------------------------------------------
+
+document.documentElement.dataset.theme = "dark";
 document.head.appendChild(document.createElement("style")).textContent = STYLE;
 document.body.innerHTML = `
-  <div id="root">
-    <div id="toolbar">
-      <button id="toggle-layers" type="button">Layers</button>
-      <button id="fit" type="button">Fit</button>
-      <span id="status">Waiting for a drawing…</span>
+  <div id="root" data-mode="inline" data-state="preparing">
+    <div id="chrome">
+      <span class="label">DXF drawing</span>
+      <span class="vsep"></span>
+      <span class="mono" id="chip-fs"></span>
+      <span class="actions">
+        <button id="fit-fs" class="chrome-btn" type="button" aria-label="Fit view">${ICONS.fit} Fit</button>
+        <button id="collapse-btn" class="chrome-btn icon" type="button" aria-label="Exit fullscreen">${ICONS.collapse}</button>
+      </span>
     </div>
-    <div id="stage">
-      <div id="viewer"></div>
-      <div id="layers"></div>
+    <div id="body">
+      <div id="stage">
+        <div id="viewer"></div>
+        <div id="state"></div>
+        <div id="cluster">
+          <button id="layers-btn" class="oc-btn" type="button" aria-label="Toggle layer panel" aria-expanded="false">${ICONS.layers} Layers</button>
+          <button id="fit-btn" class="oc-btn" type="button" aria-label="Fit view">${ICONS.fit} Fit</button>
+          <button id="expand-btn" class="oc-btn icon" type="button" aria-label="Expand">${ICONS.expand}</button>
+        </div>
+        <div id="panel"></div>
+        <div id="chip"></div>
+      </div>
+      <div id="sidebar"></div>
     </div>
   </div>
 `;
 
 const el = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
-const status = (text: string): void => {
-  el("status").textContent = text;
-};
+const root = el("root");
 
-const viewer = new DxfViewer(el("viewer"), { background: BACKGROUND });
+const viewer = new DxfViewer(el("viewer"), { background: CANVAS_BG });
 
-el("fit").addEventListener("click", () => viewer.fitView({ animate: true }));
-el("toggle-layers").addEventListener("click", () => el("layers").classList.toggle("open"));
+// ---------------------------------------------------------------------------
+// State cards (replace the canvas — never overlay a stale drawing)
+// ---------------------------------------------------------------------------
 
-function renderLayerPanel(): void {
-  const panel = el("layers");
-  panel.textContent = "";
-  for (const layer of viewer.getLayers()) {
-    const label = document.createElement("label");
-    const box = document.createElement("input");
-    box.type = "checkbox";
-    box.checked = layer.visible;
-    box.addEventListener("change", () => viewer.setLayerVisible(layer.name, box.checked));
-    const swatch = document.createElement("span");
-    swatch.className = "swatch";
-    swatch.style.background = cssColor(layer.effectiveColors?.[0] ?? layer.color);
-    const name = document.createElement("span");
-    name.textContent = layer.name;
-    label.append(box, swatch, name);
-    panel.appendChild(label);
+const SUGGESTED_REQUEST =
+  "Please render the drawing as an image instead (render_dxf) — it is too large for the interactive viewer.";
+
+function showPreparing(): void {
+  root.dataset.state = "preparing";
+  el("state").innerHTML = `
+    <div class="card">
+      ${ICONS.drawing}
+      <div class="title">Preparing drawing</div>
+      <div class="msg">Waiting for the drawing from the assistant…</div>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>`;
+}
+
+function showError(detail: string): void {
+  root.dataset.state = "error";
+  el("state").innerHTML = `
+    <div class="card">
+      ${ICONS.warn}
+      <div class="title danger">Could not load drawing</div>
+      <div class="msg"></div>
+      <div class="sub">Ask the assistant to check or re-send the file.</div>
+    </div>`;
+  (el("state").querySelector(".msg") as HTMLElement).textContent = detail;
+}
+
+function showTooLarge(byteLength: number): void {
+  root.dataset.state = "toolarge";
+  const mb = (n: number): string => `${(n / 1024 / 1024).toFixed(1)} MB`;
+  el("state").innerHTML = `
+    <div class="card">
+      ${ICONS.box}
+      <div class="title">Too large to view inline<span class="compact-size"> · ${mb(byteLength)}</span></div>
+      <div class="figure">${mb(byteLength)} <span class="dim">/ ${mb(MAX_EMBED_BYTES)} limit</span></div>
+      <div class="msg">The drawing arrived as facts only. Ask the assistant to render an image of it instead.</div>
+      <button id="copy-btn" class="oc-btn" type="button" aria-label="Copy suggested request">${ICONS.copy} Copy suggested request</button>
+    </div>`;
+  el("copy-btn").addEventListener("click", () => {
+    navigator.clipboard?.writeText(SUGGESTED_REQUEST).then(
+      () => {
+        el("copy-btn").textContent = "Copied";
+      },
+      () => {
+        // Clipboard may be blocked in the sandbox — show the text to select.
+        const msg = el("state").querySelector(".msg") as HTMLElement;
+        msg.textContent = SUGGESTED_REQUEST;
+      },
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Layer list — one row set, rendered into panel (inline) and sidebar (fullscreen)
+// ---------------------------------------------------------------------------
+
+function layersMarkup(): string {
+  const rows = viewer
+    .getLayers()
+    .map((layer, i) => {
+      const color = cssColor(layer.effectiveColors?.[0] ?? layer.color);
+      return `<label class="${layer.visible ? "" : "off"}" data-i="${i}">
+        <input type="checkbox" ${layer.visible ? "checked" : ""}>
+        <span class="box">${ICONS.check}</span>
+        <span class="swatch" style="border-top-color: ${color}"></span>
+        <span class="name"></span>
+      </label>`;
+    })
+    .join("");
+  return `
+    <div class="layers-head">
+      <span class="h">Layers · ${viewer.getLayers().length}</span>
+      <span class="links">
+        <button type="button" data-all="1" aria-label="Show all layers">All</button>
+        <button type="button" data-all="0" aria-label="Hide all layers">None</button>
+      </span>
+    </div>
+    <div class="layer-rows">${rows}</div>`;
+}
+
+function wireLayerHome(home: HTMLElement): void {
+  home.innerHTML = layersMarkup();
+  // Names go in via textContent — layer names are drawing data, not markup.
+  const layers = viewer.getLayers();
+  for (const label of home.querySelectorAll("label")) {
+    const layer = layers[Number(label.dataset.i)];
+    (label.querySelector(".name") as HTMLElement).textContent = layer.name;
+    const input = label.querySelector("input") as HTMLInputElement;
+    input.addEventListener("change", () => {
+      viewer.setLayerVisible(layer.name, input.checked);
+      syncLayerRows();
+    });
+  }
+  for (const btn of home.querySelectorAll<HTMLButtonElement>("[data-all]")) {
+    btn.addEventListener("click", () => {
+      const visible = btn.dataset.all === "1";
+      for (const layer of layers) viewer.setLayerVisible(layer.name, visible);
+      syncLayerRows();
+    });
   }
 }
 
+/** Reflect current visibility into both homes without rebuilding them. */
+function syncLayerRows(): void {
+  const layers = viewer.getLayers();
+  for (const home of [el("panel"), el("sidebar")]) {
+    for (const label of home.querySelectorAll("label")) {
+      const layer = layers[Number(label.dataset.i)];
+      if (!layer) continue;
+      const input = label.querySelector("input") as HTMLInputElement;
+      input.checked = layer.visible;
+      label.classList.toggle("off", !layer.visible);
+    }
+  }
+}
+
+function renderLayers(): void {
+  wireLayerHome(el("panel"));
+  const sidebar = el("sidebar");
+  wireLayerHome(sidebar);
+  sidebar.insertAdjacentHTML(
+    "beforeend",
+    `<div class="hint">Drag to pan · Scroll to zoom<br>Double-click to fit</div>`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Panel open/close (inline overlay) — outside click and Esc close it
+// ---------------------------------------------------------------------------
+
+function setPanelOpen(open: boolean): void {
+  el("panel").classList.toggle("open", open);
+  el("layers-btn").setAttribute("aria-expanded", String(open));
+}
+
+el("layers-btn").addEventListener("click", (ev) => {
+  ev.stopPropagation();
+  setPanelOpen(!el("panel").classList.contains("open"));
+});
+el("panel").addEventListener("click", (ev) => ev.stopPropagation());
+document.addEventListener("click", () => setPanelOpen(false));
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") setPanelOpen(false);
+});
+
+// ---------------------------------------------------------------------------
+// Display modes and theme
+// ---------------------------------------------------------------------------
+
+function setMode(mode: McpUiDisplayMode): void {
+  root.dataset.mode = mode === "fullscreen" ? "fullscreen" : "inline";
+  setPanelOpen(false);
+}
+
+function setTheme(theme: string | undefined): void {
+  if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+}
+
+el("expand-btn").addEventListener("click", () => {
+  void app.requestDisplayMode({ mode: "fullscreen" }).then((r) => setMode(r.mode));
+});
+el("collapse-btn").addEventListener("click", () => {
+  void app.requestDisplayMode({ mode: "inline" }).then((r) => setMode(r.mode));
+});
+el("fit-btn").addEventListener("click", () => viewer.fitView({ animate: true }));
+el("fit-fs").addEventListener("click", () => viewer.fitView({ animate: true }));
+
+// Re-fit when the host resizes the widget (inline card → expanded, etc.) so
+// the drawing is never left cropped by a size change.
+let refit: ReturnType<typeof setTimeout> | undefined;
+new ResizeObserver(() => {
+  if (root.dataset.state !== "loaded") return;
+  clearTimeout(refit);
+  refit = setTimeout(() => viewer.fitView(), 120);
+}).observe(el("stage"));
+
+// ---------------------------------------------------------------------------
+// Tool results → widget state
+// ---------------------------------------------------------------------------
+
 async function apply(action: ViewerAction): Promise<void> {
   switch (action.kind) {
-    case "load":
+    case "load": {
       await viewer.load(action.bytes);
-      renderLayerPanel();
-      status(`${viewer.getLayers().length} layers`);
+      renderLayers();
+      const chip = statusChip(viewer.getLayers().length, action.byteLength);
+      el("chip").textContent = chip;
+      el("chip-fs").textContent = chip;
+      root.dataset.state = "loaded";
+      viewer.fitView();
       break;
+    }
     case "too-large":
-      status(
-        `Drawing too large for inline viewing (${(action.byteLength / 1024 / 1024).toFixed(1)} MB)`,
-      );
+      showTooLarge(action.byteLength);
       break;
     case "missing":
-      status("No drawing in the tool result");
+      showPreparing();
       break;
   }
 }
@@ -101,7 +422,16 @@ const app = new App({ name: "aspicio-viewer", version: "0.0.0" }, {});
 // Register before connect() so a result replayed during the handshake lands.
 app.ontoolresult = (result) => {
   void apply(actionForToolResult(result)).catch((err: Error) => {
-    status(`Could not load drawing: ${err.message}`);
+    showError(`The file isn't valid DXF${err.message ? ` — ${err.message}.` : "."}`);
   });
 };
+app.onhostcontextchanged = (ctx) => {
+  setTheme(ctx.theme);
+  if (ctx.displayMode) setMode(ctx.displayMode);
+};
+
+showPreparing();
 await app.connect();
+const ctx = app.getHostContext();
+setTheme(ctx?.theme);
+if (ctx?.displayMode) setMode(ctx.displayMode);
