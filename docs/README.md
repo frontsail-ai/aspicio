@@ -5,13 +5,14 @@ the files; this page is about managing them.
 
 ## What lives here
 
-| File                                      | Holds                                                            |
-| ----------------------------------------- | ---------------------------------------------------------------- |
-| [architecture.md](architecture.md)        | Layers, boundaries, technical assumptions, tech choices          |
-| [guidelines.md](guidelines.md)            | Process: gates, planning checklist, change protocol, regressions |
-| [releasing.md](releasing.md)              | The tag-driven release runbook                                   |
-| [product-specs/](product-specs/README.md) | Behavioral specs (one file per feature area) + invariants        |
-| `*.png`                                   | Screenshots referenced by READMEs                                |
+| File                                         | Holds                                                            |
+| -------------------------------------------- | ---------------------------------------------------------------- |
+| [architecture.md](architecture.md)           | Layers, boundaries, technical assumptions, tech choices          |
+| [guidelines.md](guidelines.md)               | Process: gates, planning checklist, change protocol, regressions |
+| [releasing.md](releasing.md)                 | The tag-driven release runbook                                   |
+| [registry-listings.md](registry-listings.md) | Runbook for MCP registry/directory submissions                   |
+| [product-specs/](product-specs/README.md)    | Behavioral specs (one file per feature area) + invariants        |
+| `*.png`                                      | Screenshots referenced by READMEs                                |
 
 ## Spec format (summary — full rules in [product-specs/README.md](product-specs/README.md))
 

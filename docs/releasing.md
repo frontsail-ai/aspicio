@@ -15,15 +15,19 @@ publishes `@aspicio/core`, `@aspicio/react`, and `@aspicio/mcp`.
 Tags are cut from the current tip of `master` — never from a branch or an
 older commit. Before tagging:
 
-1. **Wait for pending PRs.** If any open PR belongs in the release —
+1. **Bump `server.json`.** Its top-level and package `version` fields are
+   pinned (the registry has no workspace stamping); set them to the new
+   version in the release PR or a pre-tag commit (INV-9), then re-run
+   `mcp-publisher publish` after the release so the listing follows.
+2. **Wait for pending PRs.** If any open PR belongs in the release —
    features, fixes, or (easy to miss) changes to the publish workflow
    itself — it merges first. A release cut around an unmerged PR silently
    ships without it: v0.4.0 nearly shipped without `@aspicio/mcp` because
    the PR wiring it into publishing was still open.
-2. **Sync and verify.** `git fetch && git checkout master && git pull`;
+3. **Sync and verify.** `git fetch && git checkout master && git pull`;
    confirm the working tree is clean and local `master` matches
    `origin/master`.
-3. **Tag that commit** and push the tag.
+4. **Tag that commit** and push the tag.
 
 ## One-time setup (repo owner)
 

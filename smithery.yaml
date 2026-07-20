@@ -1,0 +1,6 @@
+# Smithery (smithery.ai) launch config for the Aspicio MCP server.
+startCommand:
+  type: stdio
+  configSchema: {}
+  commandFunction: |-
+    () => ({ command: "npx", args: ["-y", "@aspicio/mcp"] })
