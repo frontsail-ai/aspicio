@@ -43,6 +43,13 @@ Errors are JSON with meaningful statuses: 400 bad input, 413 too large,
 422 unparseable DXF, 429 rate-limited, 502 upstream fetch failure.
 Unknown routes are 404; a health endpoint reports ok.
 
+### AGT-12: The API self-describes via OpenAPI
+
+The API serves an OpenAPI 3.1 document describing every endpoint,
+parameter, schema, and error status, with authentication explicitly
+declared as none — importable as-is by OpenAPI-speaking agent platforms.
+The index endpoint links to it.
+
 ### AGT-6: MCP tools
 
 A local stdio MCP server exposes `describe_dxf` and `render_dxf`, whose

@@ -1,4 +1,5 @@
 import { describeDrawing, parseDxfBytes, tessellate, tessellationToSvg } from "@aspicio/core";
+import { openapi } from "./openapi.ts";
 
 const MAX_BYTES = 8 * 1024 * 1024; // reject DXF payloads larger than 8 MB
 const FETCH_TIMEOUT_MS = 10_000;
@@ -189,9 +190,12 @@ export async function handleRequest(
     switch (url.pathname) {
       case "/health":
         return json({ status: "ok" });
+      case "/openapi.json":
+        return json(openapi);
       case "/":
         return json({
           name: "aspicio-api",
+          openapi: "/openapi.json",
           endpoints: {
             "GET|POST /describe": "structured JSON summary of a DXF (?src=<url> or POST body)",
             "GET|POST /render": "?format=png|svg&width=&bg=  — render a DXF to an image",
