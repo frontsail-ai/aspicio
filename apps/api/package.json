@@ -1,0 +1,23 @@
+{
+  "name": "@aspicio/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "tsc --noEmit",
+    "test": "vp test"
+  },
+  "dependencies": {
+    "@aspicio/core": "workspace:*",
+    "@resvg/resvg-wasm": "^2.6.2",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "typescript": "~6.0.2",
+    "vite-plus": "catalog:",
+    "wrangler": "^4.0.0"
+  }
+}

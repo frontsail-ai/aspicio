@@ -34,3 +34,4 @@ playwright-report/
 
 # Coverage
 coverage/
+.wrangler/
