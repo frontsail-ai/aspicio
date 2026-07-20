@@ -4,8 +4,7 @@ import type { EntityInfo } from "./entity-info.ts";
 import { tessellationToSvg } from "./export.ts";
 import { attachGestures } from "./input/gestures.ts";
 import type { DxfDocument, Entity, LayerInfo, Point2 } from "./model/types.ts";
-import { binaryDxfToText, isBinaryDxf } from "./parse/binary.ts";
-import { parseDxf } from "./parse/parse.ts";
+import { parseDxfBytes } from "./parse/parse.ts";
 import { pickEntity as pickEntityHit, pickLayer } from "./pick/pick.ts";
 import { SceneRenderer } from "./render/renderer.ts";
 import { buildSnapIndex } from "./snap/snap.ts";
@@ -120,15 +119,9 @@ export class DxfViewer {
 
   /** Load a DXF from text, a File/Blob, or an ArrayBuffer (ASCII or binary). */
   async load(source: DxfSource): Promise<void> {
-    let text: string;
-    if (typeof source === "string") {
-      text = source;
-    } else {
-      const bytes = new Uint8Array(source instanceof Blob ? await source.arrayBuffer() : source);
-      text = isBinaryDxf(bytes) ? binaryDxfToText(bytes) : new TextDecoder().decode(bytes);
-    }
-
-    this.document = parseDxf(text);
+    // The byte→document policy (binary detection included) lives in
+    // parseDxfBytes — one place, shared with the API and MCP surfaces.
+    this.document = parseDxfBytes(source instanceof Blob ? await source.arrayBuffer() : source);
     this.activeSpace = MODEL_SPACE;
     this.activate(tessellate(this.document, { curveSegments: this.options.curveSegments }));
     this.emit("loaded");
