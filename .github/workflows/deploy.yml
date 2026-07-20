@@ -1,4 +1,4 @@
-# Builds the demo and deploys it to a Cloudflare Worker (Static Assets).
+# Deploys two Cloudflare Workers: the demo (static assets) and the DXF API.
 #   push → master : production deploy (`wrangler deploy`)
 #   pull_request  : preview version (`wrangler versions upload`); its URL is
 #                   posted back as a sticky comment on the PR
@@ -6,8 +6,8 @@
 # One-time setup:
 #   1. Create a Cloudflare API token with the "Workers Scripts: Edit" permission.
 #   2. Add repo secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
-#   (No resource to pre-create — `wrangler deploy` creates the Worker on first run.)
-name: Deploy demo (Cloudflare Workers)
+#   (No resource to pre-create — `wrangler deploy` creates each Worker on first run.)
+name: Deploy (Cloudflare Workers)
 
 on:
   push:
@@ -27,12 +27,30 @@ permissions:
 
 jobs:
   deploy:
-    name: Build and deploy
+    name: Deploy ${{ matrix.target }}
     runs-on: ubuntu-latest
     # Fork PRs can't read secrets — skip them (no preview) instead of failing.
     if: >-
       github.event_name == 'push' ||
       github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: demo
+            # The demo Worker is assets-only; vite builds them (resolving
+            # @aspicio/core from source via its alias).
+            build: "@aspicio/demo#build"
+            workdir: "."
+            marker: aspicio-preview
+            label: "🚀 **Preview deployed**"
+          - target: api
+            # wrangler bundles the API Worker itself, but resolves
+            # @aspicio/core through node_modules → its built dist.
+            build: "@aspicio/core#build"
+            workdir: apps/api
+            marker: aspicio-api-preview
+            label: "🛠️ **API preview deployed**"
     steps:
       - uses: actions/checkout@v4
 
@@ -47,8 +65,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build the demo
-        run: bunx vp run @aspicio/demo#build
+      - name: Build
+        run: bunx vp run ${{ matrix.build }}
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -57,26 +75,30 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          # Name + assets dir come from wrangler.toml. Production on master; a
-          # preview version (with its own URL) on pull requests.
+          workingDirectory: ${{ matrix.workdir }}
+          # Subdirectories have no lockfile, so the action's autodetect would
+          # fall back to npm — which rejects the repo's bun devEngines pin.
+          packageManager: bun
           command: ${{ github.event_name == 'pull_request' && 'versions upload' || 'deploy' }}
 
-      # Post (and keep updating) a single PR comment with the preview URL.
+      # Post (and keep updating) one sticky PR comment per target.
       - name: Comment the preview URL on the PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         env:
+          MARKER: ${{ matrix.marker }}
+          LABEL: ${{ matrix.label }}
           DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
           WRANGLER_OUTPUT: ${{ steps.deploy.outputs.command-output }}${{ steps.deploy.outputs.command-stderr }}
         with:
           script: |
-            const marker = "<!-- aspicio-preview -->";
+            const marker = `<!-- ${process.env.MARKER} -->`;
             const url =
               process.env.DEPLOY_URL ||
               (process.env.WRANGLER_OUTPUT.match(/https:\/\/[a-z0-9-]+\.workers\.dev\S*/i) || [])[0];
             const sha = context.sha.slice(0, 7);
             const body = url
-              ? `${marker}\n🚀 **Preview deployed** for \`${sha}\`: ${url}`
+              ? `${marker}\n${process.env.LABEL} for \`${sha}\`: ${url}`
               : `${marker}\n⚠️ Preview version uploaded for \`${sha}\`, but no preview URL was found in the wrangler output.`;
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,

@@ -71,7 +71,10 @@ vp run ready     # check + test + build everything
 ```
 
 CI runs the same gates on every PR, plus a smoke suite against the
-production build ([ci.yml](.github/workflows/ci.yml)).
+production build ([ci.yml](.github/workflows/ci.yml)). Pushes to `master`
+deploy the demo and the DXF API to Cloudflare Workers, and every PR gets
+preview URLs posted back as comments
+([deploy.yml](.github/workflows/deploy.yml)).
 
 ## Testing
 
