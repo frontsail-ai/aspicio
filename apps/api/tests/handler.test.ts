@@ -222,3 +222,44 @@ test("/openapi.json serves a valid 3.1 document that matches the routes", async 
   const root = (await (await handleRequest(get("/"), noPng)).json()) as { openapi: string };
   expect(root.openapi).toBe("/openapi.json");
 });
+
+test("/mcp speaks Streamable-HTTP MCP: initialize, tools/list, tools/call", async () => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StreamableHTTPClientTransport } =
+    await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
+  const stubPng = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+  // Bridge the client's fetch to the pure handler — no network, real protocol.
+  const transport = new StreamableHTTPClientTransport(new URL("http://api.test/mcp"), {
+    fetch: ((input: RequestInfo | URL, init?: RequestInit) =>
+      handleRequest(new Request(input, init), async () => stubPng)) as typeof fetch,
+  });
+  const client = new Client({ name: "remote-contract", version: "0" });
+  await client.connect(transport);
+
+  const { tools } = await client.listTools();
+  expect(tools.map((t) => t.name).sort()).toEqual(["describe_dxf", "render_dxf"]);
+
+  const d = await client.callTool({ name: "describe_dxf", arguments: { source: SAMPLE } });
+  const summary = JSON.parse((d.content as Array<{ text: string }>)[0].text) as {
+    entityCount: number;
+  };
+  expect(summary.entityCount).toBe(2);
+
+  const r = await client.callTool({
+    name: "render_dxf",
+    arguments: { source: SAMPLE, width: 200 },
+  });
+  const img = (r.content as Array<{ type: string; mimeType?: string; data?: string }>)[0];
+  expect(img.type).toBe("image");
+  expect(img.mimeType).toBe("image/png");
+  await client.close();
+});
+
+test("/mcp is rate-limited like the other work endpoints", async () => {
+  const denied = await handleRequest(
+    new Request("http://api.test/mcp", { method: "POST", body: "{}" }),
+    noPng,
+    async () => false,
+  );
+  expect(denied.status).toBe(429);
+});

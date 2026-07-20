@@ -1,4 +1,5 @@
 import { describeDrawing, parseDxfBytes, tessellate, tessellationToSvg } from "@aspicio/core";
+import { handleMcp } from "./mcp.ts";
 import { openapi } from "./openapi.ts";
 
 const MAX_BYTES = 8 * 1024 * 1024; // reject DXF payloads larger than 8 MB
@@ -15,7 +16,7 @@ export type RenderPng = (svg: string, width: number) => Promise<Uint8Array>;
 export type CheckRateLimit = (key: string) => Promise<boolean>;
 
 /** Endpoints that do real work (fetch/parse/rasterize) and get rate-limited. */
-const WORK_ENDPOINTS = new Set(["/describe", "/render"]);
+const WORK_ENDPOINTS = new Set(["/describe", "/render", "/mcp"]);
 
 class HttpError extends Error {
   constructor(
@@ -83,7 +84,7 @@ function validateSrcUrl(src: string, base?: URL): URL {
   return url;
 }
 
-async function fetchDxf(src: string): Promise<Uint8Array> {
+export async function fetchDxf(src: string): Promise<Uint8Array> {
   let url = validateSrcUrl(src);
 
   const controller = new AbortController();
@@ -201,6 +202,10 @@ export async function handleRequest(
             "GET|POST /render": "?format=png|svg&width=&bg=  — render a DXF to an image",
           },
         });
+      case "/mcp":
+        // Remote MCP (Streamable HTTP, stateless) — the connector endpoint
+        // for Claude.ai and other web clients.
+        return await handleMcp(req, renderPng);
       case "/describe":
         return handleDescribe(await resolveDxf(req, url));
       case "/render":

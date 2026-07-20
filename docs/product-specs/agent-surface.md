@@ -72,6 +72,14 @@ result over the wire — never a crashed server.
 `render_dxf` returns spec-correct MCP image content (base64 PNG with mime
 type); `describe_dxf` returns JSON text content.
 
+### AGT-13: Remote MCP endpoint
+
+The API Worker also serves the MCP protocol over Streamable HTTP,
+statelessly, at a dedicated endpoint — the same describe/render tools as
+the local server, with sources limited to URLs (same guards as AGT-4) and
+inline text (no file paths on a hosted server). Web clients that support
+remote MCP connectors can use it with no local install.
+
 ### AGT-10: One-step plugin install
 
 The repo doubles as a plugin marketplace for both Claude Code and Codex:
