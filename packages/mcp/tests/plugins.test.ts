@@ -19,7 +19,10 @@ test(".mcp.json bundles the aspicio MCP server via npx", () => {
   const mcp = (read(".mcp.json").mcpServers as Record<string, { command: string; args: string[] }>)
     .aspicio;
   expect(mcp.command).toBe("npx");
-  expect(mcp.args).toContain("@aspicio/mcp");
+  // The npx target must be the actual package name — the one load-bearing
+  // string that makes the plugin work, living in two files. (Deliberately
+  // unpinned: plugin installs track the latest published server.)
+  expect(mcp.args).toContain(read("packages/mcp/package.json").name);
 });
 
 test("Claude marketplace lists the plugin at the repo root", () => {

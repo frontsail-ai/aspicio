@@ -17,8 +17,8 @@
   (pinch zoom, twist rotate) are equally first-class
 - Tools: distance/area measure with object snap, click-to-select with an
   entity info panel, and keyboard shortcuts
-- SVG (vector) and PNG export, paper-space layouts, and both ASCII and
-  binary DXF
+- SVG (vector) and PNG export, paper-space layouts; ASCII DXF (binary
+  DXF is detected and rejected with a clear message)
 - Hit-testing (`pickLayer`), camera state access, extensible
   entity-handler registry
 
@@ -51,6 +51,9 @@ PNG the model can look at.
   `codex mcp add aspicio -- npx -y @aspicio/mcp`
 - **Any MCP client** (Cursor, ChatGPT, …) — register the stdio server:
   `npx -y @aspicio/mcp`
+
+> `@aspicio/mcp` ships to npm with the next release — until then the
+> `npx` commands above won't resolve (the bundled skills install fine).
 
 The HTTP equivalents live on the API Worker: `GET /describe?src=<dxf-url>`
 and `GET /render?src=<dxf-url>&format=png|svg`.
