@@ -7,12 +7,13 @@ rasterizes the SVG with resvg (WASM) inside the Worker.
 
 ## Endpoints
 
-| Endpoint                | Returns                                                                                                                                |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET \| POST /describe` | JSON summary: units, bounds/size, entity + segment counts, layers with the color actually drawn, per-type entity counts, skipped types |
-| `GET \| POST /render`   | The drawing as an image — `?format=png` (default) or `svg`                                                                             |
-| `GET /openapi.json`     | OpenAPI 3.1 description of this API — import it into ChatGPT Actions, Gemini/Grok function calling, or any OpenAPI-speaking tool       |
-| `GET /health`           | `{ "status": "ok" }`                                                                                                                   |
+| Endpoint                | Returns                                                                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET \| POST /describe` | JSON summary: units, bounds/size, entity + segment counts, layers with the color actually drawn, per-type entity counts, skipped types        |
+| `GET \| POST /render`   | The drawing as an image — `?format=png` (default) or `svg`                                                                                    |
+| `GET /openapi.json`     | OpenAPI 3.1 description of this API — import it into ChatGPT Actions, Gemini/Grok function calling, or any OpenAPI-speaking tool              |
+| `POST /mcp`             | Remote MCP (Streamable HTTP, stateless): the same `describe_dxf`/`render_dxf` tools for web clients with connector support — no local install |
+| `GET /health`           | `{ "status": "ok" }`                                                                                                                          |
 
 Input is either a fetched URL (`?src=<dxf-url>`) or the DXF file itself as
 the POST body — ASCII and binary DXF alike (auto-detected).

@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { handleRequest, isPrivateHost } from "../src/handler.ts";
+import { isPrivateHost } from "../src/fetch.ts";
+import { handleRequest } from "../src/handler.ts";
 
 // A tiny valid drawing: a WALLS layer with one LINE and one CIRCLE.
 const SAMPLE = [
@@ -221,4 +222,54 @@ test("/openapi.json serves a valid 3.1 document that matches the routes", async 
   // The index advertises the spec.
   const root = (await (await handleRequest(get("/"), noPng)).json()) as { openapi: string };
   expect(root.openapi).toBe("/openapi.json");
+});
+
+test("/mcp speaks Streamable-HTTP MCP: initialize, tools/list, tools/call", async () => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StreamableHTTPClientTransport } =
+    await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
+  const stubPng = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+  // Bridge the client's fetch to the pure handler — no network, real protocol.
+  const transport = new StreamableHTTPClientTransport(new URL("http://api.test/mcp"), {
+    fetch: ((input: RequestInfo | URL, init?: RequestInit) =>
+      handleRequest(new Request(input, init), async () => stubPng)) as typeof fetch,
+  });
+  const client = new Client({ name: "remote-contract", version: "0" });
+  await client.connect(transport);
+
+  const { tools } = await client.listTools();
+  expect(tools.map((t) => t.name).sort()).toEqual(["describe_dxf", "render_dxf"]);
+
+  const d = await client.callTool({ name: "describe_dxf", arguments: { source: SAMPLE } });
+  const summary = JSON.parse((d.content as Array<{ text: string }>)[0].text) as {
+    entityCount: number;
+  };
+  expect(summary.entityCount).toBe(2);
+
+  const r = await client.callTool({
+    name: "render_dxf",
+    arguments: { source: SAMPLE, width: 200 },
+  });
+  const img = (r.content as Array<{ type: string; mimeType?: string; data?: string }>)[0];
+  expect(img.type).toBe("image");
+  expect(img.mimeType).toBe("image/png");
+
+  // The SSRF guard surfaces as a clean tool error over the wire — the
+  // security-relevant behavior for a hosted server.
+  const bad = await client.callTool({
+    name: "describe_dxf",
+    arguments: { source: "http://127.0.0.1/x.dxf" },
+  });
+  expect(bad.isError).toBe(true);
+  expect((bad.content as Array<{ text?: string }>)[0].text).toMatch(/private or loopback/);
+  await client.close();
+});
+
+test("/mcp is rate-limited like the other work endpoints", async () => {
+  const denied = await handleRequest(
+    new Request("http://api.test/mcp", { method: "POST", body: "{}" }),
+    noPng,
+    async () => false,
+  );
+  expect(denied.status).toBe(429);
 });

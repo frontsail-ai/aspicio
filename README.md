@@ -51,6 +51,12 @@ PNG the model can look at.
   `codex mcp add aspicio -- npx -y @aspicio/mcp`
 - **Any MCP client** (Cursor, ChatGPT, …) — register the stdio server:
   `npx -y @aspicio/mcp`
+- **Web clients with remote-MCP connectors** (e.g. Claude.ai custom
+  connectors) — add `https://aspicio-api.dmitri-66a.workers.dev/mcp`; no
+  local install. Sources are URLs or inline DXF (no file paths). The same
+  API also self-describes at [`/openapi.json`](https://aspicio-api.dmitri-66a.workers.dev/openapi.json)
+  for OpenAPI-speaking platforms (ChatGPT Actions, Gemini/Grok function
+  calling).
 
 The HTTP equivalents live on the API Worker: `GET /describe?src=<dxf-url>`
 and `GET /render?src=<dxf-url>&format=png|svg`.
