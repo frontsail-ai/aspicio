@@ -1,6 +1,7 @@
 {
   "name": "@aspicio/mcp",
   "version": "0.0.0",
+  "license": "MIT",
   "bin": {
     "aspicio-mcp": "./dist/index.mjs"
   },

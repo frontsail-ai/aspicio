@@ -62,6 +62,7 @@ docs/             architecture, guidelines, product specs, releasing
 | [docs/releasing.md](docs/releasing.md)                                     | Tag-driven release runbook                                 | cutting or debugging a release                                     |
 | [docs/registry-listings.md](docs/registry-listings.md)                     | MCP registry submission runbook                            | listing or updating the server in directories                      |
 | [docs/README.md](docs/README.md)                                           | How docs/ itself is managed                                | adding or restructuring docs                                       |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                                         | Contributor mechanics: commands, testing, CI, releasing    | onboarding a human contributor                                     |
 
 ## Conventions & process (the short version)
 
