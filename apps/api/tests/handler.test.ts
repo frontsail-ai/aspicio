@@ -168,3 +168,25 @@ test("?src= fetch: happy path, oversize, and redirect-to-private", async () => {
     globalThis.fetch = realFetch;
   }
 });
+
+test("rate limiting: denied callers get 429, allowed pass, health is exempt", async () => {
+  const denyAll = async (): Promise<boolean> => false;
+  const denied = await handleRequest(post("/describe", SAMPLE), noPng, denyAll);
+  expect(denied.status).toBe(429);
+  const deniedRender = await handleRequest(post("/render?format=svg", SAMPLE), noPng, denyAll);
+  expect(deniedRender.status).toBe(429);
+  // Health and the index stay reachable even when the limiter says no.
+  expect((await handleRequest(get("/health"), noPng, denyAll)).status).toBe(200);
+  expect((await handleRequest(get("/"), noPng, denyAll)).status).toBe(200);
+
+  // An allowing limiter is invisible, and receives the client IP as the key.
+  let seenKey = "";
+  const allow = async (key: string): Promise<boolean> => ((seenKey = key), true);
+  const req = new Request("http://api.test/describe", {
+    method: "POST",
+    body: SAMPLE,
+    headers: { "cf-connecting-ip": "203.0.113.9" },
+  });
+  expect((await handleRequest(req, noPng, allow)).status).toBe(200);
+  expect(seenKey).toBe("203.0.113.9");
+});

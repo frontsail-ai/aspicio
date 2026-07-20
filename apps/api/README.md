@@ -34,8 +34,11 @@ curl -X POST --data-binary @plan.dxf "https://<worker>/render?format=png&width=1
   again after), 10 s fetch timeout
 - `bg` is whitelisted to hex colors so query input can't break out of the
   SVG attribute it lands in
+- The DXF endpoints are rate-limited per client IP (60/min); `/health`
+  and `/` stay exempt
 - Errors are JSON with meaningful statuses: 400 (bad input), 413 (too
-  large), 422 (unparseable DXF), 502 (upstream fetch failed)
+  large), 422 (unparseable DXF), 429 (rate-limited), 502 (upstream fetch
+  failed)
 
 ## Development
 

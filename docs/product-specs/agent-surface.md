@@ -33,13 +33,14 @@ body is a 400.
 `src` fetches refuse loopback/private/link-local hosts (IPv4 and IPv6),
 revalidate every redirect hop (bounded hop count), cap payloads at 8 MB —
 checked against the declared length before buffering — and time out (see
-INV-5).
+INV-5). The DXF endpoints are rate-limited per client IP; the health and
+index endpoints stay exempt.
 
 ### AGT-5: HTTP error contract
 
 Errors are JSON with meaningful statuses: 400 bad input, 413 too large,
-422 unparseable DXF, 502 upstream fetch failure. Unknown routes are 404;
-a health endpoint reports ok.
+422 unparseable DXF, 429 rate-limited, 502 upstream fetch failure.
+Unknown routes are 404; a health endpoint reports ok.
 
 ### AGT-6: MCP tools
 
