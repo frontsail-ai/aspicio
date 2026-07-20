@@ -79,6 +79,7 @@ export async function handleRequest(
   req: Request,
   renderPng: RenderPng,
   checkRateLimit?: CheckRateLimit,
+  widgetHtml?: string,
 ): Promise<Response> {
   const url = new URL(req.url);
   if (req.method === "OPTIONS")
@@ -115,7 +116,7 @@ export async function handleRequest(
       case "/mcp":
         // Remote MCP (Streamable HTTP, stateless) — the connector endpoint
         // for Claude.ai and other web clients.
-        return await handleMcp(req, renderPng);
+        return await handleMcp(req, renderPng, widgetHtml);
       case "/describe":
         return handleDescribe(await resolveDxf(req, url));
       case "/render":
