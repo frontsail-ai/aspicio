@@ -27,6 +27,7 @@ export { unitLabel, niceLength } from "./units.ts";
 export { tessellationToSvg } from "./export.ts";
 export type { SvgExportOptions } from "./export.ts";
 export { parseDxf, parseDxfBytes } from "./parse/parse.ts";
+export { binaryDxfToText, isBinaryDxf } from "./parse/binary.ts";
 export { describeDrawing } from "./describe.ts";
 export type { DrawingSummary, LayerSummary } from "./describe.ts";
 export { tessellate, tessellateLayout, registerEntityHandler } from "./tessellate/tessellate.ts";

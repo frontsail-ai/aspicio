@@ -1,0 +1,2 @@
+# Binary DXF test fixtures must never be line-ending–normalized or filtered.
+*-binary.dxf binary

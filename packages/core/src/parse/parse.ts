@@ -1,5 +1,6 @@
 import DxfParser from "dxf-parser";
 import type { IBlock, IEntity, ILayer } from "dxf-parser";
+import { binaryDxfToText, isBinaryDxf } from "./binary.ts";
 import { DEFAULT_CURVE_SEGMENTS, sampleArc, sampleBulge } from "../geom/arc.ts";
 import type {
   BlockDef,
@@ -418,34 +419,18 @@ export function parseDxf(text: string): DxfDocument {
   return { layers, entities, blocks, lineTypes, unsupported, units, layouts };
 }
 
-/** The 22-byte magic prefix every "AutoCAD Binary DXF" file starts with. */
-const BINARY_SENTINEL = "AutoCAD Binary DXF\r\n\x1a\0";
-
 /**
  * Parse a DXF from raw bytes or text. Headless (no DOM/WebGL) — safe in Node
  * and Cloudflare Workers. Use when the source arrives as bytes (e.g. a fetched
  * file); pass a string to parse ASCII DXF text directly.
  *
- * Bytes are decoded as UTF-8, which also covers ASCII. Pre-2007 files using an
- * ANSI code page ($DWGCODEPAGE) will decode non-ASCII text as U+FFFD. Binary
- * "AutoCAD Binary DXF" input is detected and rejected with a clear error
- * (decoding it is a follow-up once the binary decoder lands in core).
+ * Binary "AutoCAD Binary DXF" input (both the R12 1-byte and R13+ 2-byte code
+ * variants) is detected by its sentinel and decoded. Other bytes are decoded
+ * as UTF-8, which also covers ASCII; pre-2007 files using an ANSI code page
+ * ($DWGCODEPAGE) will decode non-ASCII text as U+FFFD.
  */
 export function parseDxfBytes(source: string | ArrayBuffer | Uint8Array): DxfDocument {
   if (typeof source === "string") return parseDxf(source);
   const bytes = source instanceof Uint8Array ? source : new Uint8Array(source);
-  if (isBinarySentinel(bytes)) {
-    throw new Error(
-      "Binary DXF (AutoCAD Binary DXF) is not supported yet — export the drawing as ASCII DXF",
-    );
-  }
-  return parseDxf(new TextDecoder().decode(bytes));
-}
-
-function isBinarySentinel(bytes: Uint8Array): boolean {
-  if (bytes.length < BINARY_SENTINEL.length) return false;
-  for (let i = 0; i < BINARY_SENTINEL.length; i++) {
-    if (bytes[i] !== BINARY_SENTINEL.charCodeAt(i)) return false;
-  }
-  return true;
+  return parseDxf(isBinaryDxf(bytes) ? binaryDxfToText(bytes) : new TextDecoder().decode(bytes));
 }

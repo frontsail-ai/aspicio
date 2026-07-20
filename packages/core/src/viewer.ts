@@ -4,6 +4,7 @@ import type { EntityInfo } from "./entity-info.ts";
 import { tessellationToSvg } from "./export.ts";
 import { attachGestures } from "./input/gestures.ts";
 import type { DxfDocument, Entity, LayerInfo, Point2 } from "./model/types.ts";
+import { binaryDxfToText, isBinaryDxf } from "./parse/binary.ts";
 import { parseDxf } from "./parse/parse.ts";
 import { pickEntity as pickEntityHit, pickLayer } from "./pick/pick.ts";
 import { SceneRenderer } from "./render/renderer.ts";
@@ -117,14 +118,15 @@ export class DxfViewer {
     this.handleResize();
   }
 
-  /** Load a DXF from text, a File/Blob, or an ArrayBuffer. */
+  /** Load a DXF from text, a File/Blob, or an ArrayBuffer (ASCII or binary). */
   async load(source: DxfSource): Promise<void> {
-    const text =
-      typeof source === "string"
-        ? source
-        : source instanceof Blob
-          ? await source.text()
-          : new TextDecoder().decode(source);
+    let text: string;
+    if (typeof source === "string") {
+      text = source;
+    } else {
+      const bytes = new Uint8Array(source instanceof Blob ? await source.arrayBuffer() : source);
+      text = isBinaryDxf(bytes) ? binaryDxfToText(bytes) : new TextDecoder().decode(bytes);
+    }
 
     this.document = parseDxf(text);
     this.activeSpace = MODEL_SPACE;
@@ -189,7 +191,8 @@ export class DxfViewer {
   async loadUrl(url: string): Promise<void> {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
-    await this.load(await response.text());
+    // arrayBuffer (not text) so binary DXF survives the round-trip.
+    await this.load(await response.arrayBuffer());
   }
 
   getLayers(): LayerInfo[] {

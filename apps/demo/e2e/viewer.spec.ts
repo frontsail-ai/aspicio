@@ -864,3 +864,17 @@ test("opening a drag-dropped file clears a stale view hash", async ({ page }) =>
   await expect(page.locator("#file-chip")).toHaveText("box.dxf");
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
 });
+
+test("loads a binary DXF file (AutoCAD Binary DXF)", async ({ page }) => {
+  await page.locator("#file").setInputFiles(fixture("box-binary.dxf"));
+  await expect(page.locator("#file-chip")).toHaveText("box-binary.dxf");
+
+  const probe = await probeViewer(page);
+  expect(probe.entityCount).toBe(6); // 4 lines + circle + polyline
+  expect(probe.segmentCount).toBeGreaterThan(0);
+  expect(probe.layers.map((l) => l.name)).toEqual(expect.arrayContaining(["WALLS", "HOLES"]));
+
+  // It actually renders — the green WALLS geometry reaches the canvas.
+  const colors = await canvasColors(page);
+  expect(colors.green).toBeGreaterThan(10);
+});

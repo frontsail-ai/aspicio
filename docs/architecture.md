@@ -60,15 +60,12 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
 ## Intentionally simple (for now)
 
 - No editing, no 3D.
-- Binary DXF is detected and rejected, not decoded (PARSE-2).
 - UTF-8 only; pre-2007 ANSI code pages decode lossily.
 - No auth/quotas on the API; SSRF guards + size caps are the perimeter.
 - Deep links cover the demo's bundled sample only (DEMO-7).
 
 ## Migration paths
 
-- Binary DXF decoding: a complete decoder exists on a parked branch;
-  landing it upgrades PARSE-2 from "reject" to "parse".
 - The URL-fetch guard is duplicated between API and MCP; consolidation
   into a shared core helper is the named follow-up (INV-5 stays the spec).
 - A third Worker (or surface) slots into the deploy matrix and the plugin

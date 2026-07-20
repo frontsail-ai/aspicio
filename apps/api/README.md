@@ -14,7 +14,7 @@ rasterizes the SVG with resvg (WASM) inside the Worker.
 | `GET /health`           | `{ "status": "ok" }`                                                                                                                   |
 
 Input is either a fetched URL (`?src=<dxf-url>`) or the DXF file itself as
-the POST body.
+the POST body — ASCII and binary DXF alike (auto-detected).
 
 `/render` options: `width` (PNG width in px, 1–4000, default 1200) and `bg`
 (background as `%23rrggbb` hex, or `none` for transparent; defaults to the
