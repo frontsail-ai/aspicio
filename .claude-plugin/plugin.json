@@ -1,0 +1,13 @@
+{
+  "name": "aspicio",
+  "description": "Open, inspect, and render DXF/CAD drawings: describe_dxf and render_dxf MCP tools plus skills for reading drawings and embedding the viewer.",
+  "version": "0.1.0",
+  "author": {
+    "name": "FrontSail",
+    "url": "https://github.com/frontsail-ai"
+  },
+  "homepage": "https://github.com/frontsail-ai/aspicio#readme",
+  "repository": "https://github.com/frontsail-ai/aspicio",
+  "license": "MIT",
+  "keywords": ["dxf", "cad", "drawing", "viewer", "mcp"]
+}

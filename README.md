@@ -17,8 +17,8 @@
   (pinch zoom, twist rotate) are equally first-class
 - Tools: distance/area measure with object snap, click-to-select with an
   entity info panel, and keyboard shortcuts
-- SVG (vector) and PNG export, paper-space layouts, and both ASCII and
-  binary DXF
+- SVG (vector) and PNG export, paper-space layouts; ASCII DXF (binary
+  DXF is detected and rejected with a clear message)
 - Hit-testing (`pickLayer`), camera state access, extensible
   entity-handler registry
 
@@ -35,6 +35,28 @@ Out of scope for now: editing and 3D.
 | [`@aspicio/mcp`](packages/mcp)     | MCP server for AI agents: `describe_dxf` + `render_dxf`             |
 | [`@aspicio/api`](apps/api)         | DXF HTTP API Worker (private): `/describe`, `/render`               |
 | [`@aspicio/demo`](apps/demo)       | Standalone demo app (private) — also the reference integration      |
+
+## For agents
+
+Aspicio speaks MCP: `describe_dxf` returns structured JSON facts about a
+drawing (layers, units, bounds, entity counts) and `render_dxf` returns a
+PNG the model can look at.
+
+- **Claude Code** — one step installs the MCP server plus the bundled
+  skills (`aspicio-inspect-dxf`, `aspicio-embed`):
+  `/plugin marketplace add frontsail-ai/aspicio` then `/plugin install aspicio@aspicio`
+- **Codex** — same repo doubles as a Codex marketplace:
+  `codex plugin marketplace add https://github.com/frontsail-ai/aspicio`,
+  `codex plugin add aspicio@aspicio`, and wire the tools with
+  `codex mcp add aspicio -- npx -y @aspicio/mcp`
+- **Any MCP client** (Cursor, ChatGPT, …) — register the stdio server:
+  `npx -y @aspicio/mcp`
+
+> `@aspicio/mcp` ships to npm with the next release — until then the
+> `npx` commands above won't resolve (the bundled skills install fine).
+
+The HTTP equivalents live on the API Worker: `GET /describe?src=<dxf-url>`
+and `GET /render?src=<dxf-url>&format=png|svg`.
 
 ## Quick start
 
