@@ -21,11 +21,11 @@ process — not necessarily testable in isolation.
 
 ## Index
 
-| File                                 | Prefix  | Covers                                                                                             |
-| ------------------------------------ | ------- | -------------------------------------------------------------------------------------------------- |
-| [invariants.md](invariants.md)       | `INV`   | System-wide properties                                                                             |
-| [parsing.md](parsing.md)             | `PARSE` | DXF input → normalized document: entity coverage, binary rejection, units, colors, blocks, layouts |
-| [viewer.md](viewer.md)               | `VIEW`  | Camera, layers, picking, snap/measure, shortcuts, view snapshots, exports, spaces                  |
-| [demo.md](demo.md)                   | `DEMO`  | Demo app: load paths, deep links, panels, error recovery, mobile                                   |
-| [react.md](react.md)                 | `REACT` | React components: embed, lifecycle, theming, SSR safety                                            |
-| [agent-surface.md](agent-surface.md) | `AGT`   | HTTP API, MCP tools, plugin/skill packaging                                                        |
+| File                                 | Prefix  | Covers                                                                                            |
+| ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------- |
+| [invariants.md](invariants.md)       | `INV`   | System-wide properties                                                                            |
+| [parsing.md](parsing.md)             | `PARSE` | DXF input → normalized document: entity coverage, binary decoding, units, colors, blocks, layouts |
+| [viewer.md](viewer.md)               | `VIEW`  | Camera, layers, picking, snap/measure, shortcuts, view snapshots, exports, spaces                 |
+| [demo.md](demo.md)                   | `DEMO`  | Demo app: load paths, deep links, panels, error recovery, mobile                                  |
+| [react.md](react.md)                 | `REACT` | React components: embed, lifecycle, theming, SSR safety                                           |
+| [agent-surface.md](agent-surface.md) | `AGT`   | HTTP API, MCP tools, plugin/skill packaging                                                       |

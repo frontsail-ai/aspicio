@@ -113,3 +113,44 @@ test("a truncated record ends the stream instead of throwing", () => {
   expect(() => binaryDxfToText(buf)).not.toThrow();
   expect(binaryDxfToText(buf).split("\n")).toEqual(["0", "SECTION"]);
 });
+
+test("decodes i32 and i64 value types", () => {
+  const i32 = (n: number): Uint8Array => {
+    const b = new Uint8Array(4);
+    new DataView(b.buffer).setInt32(0, n, true);
+    return b;
+  };
+  const i64 = (n: bigint): Uint8Array => {
+    const b = new Uint8Array(8);
+    new DataView(b.buffer).setBigInt64(0, n, true);
+    return b;
+  };
+  const buf = bytes(
+    SENTINEL,
+    u16(0),
+    cstr("SECTION"),
+    u16(90),
+    i32(-70000), // int32 range (90–99)
+    u16(160),
+    i64(4294967296n), // int64 range (160–169)
+    u16(0),
+    cstr("EOF"),
+  );
+  expect(binaryDxfToText(buf).split("\n")).toEqual([
+    "0",
+    "SECTION",
+    "90",
+    "-70000",
+    "160",
+    "4294967296",
+    "0",
+    "EOF",
+  ]);
+});
+
+test("an unterminated string ends the stream cleanly", () => {
+  // Code 2 (string) whose bytes run to the end of the buffer with no NUL.
+  const buf = bytes(SENTINEL, u16(0), cstr("SECTION"), u16(2), "ENTIT");
+  expect(() => binaryDxfToText(buf)).not.toThrow();
+  expect(binaryDxfToText(buf).split("\n")).toEqual(["0", "SECTION"]);
+});
