@@ -10,6 +10,21 @@ The [publish workflow](../.github/workflows/publish.yml) then re-runs the
 lint/test gate, stamps `0.1.0` into the package manifests, builds, and
 publishes `@aspicio/core`, `@aspicio/react`, and `@aspicio/mcp`.
 
+## Always release the tip of master
+
+Tags are cut from the current tip of `master` — never from a branch or an
+older commit. Before tagging:
+
+1. **Wait for pending PRs.** If any open PR belongs in the release —
+   features, fixes, or (easy to miss) changes to the publish workflow
+   itself — it merges first. A release cut around an unmerged PR silently
+   ships without it: v0.4.0 nearly shipped without `@aspicio/mcp` because
+   the PR wiring it into publishing was still open.
+2. **Sync and verify.** `git fetch && git checkout master && git pull`;
+   confirm the working tree is clean and local `master` matches
+   `origin/master`.
+3. **Tag that commit** and push the tag.
+
 ## One-time setup (repo owner)
 
 1. **Claim the npm scope.** Create the `aspicio` organization on
@@ -49,6 +64,7 @@ The same dry run works locally:
 vp run -r build
 cd packages/core && bun publish --access public --dry-run
 cd ../react && bun publish --access public --dry-run
+cd ../mcp && bun publish --access public --dry-run
 ```
 
 ## Verifying a release
@@ -56,6 +72,8 @@ cd ../react && bun publish --access public --dry-run
 ```bash
 npm view @aspicio/core version           # the new version is live
 npm view @aspicio/react dependencies     # core range is ^<version>
+npm view @aspicio/mcp dependencies       # same for the MCP server
+npx -y @aspicio/mcp </dev/null           # the agent entry point resolves
 ```
 
 Then the real proof: `npm install @aspicio/react` in a scratch app and
@@ -63,7 +81,7 @@ render a drawing.
 
 ## When things go wrong
 
-- **The gate fails** — nothing was published; fix the failure on `main`,
+- **The gate fails** — nothing was published; fix the failure on `master`,
   delete and re-push the tag (`git tag -d v0.1.0 && git push --delete
 origin v0.1.0`, then re-tag). Deleting tags is safe _only_ while the
   publish failed — never move a tag whose version reached npm.
