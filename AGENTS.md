@@ -60,6 +60,7 @@ docs/             architecture, guidelines, product specs, releasing
 | [docs/product-specs/react.md](docs/product-specs/react.md)                 | `REACT-*` — component behaviors                            | touching packages/react                                            |
 | [docs/product-specs/agent-surface.md](docs/product-specs/agent-surface.md) | `AGT-*` — API, MCP, plugins                                | touching apps/api, packages/mcp, skills, manifests                 |
 | [docs/releasing.md](docs/releasing.md)                                     | Tag-driven release runbook                                 | cutting or debugging a release                                     |
+| [docs/registry-listings.md](docs/registry-listings.md)                     | MCP registry submission runbook                            | listing or updating the server in directories                      |
 | [docs/README.md](docs/README.md)                                           | How docs/ itself is managed                                | adding or restructuring docs                                       |
 
 ## Conventions & process (the short version)
