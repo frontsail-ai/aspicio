@@ -8,7 +8,7 @@ git tag v0.1.0 && git push origin v0.1.0
 
 The [publish workflow](../.github/workflows/publish.yml) then re-runs the
 lint/test gate, stamps `0.1.0` into the package manifests, builds, and
-publishes `@aspicio/core` followed by `@aspicio/react`.
+publishes `@aspicio/core`, `@aspicio/react`, and `@aspicio/mcp`.
 
 ## One-time setup (repo owner)
 
@@ -22,8 +22,9 @@ publishes `@aspicio/core` followed by `@aspicio/react`.
 
 ## Versioning policy
 
-- **One version for both packages.** `@aspicio/core` and `@aspicio/react`
-  always release together with the same number. Revisit (e.g. with
+- **One version for all public packages.** `@aspicio/core`,
+  `@aspicio/react`, and `@aspicio/mcp` always release together with the
+  same number (INV-9). Revisit (e.g. with
   changesets) only if their release cadences genuinely diverge.
 - **The tag is the source of truth.** Manifests in the repo stay at
   `0.0.0`; the workflow stamps the tag's version at publish time. There
