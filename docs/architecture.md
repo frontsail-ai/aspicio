@@ -61,7 +61,10 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
 
 - No editing, no 3D.
 - UTF-8 only; pre-2007 ANSI code pages decode lossily.
-- No auth/quotas on the API; SSRF guards + size caps are the perimeter.
+- The API's abuse perimeter is SSRF guards, size caps, and per-IP rate
+  limits — no auth. Per-IP is weak against IPv6 /64 rotation; keying on
+  the /64 prefix (or a global cap) is the known next step if abuse
+  materializes.
 - Deep links cover the demo's bundled sample only (DEMO-7).
 
 ## Migration paths
