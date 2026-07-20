@@ -52,9 +52,6 @@ PNG the model can look at.
 - **Any MCP client** (Cursor, ChatGPT, …) — register the stdio server:
   `npx -y @aspicio/mcp`
 
-> `@aspicio/mcp` ships to npm with the next release — until then the
-> `npx` commands above won't resolve (the bundled skills install fine).
-
 The HTTP equivalents live on the API Worker: `GET /describe?src=<dxf-url>`
 and `GET /render?src=<dxf-url>&format=png|svg`.
 
