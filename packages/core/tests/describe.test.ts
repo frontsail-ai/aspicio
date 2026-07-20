@@ -233,3 +233,248 @@ test("parseDxfBytes decodes binary DXF through the sentinel path", () => {
   // A short buffer that can't hold the sentinel is treated as text, not binary.
   expect(() => parseDxfBytes(new Uint8Array([48, 10]))).toThrow(/end of input|EOF/i);
 });
+
+test("texts collects TEXT strings, including inside reachable blocks, deduped", () => {
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "BLOCKS",
+    "0",
+    "BLOCK",
+    "2",
+    "TITLE",
+    "10",
+    "0",
+    "20",
+    "0",
+    "0",
+    "TEXT",
+    "8",
+    "0",
+    "10",
+    "0",
+    "20",
+    "0",
+    "40",
+    "2",
+    "1",
+    "PART-42",
+    "0",
+    "ENDBLK",
+    "0",
+    "BLOCK",
+    "2",
+    "UNUSED",
+    "10",
+    "0",
+    "20",
+    "0",
+    "0",
+    "TEXT",
+    "8",
+    "0",
+    "10",
+    "0",
+    "20",
+    "0",
+    "40",
+    "2",
+    "1",
+    "GHOST",
+    "0",
+    "ENDBLK",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "TEXT",
+    "8",
+    "NOTES",
+    "10",
+    "0",
+    "20",
+    "0",
+    "40",
+    "3",
+    "1",
+    "ROOM A",
+    "0",
+    "INSERT",
+    "2",
+    "TITLE",
+    "10",
+    "5",
+    "20",
+    "5",
+    "0",
+    "INSERT",
+    "2",
+    "TITLE",
+    "10",
+    "50",
+    "20",
+    "5",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+  const doc = parseDxf(dxf);
+  const summary = describeDrawing(doc, tessellate(doc, {}));
+  // Top-level text first, block text once despite two inserts, unused block excluded.
+  expect(summary.texts).toEqual(["ROOM A", "PART-42"]);
+});
+
+test("texts includes dimension values (DIMENSION → its block) and MTEXT content", () => {
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "BLOCKS",
+    "0",
+    "BLOCK",
+    "2",
+    "*D1",
+    "10",
+    "0",
+    "20",
+    "0",
+    "0",
+    "TEXT",
+    "8",
+    "NOTES",
+    "10",
+    "0",
+    "20",
+    "0",
+    "40",
+    "2",
+    "1",
+    "100",
+    "0",
+    "ENDBLK",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "DIMENSION",
+    "8",
+    "NOTES",
+    "2",
+    "*D1",
+    "10",
+    "0",
+    "20",
+    "0",
+    "70",
+    "0",
+    "0",
+    "MTEXT",
+    "8",
+    "NOTES",
+    "10",
+    "0",
+    "20",
+    "0",
+    "40",
+    "3",
+    "1",
+    "\\pxqc;{\\fArial;Part No. 7}",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+  const doc = parseDxf(dxf);
+  const summary = describeDrawing(doc, tessellate(doc, {}));
+  // The dimension's value text comes from inside its *D1 block; the MTEXT
+  // arrives with its format codes stripped by the parser.
+  expect(summary.texts).toContain("100");
+  expect(summary.texts).toContain("Part No. 7");
+});
+
+test("texts survives block reference cycles and respects the insert depth cap", () => {
+  // A ↔ B cycle plus a chain deeper than MAX_INSERT_DEPTH: the walk must
+  // terminate, keep cycle-reachable text, and drop text past the cap —
+  // matching what tessellation would render.
+  const blocks: string[] = [];
+  const mkBlock = (name: string, inner: string[]): void => {
+    blocks.push("0", "BLOCK", "2", name, "10", "0", "20", "0", ...inner, "0", "ENDBLK");
+  };
+  mkBlock("A", [
+    "0",
+    "TEXT",
+    "8",
+    "0",
+    "10",
+    "0",
+    "20",
+    "0",
+    "40",
+    "1",
+    "1",
+    "IN-A",
+    "0",
+    "INSERT",
+    "2",
+    "B",
+    "10",
+    "0",
+    "20",
+    "0",
+  ]);
+  mkBlock("B", ["0", "INSERT", "2", "A", "10", "0", "20", "0"]);
+  // C0 → C1 → … → C20, with text only at the deep end.
+  for (let i = 0; i < 20; i++) {
+    mkBlock(
+      `C${i}`,
+      i === 19
+        ? ["0", "TEXT", "8", "0", "10", "0", "20", "0", "40", "1", "1", "TOO-DEEP"]
+        : ["0", "INSERT", "2", `C${i + 1}`, "10", "0", "20", "0"],
+    );
+  }
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "BLOCKS",
+    ...blocks,
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "INSERT",
+    "2",
+    "A",
+    "10",
+    "0",
+    "20",
+    "0",
+    "0",
+    "INSERT",
+    "2",
+    "C0",
+    "10",
+    "0",
+    "20",
+    "0",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+  const doc = parseDxf(dxf);
+  const summary = describeDrawing(doc, tessellate(doc, {}));
+  expect(summary.texts).toContain("IN-A"); // the cycle terminated, text kept
+  expect(summary.texts).not.toContain("TOO-DEEP"); // past the shared depth cap
+});

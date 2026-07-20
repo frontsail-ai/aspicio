@@ -12,8 +12,9 @@ Prefix: `AGT`.
 Describing a drawing returns JSON facts: unit label, bounds and size in
 drawing units, entity and segment counts, per-layer entries (name, entity
 count, visibility, the color actually drawn — see INV-2), per-type entity
-counts, and per-type skipped counts. Identical semantics over HTTP and
-MCP.
+counts, per-type skipped counts, and the drawing's text content — unique
+TEXT/MTEXT strings including those inside blocks reachable through
+inserts and dimensions. Identical semantics over HTTP and MCP.
 
 ### AGT-2: Render to image
 
