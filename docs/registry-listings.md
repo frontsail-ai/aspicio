@@ -1,14 +1,18 @@
 # Getting listed in MCP registries
 
 Where agents and people discover MCP servers, and how Aspicio gets into
-each. The metadata lives in the repo (`server.json`, `smithery.yaml`);
-the submissions themselves need the repo owner's accounts — this is the
-runbook.
+each. The metadata lives in the repo (`server.json`, `smithery.yaml`,
+`glama.json`); the submissions themselves need the repo owner's
+accounts — this is the runbook.
 
 **Prerequisites (all already true after the reach-plan stack merges):**
 `@aspicio/mcp` published to npm; the remote endpoint live at
-`https://aspicio-api.dmitri-66a.workers.dev/mcp`; `server.json` and
-`smithery.yaml` on `master`.
+`https://aspicio-api.dmitri-66a.workers.dev/mcp`; `server.json`,
+`smithery.yaml`, and `glama.json` on `master`.
+
+The supported set is deliberately these four — the canonical registry
+plus the three community directories with real curation or install
+tooling. mcp.so was considered and skipped (scrape-heavy, low signal).
 
 ## 1. Official MCP registry (registry.modelcontextprotocol.io)
 
@@ -33,18 +37,19 @@ against the current schema and is the ground truth if it has moved past
 Sign in with GitHub → Add server → point it at this repo. It reads
 `smithery.yaml` (stdio launch via `npx -y @aspicio/mcp`).
 
-## 3. mcp.so
+## 3. Glama (glama.ai)
 
-Community directory. Submit via the "Submit" form on the site (name,
-repo URL, description) — or the maintainers accept PRs to their data
-repo. Two-minute job.
+Crawls npm + GitHub, so listing generally appears on its own once the
+package is public. `glama.json` at the repo root names the GitHub
+users allowed to claim and maintain the listing (that is the file's
+entire schema — display metadata comes from the crawl). If the entry
+hasn't appeared after a few days, use "Add MCP Server" on the site.
 
-## 4. PulseMCP + Glama
+## 4. PulseMCP (pulsemcp.com)
 
-Both primarily **crawl** — PulseMCP ingests the official registry, and
-Glama indexes npm + GitHub. Listing #1 and having the npm package public
-generally gets these for free; each site has a "claim/submit" flow if the
-entry hasn't appeared after a few days.
+Hand-curated; auto-ingests the official registry weekly, so listing #1
+gets this for free. If the entry hasn't appeared a week after the
+official listing, use the site's Submit form.
 
 ## What to say (shared blurb)
 

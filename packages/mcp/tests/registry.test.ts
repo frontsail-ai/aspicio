@@ -46,3 +46,11 @@ test("registry metadata agrees on the one load-bearing package name", () => {
   expect(read("smithery.yaml")).toContain(pkgName);
   expect(read("smithery.yaml")).toContain("type: stdio");
 });
+
+test("glama.json names at least one maintainer", () => {
+  // Glama's entire schema: who may claim the listing. Everything else
+  // (name, description) comes from crawling npm + GitHub.
+  const glama = JSON.parse(read("glama.json")) as { maintainers: string[] };
+  expect(glama.maintainers.length).toBeGreaterThan(0);
+  for (const m of glama.maintainers) expect(m).toMatch(/^[\w-]+$/);
+});
