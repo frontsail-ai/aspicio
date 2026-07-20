@@ -1,4 +1,5 @@
-import type { DxfDocument } from "./model/types.ts";
+import type { DxfDocument, Entity } from "./model/types.ts";
+import { MAX_INSERT_DEPTH } from "./tessellate/tessellate.ts";
 import type { Tessellation } from "./tessellate/tessellate.ts";
 
 /** One layer's entry in a {@link DrawingSummary}. */
@@ -28,6 +29,12 @@ export interface DrawingSummary {
   entityTypes: Record<string, number>;
   /** Per-type counts of entities the parser skipped (unsupported types). */
   unsupported: Record<string, number>;
+  /**
+   * Unique TEXT/MTEXT strings in first-appearance order, including text
+   * inside blocks reachable through INSERTs and DIMENSIONs (where title
+   * blocks and dimension values live). Repeated inserts contribute once.
+   */
+  texts: string[];
 }
 
 const hex = (rgb: number): string => `#${(rgb >>> 0).toString(16).padStart(6, "0").slice(-6)}`;
@@ -45,6 +52,35 @@ function effectiveColor(name: string, fallback: number, tessellation: Tessellati
     }
   }
   return best;
+}
+
+/** Collect unique text strings from entities and reachable blocks. */
+function collectTexts(doc: DxfDocument): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const visitedBlocks = new Set<string>();
+  const walk = (entities: Entity[], depth: number): void => {
+    // Same recursion bound tessellation uses, so the summary never reports
+    // text from deeper than the renderer would draw — and a crafted long
+    // INSERT chain can't overflow the stack.
+    if (depth >= MAX_INSERT_DEPTH) return;
+    for (const entity of entities) {
+      if (entity.type === "TEXT" && entity.text) {
+        if (!seen.has(entity.text)) {
+          seen.add(entity.text);
+          out.push(entity.text);
+        }
+      } else if (entity.type === "INSERT" || entity.type === "DIMENSION") {
+        const name = entity.type === "INSERT" ? entity.blockName : entity.block;
+        if (visitedBlocks.has(name)) continue;
+        visitedBlocks.add(name);
+        const block = doc.blocks.get(name);
+        if (block) walk(block.entities, depth + 1);
+      }
+    }
+  };
+  walk(doc.entities, 0);
+  return out;
 }
 
 /**
@@ -77,5 +113,6 @@ export function describeDrawing(doc: DxfDocument, tessellation: Tessellation): D
     entityTypes,
     // Copied so the summary is a detached snapshot, not a live view.
     unsupported: { ...doc.unsupported },
+    texts: collectTexts(doc),
   };
 }

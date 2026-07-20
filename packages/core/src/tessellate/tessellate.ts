@@ -19,7 +19,8 @@ import { layoutText } from "../text/layout.ts";
 type Affine = Affine2D;
 
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
-const MAX_INSERT_DEPTH = 16;
+/** Block recursion bound, shared by rendering and text collection. */
+export const MAX_INSERT_DEPTH = 16;
 
 /** Batched line-segment (and optional filled-triangle) geometry for one layer. */
 export interface LayerGeometry {

@@ -22,7 +22,8 @@ Both tools accept `source` as an http(s) URL, a local file path, or inline DXF t
    - `units` — dimension labels ("mm", "in"); empty string means the drawing is unitless: report numbers without inventing a unit.
    - `size` / `bounds` — overall extents in drawing units. "How big is this?" = `size`, stated with `units`.
    - `layers[]` — name, entity count, and `color` (the color **actually drawn**, not the layer table's claim). CAD convention: layer names encode meaning (WALLS, DOORS, CUT, ENGRAVE…).
-   - `entityTypes` — counts per DXF type. TEXT/MTEXT presence means there are annotations worth reading off a render.
+   - `texts` — every unique text string in the drawing (title blocks and dimension values included). Answer "what does it say / find the part number" from here directly — no render needed.
+   - `entityTypes` — counts per DXF type.
    - `unsupported` — types the parser skipped. **If non-empty, say so** when completeness matters; the drawing may show less than the file contains.
 3. **Render when the question is visual.** Default width is fine for an overview; bump `width` (up to 4000) when the user asks about small details. The image has a dark background — geometry is drawn in the layer colors from the summary, so you can name what you see by color.
 4. **Answer from evidence.** Cite numbers from `describe_dxf`, visual observations from the render. If asked something the tools cannot establish (e.g. tolerances, materials), say the DXF does not carry it.
