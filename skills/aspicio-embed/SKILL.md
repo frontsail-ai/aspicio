@@ -39,6 +39,7 @@ For custom layouts compose `DxfPreview` (canvas only) + `DxfLayerPanel` yourself
 import { DxfViewer } from "@aspicio/core";
 const viewer = new DxfViewer(container, { background: 0x16181d });
 await viewer.load(file); // File | Blob | ArrayBuffer | DXF text
+await viewer.loadUrl("/drawing.dxf"); // for URLs — don't pass a URL to load()
 ```
 
 ## Headless (no browser)

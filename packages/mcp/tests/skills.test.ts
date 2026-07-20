@@ -7,6 +7,9 @@ import { expect, test } from "vite-plus/test";
 // bad edit can't silently break either plugin wrapper.
 const SKILLS_DIR = join(import.meta.dirname, "../../../skills");
 
+// Line-by-line parse: frontmatter values must stay single-line. A folded or
+// multi-line YAML value would be silently truncated here — if the format ever
+// grows, switch to a real YAML parser instead of loosening the regex.
 function frontmatter(text: string): Record<string, string> {
   const m = /^---\n([\s\S]*?)\n---/.exec(text);
   expect(m, "SKILL.md must start with a --- frontmatter block").not.toBeNull();
@@ -40,5 +43,59 @@ for (const dir of skillDirs) {
     // A body with actual guidance, not a stub.
     const body = text.slice(text.indexOf("---", 3) + 3);
     expect(body.trim().length).toBeGreaterThan(500);
+  });
+}
+
+// ---- Drift guard: the API names the skills teach must exist in the code ----
+// The skills are the one place API names live outside TypeScript's reach; a
+// rename would otherwise leave them confidently teaching code that no longer
+// compiles. Each entry is checked BOTH ways: the skill must still mention the
+// name (keeps this list honest) and the source must still define it.
+const ROOT = join(import.meta.dirname, "../../..");
+const read = (p: string): string => readFileSync(join(ROOT, p), "utf8");
+
+const DRIFT_GUARD: Array<{ skill: string; source: string; names: string[] }> = [
+  {
+    skill: "skills/aspicio-embed/SKILL.md",
+    source: "packages/react/src/DxfPreview.tsx",
+    names: ["src", "srcUrl", "showDownload", "shortcuts", "onLoaded", "onError", "onViewer"],
+  },
+  {
+    skill: "skills/aspicio-embed/SKILL.md",
+    source: "packages/core/src/viewer.ts",
+    names: [
+      "fitView",
+      "zoomBy",
+      "setLayerVisible",
+      "pickLayer",
+      "setView",
+      "toSVG",
+      "toPNG",
+      "loadUrl",
+    ],
+  },
+  {
+    skill: "skills/aspicio-embed/SKILL.md",
+    source: "packages/core/src/index.ts",
+    names: ["parseDxfBytes", "tessellationToSvg", "describeDrawing"],
+  },
+  {
+    skill: "skills/aspicio-inspect-dxf/SKILL.md",
+    source: "packages/mcp/src/server.ts",
+    names: ["describe_dxf", "render_dxf"],
+  },
+];
+
+for (const { skill, source, names } of DRIFT_GUARD) {
+  test(`${skill} stays in sync with ${source}`, () => {
+    const skillText = read(skill);
+    const sourceText = read(source);
+    for (const name of names) {
+      expect(skillText, `skill no longer mentions ${name} — update the guard list`).toContain(name);
+      expect(
+        sourceText,
+        `${source} no longer defines ${name} — the skill is teaching a stale API`,
+      ).toContain(name);
+    }
   });
 }
