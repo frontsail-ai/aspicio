@@ -2,7 +2,8 @@ import { describeDrawing, parseDxfBytes, tessellate, tessellationToSvg } from "@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
-import { fetchDxf, type RenderPng } from "./handler.ts";
+import { fetchDxf } from "./fetch.ts";
+import type { RenderPng } from "./handler.ts";
 
 const DEFAULT_BG = "#16181d";
 

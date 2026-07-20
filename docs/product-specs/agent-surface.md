@@ -78,7 +78,9 @@ The API Worker also serves the MCP protocol over Streamable HTTP,
 statelessly, at a dedicated endpoint — the same describe/render tools as
 the local server, with sources limited to URLs (same guards as AGT-4) and
 inline text (no file paths on a hosted server). Web clients that support
-remote MCP connectors can use it with no local install.
+remote MCP connectors can use it with no local install. The rate limit
+counts protocol messages (each initialize/list/call is one request), so a
+chatty session consumes the per-IP budget faster than plain HTTP calls.
 
 ### AGT-10: One-step plugin install
 

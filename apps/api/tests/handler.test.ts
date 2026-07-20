@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { handleRequest, isPrivateHost } from "../src/handler.ts";
+import { isPrivateHost } from "../src/fetch.ts";
+import { handleRequest } from "../src/handler.ts";
 
 // A tiny valid drawing: a WALLS layer with one LINE and one CIRCLE.
 const SAMPLE = [
@@ -252,6 +253,15 @@ test("/mcp speaks Streamable-HTTP MCP: initialize, tools/list, tools/call", asyn
   const img = (r.content as Array<{ type: string; mimeType?: string; data?: string }>)[0];
   expect(img.type).toBe("image");
   expect(img.mimeType).toBe("image/png");
+
+  // The SSRF guard surfaces as a clean tool error over the wire — the
+  // security-relevant behavior for a hosted server.
+  const bad = await client.callTool({
+    name: "describe_dxf",
+    arguments: { source: "http://127.0.0.1/x.dxf" },
+  });
+  expect(bad.isError).toBe(true);
+  expect((bad.content as Array<{ text?: string }>)[0].text).toMatch(/private or loopback/);
   await client.close();
 });
 
