@@ -75,6 +75,7 @@ export function describeDrawing(doc: DxfDocument, tessellation: Tessellation): D
     segmentCount: tessellation.segmentCount,
     layers,
     entityTypes,
-    unsupported: doc.unsupported,
+    // Copied so the summary is a detached snapshot, not a live view.
+    unsupported: { ...doc.unsupported },
   };
 }

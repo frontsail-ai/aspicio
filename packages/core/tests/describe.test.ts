@@ -106,3 +106,103 @@ test("describeDrawing reports an empty drawing as null bounds", () => {
   expect(summary.entityCount).toBe(0);
   expect(summary.entityTypes).toEqual({});
 });
+
+test("layer color reflects entity overrides (dominant drawn color, not the table)", () => {
+  // WALLS is green (ACI 3) in the table, but two long red (62=1) lines dominate
+  // the one short ByLayer line by segment count — the summary must say red.
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "TABLES",
+    "0",
+    "TABLE",
+    "2",
+    "LAYER",
+    "0",
+    "LAYER",
+    "2",
+    "WALLS",
+    "70",
+    "0",
+    "62",
+    "3",
+    "0",
+    "LAYER",
+    "2",
+    "EMPTY",
+    "70",
+    "0",
+    "62",
+    "5",
+    "0",
+    "ENDTAB",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "LINE",
+    "8",
+    "WALLS",
+    "62",
+    "1",
+    "10",
+    "0",
+    "20",
+    "0",
+    "11",
+    "100",
+    "21",
+    "0",
+    "0",
+    "LINE",
+    "8",
+    "WALLS",
+    "62",
+    "1",
+    "10",
+    "0",
+    "20",
+    "5",
+    "11",
+    "100",
+    "21",
+    "5",
+    "0",
+    "LINE",
+    "8",
+    "WALLS",
+    "10",
+    "0",
+    "20",
+    "9",
+    "11",
+    "10",
+    "21",
+    "9",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+  const doc = parseDxf(dxf);
+  const summary = describeDrawing(doc, tessellate(doc, {}));
+
+  const walls = summary.layers.find((l) => l.name === "WALLS");
+  expect(walls!.color).toBe("#ff0000"); // entity override wins over the green table color
+  // A layer with nothing drawn falls back to its table color (ACI 5 = blue).
+  const empty = summary.layers.find((l) => l.name === "EMPTY");
+  expect(empty!.color).toBe("#0000ff");
+});
+
+test("parseDxfBytes rejects binary DXF with a clear error", () => {
+  const sentinel = "AutoCAD Binary DXF\r\n\x1a\0";
+  const bytes = new Uint8Array(64);
+  for (let i = 0; i < sentinel.length; i++) bytes[i] = sentinel.charCodeAt(i);
+  expect(() => parseDxfBytes(bytes)).toThrow(/Binary DXF.*ASCII/);
+  // A short buffer that can't hold the sentinel is treated as text, not binary.
+  expect(() => parseDxfBytes(new Uint8Array([48, 10]))).toThrow(/end of input|EOF/i);
+});
