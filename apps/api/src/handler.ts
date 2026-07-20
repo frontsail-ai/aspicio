@@ -13,6 +13,9 @@ export type RenderPng = (svg: string, width: number) => Promise<Uint8Array>;
 /** Per-caller rate check: true = allowed. Injected (the binding is runtime). */
 export type CheckRateLimit = (key: string) => Promise<boolean>;
 
+/** Endpoints that do real work (fetch/parse/rasterize) and get rate-limited. */
+const WORK_ENDPOINTS = new Set(["/describe", "/render"]);
+
 class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -176,6 +179,13 @@ export async function handleRequest(
     });
 
   try {
+    // Rate-limit only the endpoints that do real work, keyed per client IP
+    // (cf-connecting-ip is set by Cloudflare's edge and can't be spoofed).
+    if (WORK_ENDPOINTS.has(url.pathname) && checkRateLimit) {
+      const key = req.headers.get("cf-connecting-ip") ?? "unknown";
+      if (!(await checkRateLimit(key)))
+        throw new HttpError(429, "rate limit exceeded — try again shortly");
+    }
     switch (url.pathname) {
       case "/health":
         return json({ status: "ok" });
@@ -188,20 +198,6 @@ export async function handleRequest(
           },
         });
       case "/describe":
-      case "/render": {
-        // Rate-limit only the endpoints that do real work, keyed per client IP.
-        if (checkRateLimit) {
-          const key = req.headers.get("cf-connecting-ip") ?? "unknown";
-          if (!(await checkRateLimit(key)))
-            throw new HttpError(429, "rate limit exceeded — try again shortly");
-        }
-        break;
-      }
-      default:
-        return json({ error: "not found" }, 404);
-    }
-    switch (url.pathname) {
-      case "/describe":
         return handleDescribe(await resolveDxf(req, url));
       case "/render":
         // `await` matters: without it a rejection inside handleRender would
@@ -211,7 +207,12 @@ export async function handleRequest(
         return json({ error: "not found" }, 404);
     }
   } catch (err) {
-    if (err instanceof HttpError) return json({ error: err.message }, err.status);
+    if (err instanceof HttpError) {
+      const res = json({ error: err.message }, err.status);
+      // Well-behaved clients back off on this; 60 = the bucket period.
+      if (err.status === 429) res.headers.set("retry-after", "60");
+      return res;
+    }
     return json({ error: `could not process DXF: ${(err as Error).message}` }, 422);
   }
 }

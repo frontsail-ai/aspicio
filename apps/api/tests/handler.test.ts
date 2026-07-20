@@ -190,3 +190,9 @@ test("rate limiting: denied callers get 429, allowed pass, health is exempt", as
   expect((await handleRequest(req, noPng, allow)).status).toBe(200);
   expect(seenKey).toBe("203.0.113.9");
 });
+
+test("429 responses carry a Retry-After header", async () => {
+  const denied = await handleRequest(post("/describe", SAMPLE), noPng, async () => false);
+  expect(denied.status).toBe(429);
+  expect(denied.headers.get("retry-after")).toBe("60");
+});

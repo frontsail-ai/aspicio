@@ -17,7 +17,10 @@ const renderPng: RenderPng = async (svg, width) => {
 
 export default {
   fetch(req: Request, env: Env): Promise<Response> {
-    // Fail open if the binding is absent (local dev without simulation).
+    // Fail open if the binding is absent (local dev without simulation) —
+    // loudly, so an accidental unprotected production deploy is detectable.
+    if (!env.RATE_LIMITER)
+      console.warn("RATE_LIMITER binding absent — serving without rate limits");
     const checkRateLimit: CheckRateLimit | undefined = env.RATE_LIMITER
       ? async (key) => (await env.RATE_LIMITER!.limit({ key })).success
       : undefined;
