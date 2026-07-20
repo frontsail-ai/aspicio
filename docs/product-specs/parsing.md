@@ -11,11 +11,12 @@ Prefix: `PARSE`.
 A drawing loads from DXF text, a `File`/`Blob`, or an `ArrayBuffer`; bytes
 are decoded as UTF-8.
 
-### PARSE-2: Binary DXF is rejected loudly
+### PARSE-2: Binary DXF is decoded
 
-Input starting with the "AutoCAD Binary DXF" sentinel is refused with an
-error telling the user to export as ASCII DXF — it is never fed to the text
-parser to fail confusingly.
+Input starting with the "AutoCAD Binary DXF" sentinel is decoded — both the
+R12 1-byte and R13+ 2-byte group-code variants — and parses to the same
+document as its ASCII twin. Truncated binary input ends the stream cleanly
+instead of erroring mid-record.
 
 ### PARSE-3: Supported entity types
 

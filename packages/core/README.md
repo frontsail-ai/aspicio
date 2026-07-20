@@ -27,10 +27,15 @@ its canvas, tracks container resizes, and renders on demand.
 
 | Member         | Notes                                                                                              |
 | -------------- | -------------------------------------------------------------------------------------------------- |
-| `load(src)`    | `File \| Blob \| ArrayBuffer \| string` (DXF text)                                                 |
+| `load(src)`    | `File \| Blob \| ArrayBuffer \| string` — ASCII **or** binary DXF (auto-detected from bytes)       |
 | `loadUrl(url)` | fetch + load; rejects on HTTP errors                                                               |
 | `document`     | the parsed, normalized `DxfDocument` (or `null`)                                                   |
 | `stats`        | `{ entityCount, segmentCount, unsupported }` — unsupported is a per-type count of skipped entities |
+
+Both DXF encodings load transparently: text and "AutoCAD Binary DXF" (R12
+1-byte and R13+ 2-byte code variants). If you parse bytes yourself,
+`isBinaryDxf(bytes)` and `binaryDxfToText(bytes)` are exported to feed the
+binary form into `parseDxf`.
 
 ### Layers
 

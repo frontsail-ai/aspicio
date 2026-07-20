@@ -198,11 +198,38 @@ test("layer color reflects entity overrides (dominant drawn color, not the table
   expect(empty!.color).toBe("#0000ff");
 });
 
-test("parseDxfBytes rejects binary DXF with a clear error", () => {
+test("parseDxfBytes decodes binary DXF through the sentinel path", () => {
+  // Build a tiny valid binary DXF (R13+ 2-byte codes): 0 SECTION / 2 ENTITIES /
+  // 0 LINE 8 WALLS 10..21 / 0 ENDSEC / 0 EOF.
+  const parts: number[] = [];
   const sentinel = "AutoCAD Binary DXF\r\n\x1a\0";
-  const bytes = new Uint8Array(64);
-  for (let i = 0; i < sentinel.length; i++) bytes[i] = sentinel.charCodeAt(i);
-  expect(() => parseDxfBytes(bytes)).toThrow(/Binary DXF.*ASCII/);
+  for (let i = 0; i < sentinel.length; i++) parts.push(sentinel.charCodeAt(i));
+  const u16 = (n: number): void => {
+    parts.push(n & 0xff, (n >> 8) & 0xff);
+  };
+  const str = (code: number, s: string): void => {
+    u16(code);
+    for (let i = 0; i < s.length; i++) parts.push(s.charCodeAt(i));
+    parts.push(0);
+  };
+  const f64 = (code: number, v: number): void => {
+    u16(code);
+    const b = new Uint8Array(8);
+    new DataView(b.buffer).setFloat64(0, v, true);
+    parts.push(...b);
+  };
+  str(0, "SECTION");
+  str(2, "ENTITIES");
+  str(0, "LINE");
+  str(8, "WALLS");
+  f64(10, 0);
+  f64(20, 0);
+  f64(11, 10);
+  f64(21, 5);
+  str(0, "ENDSEC");
+  str(0, "EOF");
+  const doc = parseDxfBytes(new Uint8Array(parts));
+  expect(doc.entities.map((e) => e.type)).toEqual(["LINE"]);
   // A short buffer that can't hold the sentinel is treated as text, not binary.
   expect(() => parseDxfBytes(new Uint8Array([48, 10]))).toThrow(/end of input|EOF/i);
 });

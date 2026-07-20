@@ -81,6 +81,37 @@ function wheelEvent(init: { deltaY: number; clientX?: number; clientY?: number }
   return event;
 }
 
+/** Encode an ASCII DXF string as a 2-byte-code binary DXF (for the load path). */
+function asciiToBinary(text: string): Uint8Array {
+  const lines = text.split("\n");
+  const codeBytes: number[] = [];
+  const utf8 = new TextEncoder();
+  const pushU16 = (n: number): void => {
+    codeBytes.push(n & 0xff, (n >> 8) & 0xff);
+  };
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = Number.parseInt(lines[i], 10);
+    if (Number.isNaN(code)) continue;
+    const value = lines[i + 1];
+    pushU16(code);
+    if (code <= 9 || code >= 100) {
+      for (const b of utf8.encode(value)) codeBytes.push(b);
+      codeBytes.push(0);
+    } else if (code <= 59) {
+      const b = new Uint8Array(8);
+      new DataView(b.buffer).setFloat64(0, Number.parseFloat(value), true);
+      codeBytes.push(...b);
+    } else {
+      pushU16(Number.parseInt(value, 10)); // int16 range (60–79)
+    }
+  }
+  const sentinel = utf8.encode("AutoCAD Binary DXF\r\n\x1a\x00");
+  const out = new Uint8Array(sentinel.length + codeBytes.length);
+  out.set(sentinel);
+  out.set(codeBytes, sentinel.length);
+  return out;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -113,6 +144,15 @@ test("load(Blob) and load(ArrayBuffer) decode to the same document", async () =>
   const { viewer: v2 } = makeViewer();
   await v2.load(new TextEncoder().encode(SAMPLE).buffer as ArrayBuffer);
   expect(v2.stats.entityCount).toBe(1);
+});
+
+test("load decodes a binary DXF (ArrayBuffer) to the same document as ASCII", async () => {
+  const { viewer } = makeViewer();
+  const binary = asciiToBinary(SAMPLE);
+  await viewer.load(binary.buffer as ArrayBuffer);
+  expect(viewer.stats.entityCount).toBe(1);
+  expect(viewer.stats.segmentCount).toBe(1);
+  expect(viewer.getLayers().map((l) => l.name)).toEqual(["WALLS"]);
 });
 
 test("loadUrl fetches and loads", async () => {

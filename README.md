@@ -17,8 +17,8 @@
   (pinch zoom, twist rotate) are equally first-class
 - Tools: distance/area measure with object snap, click-to-select with an
   entity info panel, and keyboard shortcuts
-- SVG (vector) and PNG export, paper-space layouts; ASCII DXF (binary
-  DXF is detected and rejected with a clear message)
+- SVG (vector) and PNG export, paper-space layouts, and both ASCII and
+  binary DXF
 - Hit-testing (`pickLayer`), camera state access, extensible
   entity-handler registry
 
