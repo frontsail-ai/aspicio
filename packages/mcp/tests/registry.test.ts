@@ -47,6 +47,16 @@ test("registry metadata agrees on the one load-bearing package name", () => {
   expect(read("smithery.yaml")).toContain("type: stdio");
 });
 
+test("README's agent-surface strings match the registry manifests", () => {
+  // The README quotes the install command and the hosted endpoint; both
+  // must track the manifests, not drift independently.
+  const readme = read("README.md");
+  const server = JSON.parse(read("server.json")) as ServerJson;
+  const pkgName = (JSON.parse(read("packages/mcp/package.json")) as { name: string }).name;
+  expect(readme).toContain(`npx -y ${pkgName}`);
+  expect(readme).toContain(server.remotes[0].url);
+});
+
 test("glama.json names at least one maintainer", () => {
   // Glama's entire schema: who may claim the listing. Everything else
   // (name, description) comes from crawling npm + GitHub.
