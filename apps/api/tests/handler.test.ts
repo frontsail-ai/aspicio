@@ -107,3 +107,64 @@ test("isPrivateHost flags loopback/link-local/private ranges", () => {
     expect(isPrivateHost(h)).toBe(true);
   for (const h of ["example.com", "8.8.8.8", "172.32.0.1"]) expect(isPrivateHost(h)).toBe(false);
 });
+
+test("render rejects a bg that is not a hex color (SVG injection guard)", async () => {
+  const evil = encodeURIComponent('#000"/><script>alert(1)</script>');
+  const res = await handleRequest(post(`/render?format=svg&bg=${evil}`, SAMPLE), noPng);
+  expect(res.status).toBe(400);
+  // A legitimate hex color passes through into the SVG background rect.
+  const ok = await handleRequest(post("/render?format=svg&bg=%23112233", SAMPLE), noPng);
+  expect(await ok.text()).toContain('fill="#112233"');
+});
+
+test("SSRF guard covers IPv6 and canonicalized numeric hosts", async () => {
+  for (const src of [
+    "http://[::1]/x",
+    "http://[fe80::1]/x",
+    "http://[fc00::1]/x",
+    "http://[::ffff:127.0.0.1]/x",
+    "http://2130706433/x", // canonicalizes to 127.0.0.1
+  ]) {
+    const res = await handleRequest(get(`/describe?src=${encodeURIComponent(src)}`), noPng);
+    expect(res.status, src).toBe(400);
+  }
+});
+
+test("?src= fetch: happy path, oversize, and redirect-to-private", async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    // Happy path: the fetched body parses and describes.
+    globalThis.fetch = (async () => new Response(SAMPLE)) as typeof fetch;
+    const ok = await handleRequest(get("/describe?src=https://example.com/a.dxf"), noPng);
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { entityCount: number }).entityCount).toBe(2);
+
+    // A declared content-length over the cap is rejected before buffering.
+    globalThis.fetch = (async () =>
+      new Response("x", {
+        headers: { "content-length": String(9 * 1024 * 1024) },
+      })) as typeof fetch;
+    const big = await handleRequest(get("/describe?src=https://example.com/a.dxf"), noPng);
+    expect(big.status).toBe(413);
+
+    // A public URL redirecting to a private address is refused at the hop.
+    globalThis.fetch = (async () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: "http://169.254.169.254/meta" },
+      })) as typeof fetch;
+    const redir = await handleRequest(get("/describe?src=https://example.com/a.dxf"), noPng);
+    expect(redir.status).toBe(400);
+
+    // Endless redirects give up with 502.
+    globalThis.fetch = (async () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://example.com/next" },
+      })) as typeof fetch;
+    const loop = await handleRequest(get("/describe?src=https://example.com/a.dxf"), noPng);
+    expect(loop.status).toBe(502);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

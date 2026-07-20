@@ -10,7 +10,10 @@
     "strict": true,
     "noUnusedLocals": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@aspicio/core": ["../../packages/core/src/index.ts"]
+    }
   },
   "include": ["src/**/*.ts"]
 }
