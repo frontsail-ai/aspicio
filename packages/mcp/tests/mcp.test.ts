@@ -72,3 +72,15 @@ test("render_dxf returns a PNG image content item", async () => {
   const png = Buffer.from(content[0].data ?? "", "base64");
   expect(png.subarray(0, 4).toString("hex")).toBe("89504e47"); // PNG magic
 });
+
+test("a broken source surfaces as a protocol error result, not a crash", async () => {
+  const client = await connect();
+  const res = await client.callTool({
+    name: "describe_dxf",
+    arguments: { source: "not a dxf at all" },
+  });
+  expect(res.isError).toBe(true);
+  const content = res.content as Array<{ type: string; text?: string }>;
+  expect(content[0].type).toBe("text");
+  expect(content[0].text).toMatch(/file not found|Unexpected|Empty/i);
+});
