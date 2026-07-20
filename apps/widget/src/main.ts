@@ -64,6 +64,10 @@ const STYLE = `
   #chrome .vsep { width: 1px; height: 16px; background: var(--w-hairline); }
   #chrome .mono { font-family: var(--w-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--w-text-2); font-feature-settings: 'tnum' 1, 'zero' 1; }
   #chrome .actions { margin-left: auto; display: flex; gap: 6px; }
+  /* A degraded state has no layers to report and nothing to fit. */
+  #root:not([data-state="loaded"]) #chip-fs,
+  #root:not([data-state="loaded"]) #chrome .vsep,
+  #root:not([data-state="loaded"]) #fit-fs { display: none; }
   .chrome-btn { height: 28px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; background: var(--w-panel-bg); border: 1px solid var(--w-border); border-radius: var(--w-r-sm); color: var(--w-text); font: 500 12px var(--w-sans); cursor: pointer; }
   .chrome-btn:hover { border-color: var(--w-text-2); }
   .chrome-btn.icon { width: 28px; padding: 0; }
@@ -229,6 +233,18 @@ function showPreparing(): void {
       <div class="title">Preparing drawing</div>
       <div class="msg">Waiting for the drawing from the assistant…</div>
       <div class="dots"><span></span><span></span><span></span></div>
+    </div>`;
+}
+
+/** A result explicitly carried no drawing — distinct from still waiting. */
+function showMissing(): void {
+  root.dataset.state = "preparing";
+  el("state").innerHTML = `
+    <div class="card">
+      ${ICONS.drawing}
+      <div class="title">No drawing in this result</div>
+      <div class="msg">This tool result carried no drawing data.</div>
+      <div class="sub">Ask the assistant to open the drawing again.</div>
     </div>`;
 }
 
@@ -413,7 +429,7 @@ async function apply(action: ViewerAction): Promise<void> {
       showTooLarge(action.byteLength);
       break;
     case "missing":
-      showPreparing();
+      showMissing();
       break;
   }
 }
