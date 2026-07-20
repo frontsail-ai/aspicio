@@ -417,3 +417,17 @@ export function parseDxf(text: string): DxfDocument {
 
   return { layers, entities, blocks, lineTypes, unsupported, units, layouts };
 }
+
+/**
+ * Parse a DXF from raw bytes or text. Headless (no DOM/WebGL) — safe in Node
+ * and Cloudflare Workers. Use when the source arrives as bytes (e.g. a fetched
+ * file); pass a string to parse ASCII DXF text directly.
+ *
+ * Bytes are decoded as UTF-8. (Binary "AutoCAD Binary DXF" detection is a
+ * follow-up once the binary decoder lands in core.)
+ */
+export function parseDxfBytes(source: string | ArrayBuffer | Uint8Array): DxfDocument {
+  if (typeof source === "string") return parseDxf(source);
+  const bytes = source instanceof Uint8Array ? source : new Uint8Array(source);
+  return parseDxf(new TextDecoder().decode(bytes));
+}
