@@ -42,8 +42,9 @@ view, layer visibility, and space — panel state included.
 
 Layer visibility is stored as whichever index set is smaller — hidden or
 visible — so soloing one layer of a many-layer drawing yields a short,
-shareable URL. Malformed or truncated hashes fall back to a normal fit,
-never an error.
+shareable URL. A malformed or truncated hash never errors: on cold start
+it opens the normal empty screen (the sample is not auto-loaded), and it
+never disturbs an already-loaded drawing.
 
 ### DEMO-7: Only URL-addressable drawings are linkable
 
@@ -60,8 +61,10 @@ space or Escape closes it.
 ### DEMO-9: Measure tool UX
 
 A toolbar toggle (or M) arms measuring: clicks add snapped points, a
-rubber band follows the cursor, and a readout shows live segment, total,
-and area. Escape first clears points, then deactivates.
+rubber band follows the cursor, and a readout shows the live segment,
+running total, and — once three or more points are placed — enclosed
+area, each carrying the drawing unit label when the drawing has one.
+Escape first clears points, then deactivates.
 
 ### DEMO-10: Shortcut cheat sheet
 

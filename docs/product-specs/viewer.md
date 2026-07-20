@@ -15,7 +15,9 @@ animated ease. User gestures cancel any running camera animation.
 
 ### VIEW-2: Fit, zoom, and rotation controls
 
-Programmatic fit frames the entire visible drawing with a margin; zoom-by
+Programmatic fit frames the entire drawing's extents with a margin
+(hidden layers included — bounds come from the loaded geometry, not
+visibility); zoom-by
 factors > 1 zoom in at the viewport center; rotation reset returns to 0°
 keeping center and zoom. Each is optionally animated.
 
@@ -44,8 +46,9 @@ hidden layer is treated as clearing the highlight.
 
 ### VIEW-7: Entity picking and description
 
-A click within tolerance selects the top-most entity — edges win over
-filled interiors within tolerance — and yields a structured description
+A click selects the entity with the nearest edge within tolerance, else
+one whose filled interior contains the point (no z-ordering is implied),
+and yields a structured description
 (type, layer, color, length/radius/area/points/position/text as
 applicable). Picking is limited to model space.
 
@@ -60,11 +63,8 @@ Within tolerance, the cursor snaps to endpoints, points, centers, and
 midpoints of visible layers only. The snap index is built lazily per
 loaded space.
 
-### VIEW-10: Measurement math
-
-Distance accumulates over clicked points; area is reported once three or
-more points are placed; values carry the drawing unit label when the
-drawing has one.
+<!-- VIEW-10 removed pre-merge: measurement accumulation is host behavior,
+not a core viewer feature — see DEMO-9. The number stays retired. -->
 
 ### VIEW-11: Keyboard shortcuts
 

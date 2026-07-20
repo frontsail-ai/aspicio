@@ -8,9 +8,10 @@ Process rules for changing this repo. Product behavior lives in
 
 - **Lint/format/type-check 100%** — `vp check` must pass; never disable a
   rule or skip a test to get green.
-- **Test 100% of new logic** — ~100% line coverage everywhere except the
+- **New logic ships with unit tests in the same change** — except the
   WebGL renderer, which is covered by the Playwright e2e suite instead
-  (INV-7).
+  (INV-7). There is no enforced coverage threshold; reviewers hold the
+  line.
 - **The repo gate** is `vp run ready` (check + all unit tests + all
   builds); browser coverage is `vp run e2e`. Run both before pushing
   non-trivial changes.

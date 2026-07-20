@@ -44,7 +44,9 @@ tessellation pipeline.
 ### INV-7: The renderer is verified end-to-end, everything else at unit level
 
 The WebGL renderer is covered by browser e2e tests (it needs a real GL
-context); all other code keeps ~100% line coverage in unit tests.
+context). All other new logic ships with unit tests in the same change;
+no enforced coverage threshold exists today (core sits near 80% lines),
+so "tested" is a review obligation, not a gate.
 
 ### INV-8: Test fixtures cover both DXF styling conventions
 

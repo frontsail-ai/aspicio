@@ -67,7 +67,8 @@ const ints = (s: string): number[] =>
 /**
  * Parse a hash produced by {@link encodeView}. Returns `null` when there is no
  * usable `v=` component (missing, malformed, or non-finite) so the caller can
- * fall back to a normal fit. Tolerant of hand-edited or truncated links.
+ * skip restoring (cold start then shows the normal empty screen). Tolerant
+ * of hand-edited or truncated links.
  */
 export function decodeView(hash: string): ViewLink | null {
   const params = new URLSearchParams(hash.replace(/^#/, ""));

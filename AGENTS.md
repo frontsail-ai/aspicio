@@ -69,7 +69,7 @@ docs/             architecture, guidelines, product specs, releasing
   publish; bun rewrites `workspace:` deps).
 - Core stays framework-free and UI-opinion-free (INV-1); new entity types
   go through `registerEntityHandler` (INV-6).
-- The renderer is e2e-tested, everything else ~100% unit coverage
+- The renderer is e2e-tested; all other new logic ships with unit tests
   (INV-7); e2e fixtures cover both ByLayer and per-entity colors (INV-8).
 - Workspace type resolution: checks/tests resolve `@aspicio/core` from
   source (tsconfig `paths` **and** the vite alias — new workspaces need
