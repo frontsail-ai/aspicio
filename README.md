@@ -70,7 +70,8 @@ drawings stay interactive), broad entity coverage (lines, arcs, circles,
 ellipses, polylines with bulges, splines, TEXT/MTEXT, DIMENSION,
 SOLID/HATCH fills, nested INSERT blocks — anything unsupported is counted
 and reported, never fatal), a layer list with the colors that are
-_actually drawn_ rather than the often-meaningless layer table, measure
+_actually drawn_ (per-entity overrides included, not just the layer
+table), measure
 with object snap, entity picking, paper-space layouts, SVG/PNG export,
 and first-class touch. Out of scope: editing and 3D.
 
@@ -101,15 +102,18 @@ Connect:
   `codex mcp add aspicio -- npx -y @aspicio/mcp`
 - **Any client that launches stdio MCP servers** — register
   `npx -y @aspicio/mcp`
-- **Any client that takes remote MCP connectors** — point it at
-  `https://aspicio-api.dmitri-66a.workers.dev/mcp` (Streamable HTTP,
-  no install; speaks MCP, not a browser page)
+- **Any client that supports remote MCP (Streamable HTTP)** — point it
+  at `https://aspicio-api.dmitri-66a.workers.dev/mcp` (no install;
+  speaks MCP, not a browser page)
 - **Plain HTTP** — `GET /describe?src=<dxf-url>`,
   `GET /render?src=<dxf-url>&format=png|svg`; the API self-describes at
   [`/openapi.json`](https://aspicio-api.dmitri-66a.workers.dev/openapi.json)
 
 URL fetches are guarded (private-network blocking, size caps, redirect
-validation, timeouts), and the stdio server keeps local files local.
+validation, timeouts). The stdio server reads local files in-process and
+never uploads the DXF to any Aspicio service — though, as with any tool
+result, your MCP client passes the returned summary or image to its
+model provider.
 
 ## Available today · direction
 
