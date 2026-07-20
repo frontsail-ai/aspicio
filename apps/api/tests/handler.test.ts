@@ -196,3 +196,29 @@ test("429 responses carry a Retry-After header", async () => {
   expect(denied.status).toBe(429);
   expect(denied.headers.get("retry-after")).toBe("60");
 });
+
+test("/openapi.json serves a valid 3.1 document that matches the routes", async () => {
+  const res = await handleRequest(get("/openapi.json"), noPng);
+  expect(res.status).toBe(200);
+  const doc = (await res.json()) as {
+    openapi: string;
+    security: unknown[];
+    paths: Record<string, unknown>;
+  };
+  expect(doc.openapi).toBe("3.1.0");
+  // Public API: auth "none" must be declared, not implied.
+  expect(doc.security).toEqual([]);
+  // Route coherence, both directions we can check: the documented path set
+  // is pinned, and every documented path is actually served (non-404) —
+  // deleting a route from the router while leaving it in the spec fails here.
+  expect(Object.keys(doc.paths).sort()).toEqual(["/describe", "/health", "/render"]);
+  for (const path of Object.keys(doc.paths)) {
+    const served = await handleRequest(get(path), noPng);
+    expect(served.status, `${path} is documented but not served`).not.toBe(404);
+  }
+  // Served-but-undocumented meta routes are deliberate: / (index) and
+  // /openapi.json describe the API rather than the drawing domain.
+  // The index advertises the spec.
+  const root = (await (await handleRequest(get("/"), noPng)).json()) as { openapi: string };
+  expect(root.openapi).toBe("/openapi.json");
+});
