@@ -103,7 +103,7 @@ Connect:
   `npx -y @aspicio/mcp`
 - **Any client that takes remote MCP connectors** — point it at
   `https://aspicio-api.dmitri-66a.workers.dev/mcp` (Streamable HTTP,
-  no install)
+  no install; speaks MCP, not a browser page)
 - **Plain HTTP** — `GET /describe?src=<dxf-url>`,
   `GET /render?src=<dxf-url>&format=png|svg`; the API self-describes at
   [`/openapi.json`](https://aspicio-api.dmitri-66a.workers.dev/openapi.json)
