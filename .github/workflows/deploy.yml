@@ -1,4 +1,4 @@
-# Builds the demo and deploys it to a Cloudflare Worker (Static Assets).
+# Deploys two Cloudflare Workers: the demo (static assets) and the DXF API.
 #   push → master : production deploy (`wrangler deploy`)
 #   pull_request  : preview version (`wrangler versions upload`); its URL is
 #                   posted back as a sticky comment on the PR
@@ -6,8 +6,8 @@
 # One-time setup:
 #   1. Create a Cloudflare API token with the "Workers Scripts: Edit" permission.
 #   2. Add repo secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
-#   (No resource to pre-create — `wrangler deploy` creates the Worker on first run.)
-name: Deploy demo (Cloudflare Workers)
+#   (No resource to pre-create — `wrangler deploy` creates each Worker on first run.)
+name: Deploy (Cloudflare Workers)
 
 on:
   push:
@@ -78,6 +78,83 @@ jobs:
             const body = url
               ? `${marker}\n🚀 **Preview deployed** for \`${sha}\`: ${url}`
               : `${marker}\n⚠️ Preview version uploaded for \`${sha}\`, but no preview URL was found in the wrangler output.`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  deploy-api:
+    name: Build and deploy the API
+    runs-on: ubuntu-latest
+    # Fork PRs can't read secrets — skip them (no preview) instead of failing.
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build core
+        # The API Worker imports @aspicio/core's built dist (not the source alias).
+        run: bunx vp run @aspicio/core#build
+
+      - name: Deploy the API Worker
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          workingDirectory: apps/api
+          # apps/api has no lockfile, so the action's autodetect falls back to
+          # npm — which rejects the repo's bun devEngines pin. Be explicit.
+          packageManager: bun
+          command: ${{ github.event_name == 'pull_request' && 'versions upload' || 'deploy' }}
+
+      # Post (and keep updating) a single PR comment with the API preview URL.
+      - name: Comment the API preview URL on the PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+          WRANGLER_OUTPUT: ${{ steps.deploy.outputs.command-output }}${{ steps.deploy.outputs.command-stderr }}
+        with:
+          script: |
+            const marker = "<!-- aspicio-api-preview -->";
+            const url =
+              process.env.DEPLOY_URL ||
+              (process.env.WRANGLER_OUTPUT.match(/https:\/\/[a-z0-9-]+\.workers\.dev\S*/i) || [])[0];
+            const sha = context.sha.slice(0, 7);
+            const body = url
+              ? `${marker}\n🛠️ **API preview deployed** for \`${sha}\`: ${url} (try \`${url}/health\`)`
+              : `${marker}\n⚠️ API preview version uploaded for \`${sha}\`, but no preview URL was found in the wrangler output.`;
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
