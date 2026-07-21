@@ -33,6 +33,17 @@ test("the light theme config themes the widget document", async ({ page }) => {
   await expect(widget(page).locator("canvas")).toBeVisible();
 });
 
+test("the fullscreen light config shows light chrome around the dark canvas", async ({ page }) => {
+  await open(page, "fullscreen-light");
+  await expect
+    .poll(() => page.frameLocator("iframe").locator("html").getAttribute("data-theme"))
+    .toBe("light");
+  // Fullscreen chrome is where the light theme is actually visible.
+  await expect(widget(page).locator('button[aria-label="Exit fullscreen"]')).toBeVisible();
+  await expect(widget(page).locator("body")).toContainText(/layers/i);
+  await expect(widget(page).locator("canvas")).toBeVisible();
+});
+
 test("the too-large config shows the state card instead of a canvas", async ({ page }) => {
   await open(page, "too-large");
   await expect(widget(page).locator("body")).toContainText("Too large to view inline");

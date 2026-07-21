@@ -71,6 +71,21 @@ const CONFIGS: ShowcaseConfig[] = [
     }),
   },
   {
+    // Light theming only shows in fullscreen chrome — the inline mode is a
+    // full-bleed canvas, and the canvas stays dark in both themes.
+    id: "fullscreen-light",
+    label: "Fullscreen · light · 920×600",
+    width: 920,
+    height: 600,
+    theme: "light",
+    displayMode: "fullscreen",
+    meta: (sample) => ({
+      dxfBase64: bytesToBase64(sample),
+      byteLength: sample.byteLength,
+      allowFilePicker: false,
+    }),
+  },
+  {
     id: "empty-drawing",
     label: "Empty drawing",
     width: 520,
