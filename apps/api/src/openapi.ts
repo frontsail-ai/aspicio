@@ -31,7 +31,7 @@ export const openapi = {
   },
   // Placeholder — the handler overwrites `servers` with the origin that
   // actually served the request (the API answers on several domains).
-  servers: [{ url: "https://aspicio-api.frontsail.ai" }],
+  servers: [{ url: "https://aspicio-api.frontsail.app" }],
   // Deliberately public: no authentication. Declared explicitly so importers
   // (ChatGPT Actions, generators) treat it as auth "none".
   security: [],
