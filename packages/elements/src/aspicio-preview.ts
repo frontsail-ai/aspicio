@@ -73,17 +73,22 @@ export class AspicioPreview extends LitElement {
 
   willUpdate(changed: PropertyValues): void {
     if (!changed.has("src") && !changed.has("srcUrl")) return;
+    // Empty strings mean "no source", exactly like null: frameworks coerce
+    // null to "" when assigning string DOM properties (Vue's patchDOMProp),
+    // and loadUrl("") would fetch the host page's own HTML.
+    const src = this.src === "" ? null : this.src;
+    const url = this.srcUrl || null;
     // The most recently set source wins (ELEM-3): an attribute lingering in
     // the markup must not shadow a later `src` assignment. When both change
     // in the same cycle (e.g. both set in the initial markup), src-url keeps
     // its documented precedence.
-    if (changed.has("src") && this.src != null) this.#activeSource = "src";
-    if (changed.has("srcUrl") && this.srcUrl != null) this.#activeSource = "url";
+    if (changed.has("src") && src != null) this.#activeSource = "src";
+    if (changed.has("srcUrl") && url != null) this.#activeSource = "url";
     // A cleared active source falls back to the other one, if set.
-    if (this.#activeSource === "src" && this.src == null)
-      this.#activeSource = this.srcUrl != null ? "url" : null;
-    if (this.#activeSource === "url" && this.srcUrl == null)
-      this.#activeSource = this.src != null ? "src" : null;
+    if (this.#activeSource === "src" && src == null)
+      this.#activeSource = url != null ? "url" : null;
+    if (this.#activeSource === "url" && url == null)
+      this.#activeSource = src != null ? "src" : null;
   }
 
   static styles = [

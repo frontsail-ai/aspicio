@@ -8,6 +8,7 @@
     <a href="https://www.npmjs.com/package/@aspicio/core"><img src="https://img.shields.io/npm/v/%40aspicio%2Fcore?label=%40aspicio%2Fcore" alt="npm: @aspicio/core" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/elements"><img src="https://img.shields.io/npm/v/%40aspicio%2Felements?label=%40aspicio%2Felements" alt="npm: @aspicio/elements" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/react"><img src="https://img.shields.io/npm/v/%40aspicio%2Freact?label=%40aspicio%2Freact" alt="npm: @aspicio/react" /></a>
+    <a href="https://www.npmjs.com/package/@aspicio/vue"><img src="https://img.shields.io/npm/v/%40aspicio%2Fvue?label=%40aspicio%2Fvue" alt="npm: @aspicio/vue" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/mcp"><img src="https://img.shields.io/npm/v/%40aspicio%2Fmcp?label=%40aspicio%2Fmcp" alt="npm: @aspicio/mcp" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
   </p>
@@ -19,9 +20,9 @@ framework-free `parse → tessellate` pipeline that runs in the browser, in
 Node, and in Cloudflare Workers. A person gets an interactive WebGL viewer
 of a CAD drawing; an AI agent gets structured JSON facts and a rendered
 PNG of the same file. Every surface — the browser viewer, the web
-components and their React bindings, the headless renderer, the HTTP
-API, and the MCP server — is a thin adapter over the same engine, so a
-drawing is equally readable everywhere.
+components and their React and Vue bindings, the headless renderer, the
+HTTP API, and the MCP server — is a thin adapter over the same engine,
+so a drawing is equally readable everywhere.
 
 ```
 DXF bytes ──parse──▶ DxfDocument ──tessellate──▶ Tessellation ──┬─▶ WebGL renderer (viewer)
@@ -36,9 +37,13 @@ specs: [docs/product-specs/](docs/product-specs/README.md)
 
 ## Embed it
 
-Any framework (or none) — one tag gives you the layer panel plus an
-interactive preview. The web components work in plain HTML, Vue, and
-Svelte alike:
+One embed, every flavor — and every path below renders the same web
+components, so the result is pixel-identical no matter which you pick.
+
+### Web components — plain HTML, Svelte, any framework
+
+One tag gives you the layer panel plus an interactive preview; no
+bindings needed:
 
 ```html
 <script type="module">
@@ -48,8 +53,10 @@ Svelte alike:
 <aspicio-embed src-url="/drawing.dxf" style="height: 480px"></aspicio-embed>
 ```
 
-React — the same embed with idiomatic props (a thin veneer over the web
-components, pixel-identical output):
+### React
+
+The same embed with idiomatic props and a `ref` exposing the full
+viewer, via [`@aspicio/react`](packages/react):
 
 ```tsx
 import { DxfEmbed } from "@aspicio/react";
@@ -57,7 +64,25 @@ import { DxfEmbed } from "@aspicio/react";
 <DxfEmbed src={file} style={{ height: 480 }} />;
 ```
 
-Vanilla TypeScript:
+### Vue
+
+Typed props and emits with unwrapped payloads, via
+[`@aspicio/vue`](packages/vue):
+
+```vue
+<script setup>
+import { DxfEmbed } from "@aspicio/vue";
+</script>
+
+<template>
+  <DxfEmbed src-url="/drawing.dxf" style="height: 480px" />
+</template>
+```
+
+### Vanilla TypeScript
+
+Skip the ready-made UI and drive the viewer directly from
+[`@aspicio/core`](packages/core) — bring your own chrome:
 
 ```ts
 import { DxfViewer } from "@aspicio/core";
@@ -66,8 +91,10 @@ const viewer = new DxfViewer(document.querySelector("#preview")!);
 await viewer.load(file); // File | Blob | ArrayBuffer | DXF text (ASCII or binary)
 ```
 
-Headless — parse, describe, and render with no browser at all (Node or
-Workers; server-side previews, thumbnails, pipelines):
+### Headless — Node and Workers
+
+Parse, describe, and render with no browser at all (server-side
+previews, thumbnails, pipelines):
 
 ```ts
 import { parseDxfBytes, tessellate, describeDrawing, tessellationToSvg } from "@aspicio/core";
@@ -142,7 +169,7 @@ model provider. Full details:
 ## Available today · direction
 
 Everything above is shipped and live: viewer + demo, core, web
-components and React packages, headless describe/render, stdio and hosted MCP, the in-chat
+components, React and Vue packages, headless describe/render, stdio and hosted MCP, the in-chat
 MCP Apps viewer, the HTTP API with OpenAPI, and plugin packaging for
 Claude Code and Codex.
 
@@ -153,11 +180,22 @@ upload flow so remote surfaces can handle local files.
 
 ## Packages
 
+| Package                                  | Description                                                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| [`@aspicio/core`](packages/core)         | The viewer library: parsing, tessellation, rendering, camera, input                                                 |
+| [`@aspicio/elements`](packages/elements) | Web components: `<aspicio-embed>`, `<aspicio-preview>`, `<aspicio-layer-panel>` — plain HTML, Svelte, any framework |
+| [`@aspicio/react`](packages/react)       | React bindings: `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`                                                     |
+| [`@aspicio/vue`](packages/vue)           | Vue 3 bindings: the same three components with typed props and emits                                                |
+| [`@aspicio/mcp`](packages/mcp)           | MCP server for AI agents: `describe_dxf` + `render_dxf`                                                             |
+| [`@aspicio/api`](apps/api)               | DXF HTTP API Worker (private): `/describe`, `/render`, `/mcp`                                                       |
+| [`@aspicio/widget`](apps/widget)         | MCP Apps in-chat viewer widget (private), served by the api Worker                                                  |
+| [`@aspicio/demo`](apps/demo)             | Standalone demo app (private) — also the reference integration                                                      |
+
 How the viewer packages fit together: every framework path funnels into
 the same Lit web components — one implementation of the embed UI — which
-sit on the framework-free core. React gets a thin veneer with idiomatic
-props; Vue and Svelte consume the elements natively, so their support is
-recipes, not wrapper packages (dashed = planned docs, not shipped).
+sit on the framework-free core. React and Vue get thin veneers with
+idiomatic props; Svelte consumes the elements natively, so its support
+is recipes, not a wrapper package (dashed = planned docs, not shipped).
 
 ```mermaid
 flowchart TD
@@ -167,13 +205,15 @@ flowchart TD
     SVELTEAPP["Svelte app"]
 
     REACT["<b>@aspicio/react</b><br/>&lt;DxfEmbed&gt; · &lt;DxfPreview&gt; · &lt;DxfLayerPanel&gt;<br/><i>thin @lit/react veneer, API-stable</i>"]
+    VUE["<b>@aspicio/vue</b><br/>&lt;DxfEmbed&gt; · &lt;DxfPreview&gt; · &lt;DxfLayerPanel&gt;<br/><i>thin Vue 3 veneer, typed emits</i>"]
     ELEMENTS["<b>@aspicio/elements</b><br/>&lt;aspicio-embed&gt; · &lt;aspicio-preview&gt; · &lt;aspicio-layer-panel&gt;<br/><i>Lit web components — the one embed-UI implementation</i>"]
     CORE["<b>@aspicio/core</b><br/>parse → tessellate → render<br/><i>camera · input · picking · SVG/PNG export · headless describe</i>"]
 
     REACTAPP -->|"idiomatic props, ref → DxfViewer"| REACT
     REACT -->|"wraps"| ELEMENTS
     HTMLAPP -->|"attributes + DOM events"| ELEMENTS
-    VUEAPP -.->|"native custom elements<br/>(recipes coming)"| ELEMENTS
+    VUEAPP -->|"idiomatic props + emits"| VUE
+    VUE -->|"wraps"| ELEMENTS
     SVELTEAPP -.->|"native custom elements<br/>(recipes coming)"| ELEMENTS
     ELEMENTS -->|"drives"| CORE
     HTMLAPP -.->|"or hand-rolled UI on the DxfViewer API"| CORE
@@ -181,20 +221,10 @@ flowchart TD
     classDef pkg fill:#191c22,stroke:#4c8dff,color:#e7e3da
     classDef app fill:#1f232b,stroke:#3a3f4a,color:#9aa0ab
     classDef planned stroke-dasharray: 5 4
-    class REACT,ELEMENTS,CORE pkg
+    class REACT,VUE,ELEMENTS,CORE pkg
     class REACTAPP,HTMLAPP,VUEAPP,SVELTEAPP app
-    class VUEAPP,SVELTEAPP planned
+    class SVELTEAPP planned
 ```
-
-| Package                                  | Description                                                                                               |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| [`@aspicio/core`](packages/core)         | The viewer library: parsing, tessellation, rendering, camera, input                                       |
-| [`@aspicio/elements`](packages/elements) | Web components: `<aspicio-embed>`, `<aspicio-preview>`, `<aspicio-layer-panel>` — plain HTML, Vue, Svelte |
-| [`@aspicio/react`](packages/react)       | React bindings: `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`                                           |
-| [`@aspicio/mcp`](packages/mcp)           | MCP server for AI agents: `describe_dxf` + `render_dxf`                                                   |
-| [`@aspicio/api`](apps/api)               | DXF HTTP API Worker (private): `/describe`, `/render`, `/mcp`                                             |
-| [`@aspicio/widget`](apps/widget)         | MCP Apps in-chat viewer widget (private), served by the api Worker                                        |
-| [`@aspicio/demo`](apps/demo)             | Standalone demo app (private) — also the reference integration                                            |
 
 ## Development
 

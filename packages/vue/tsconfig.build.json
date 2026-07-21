@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    /*
+     * The dts build must resolve workspace deps through their built package
+     * exports, not the source mapping — with paths, tsgo emits stray .d.ts
+     * files next to their sources. Requires them to be built first, which
+     * `vp run -r build` guarantees via the workspace dependency order.
+     */
+    "paths": {}
+  }
+}
