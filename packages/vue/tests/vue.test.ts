@@ -131,6 +131,21 @@ test("srcUrl uses loadUrl; switching to src wins afterwards", async () => {
   expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
 });
 
+test('switching srcUrl→src through Vue state loads the data (null coerces to "")', async () => {
+  // The File-upload flow: start from a URL, then null the URL and set data.
+  // Vue's patchDOMProp turns the null into "" on the element — which must
+  // count as "no source", not as a URL to fetch.
+  const w = mount(DxfPreview, { props: { srcUrl: "/plan.dxf" }, attachTo: document.body });
+  await flush();
+  expect(lastViewer().loadUrl).toHaveBeenCalledWith("/plan.dxf");
+
+  await w.setProps({ srcUrl: null, src: "dxf-data" });
+  await flush();
+  expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
+  const urlCalls = lastViewer().loadUrl.mock.calls.map(([u]: [string]) => u);
+  expect(urlCalls).not.toContain("");
+});
+
 test("emits `load-error` for failed loads", async () => {
   const w = mount(DxfPreview, { props: { src: "ok" }, attachTo: document.body });
   await flush();

@@ -228,6 +228,22 @@ test("setting src after src-url loads the data — the last-set source wins", as
   expect(lastViewer().loadUrl).toHaveBeenLastCalledWith("/other.dxf");
 });
 
+test("empty-string src-url means no source — the framework null-coercion case", async () => {
+  const el = mount("aspicio-preview");
+  el.setAttribute("src-url", "/plan.dxf");
+  await flush();
+  expect(lastViewer().loadUrl).toHaveBeenCalledWith("/plan.dxf");
+
+  // Vue coerces null to "" when assigning string DOM properties: an app
+  // switching from a URL to data sends srcUrl="" and src together.
+  el.srcUrl = "";
+  el.src = "dxf-data";
+  await flush();
+  expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
+  const urlCalls = lastViewer().loadUrl.mock.calls.map(([u]) => u);
+  expect(urlCalls).not.toContain(""); // never fetch the page itself
+});
+
 test("when both sources are set at creation, src-url wins", async () => {
   const el = document.createElement("aspicio-preview");
   el.src = "dxf-data";
