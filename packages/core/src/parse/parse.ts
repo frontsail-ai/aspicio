@@ -16,7 +16,7 @@ import type {
   TextVAlign,
   Viewport,
 } from "../model/types.ts";
-import { stripMText } from "../text/layout.ts";
+import { decodeTextSpecials, stripMText } from "../text/layout.ts";
 import { unitLabel } from "../units.ts";
 import { HatchHandler } from "./hatch.ts";
 import type { HatchBoundary, RawHatchEntity } from "./hatch.ts";
@@ -144,7 +144,7 @@ function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entit
         rotation: (e.rotation ?? 0) * DEG2RAD,
       };
     case "TEXT": {
-      const text: string = e.text ?? "";
+      const text = decodeTextSpecials(e.text ?? "");
       if (!text) return null;
       const halign = e.halign ?? 0;
       const valign = e.valign ?? 0;
@@ -163,7 +163,7 @@ function convertEntity(raw: IEntity, unsupported: Record<string, number>): Entit
       };
     }
     case "MTEXT": {
-      const text = stripMText(e.text ?? "");
+      const text = decodeTextSpecials(stripMText(e.text ?? ""));
       if (!text) return null;
       const ap: number = e.attachmentPoint ?? 1;
       const hCol = (ap - 1) % 3; // 0 left, 1 center, 2 right
