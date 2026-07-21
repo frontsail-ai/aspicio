@@ -14,9 +14,6 @@
     "dist"
   ],
   "type": "module",
-  "sideEffects": [
-    "./dist/index.mjs"
-  ],
   "exports": {
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"

@@ -85,6 +85,21 @@ jobs:
         env:
           E2E_PREVIEW: "1"
 
+      # Production bundles behave differently from dev (tree-shaking almost
+      # shipped blank embeds once) — re-run both embed suites against the
+      # built apps.
+      - name: Smoke test the built React embed example
+        run: bun run e2e
+        working-directory: apps/react-example
+        env:
+          E2E_PREVIEW: "1"
+
+      - name: Smoke test the built web components example
+        run: bun run e2e
+        working-directory: apps/elements-example
+        env:
+          E2E_PREVIEW: "1"
+
       - name: Upload Playwright traces on failure
         if: failure()
         uses: actions/upload-artifact@v4
