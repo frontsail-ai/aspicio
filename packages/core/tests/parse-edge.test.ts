@@ -37,6 +37,46 @@ test("single-vertex LWPOLYLINE is dropped", () => {
   expect(doc.entities).toHaveLength(0);
 });
 
+test("out-of-range boolean header flags are tolerated (PARSE-11)", () => {
+  // $XCLIPFRAME is a 0/1/2 enum since DXF 2010 but still written at the
+  // boolean group code 290; dxf-parser alone throws on the value 2.
+  const doc = parseDxf(
+    dxf(
+      0,
+      "SECTION",
+      2,
+      "HEADER",
+      9,
+      "$XCLIPFRAME",
+      290,
+      2,
+      0,
+      "ENDSEC",
+      0,
+      "SECTION",
+      2,
+      "ENTITIES",
+      0,
+      "LINE",
+      8,
+      "L",
+      10,
+      0,
+      20,
+      0,
+      11,
+      1,
+      21,
+      1,
+      0,
+      "ENDSEC",
+      0,
+      "EOF",
+    ),
+  );
+  expect(doc.entities).toHaveLength(1);
+});
+
 test("layers referenced by entities but missing from tables are created", () => {
   const doc = parseDxf(entitiesSection(0, "LINE", 8, "GHOST", 10, 0, 20, 0, 11, 1, 21, 1));
   const ghost = doc.layers.get("GHOST");

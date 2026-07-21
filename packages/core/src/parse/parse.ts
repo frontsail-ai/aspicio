@@ -332,8 +332,24 @@ function parseLineTypes(dxf: {
   return map;
 }
 
-/** Parse DXF text into the normalized Aspicio document model. */
-export function parseDxf(text: string): DxfDocument {
+/**
+ * Coerce out-of-range boolean group values (codes 290–299) to 0/1.
+ * Real-world files carry e.g. `$XCLIPFRAME 290 2` (a 0/1/2 enum since DXF
+ * 2010), which dxf-parser's scanner refuses to cast to boolean (PARSE-11).
+ */
+function coerceBooleanGroups(text: string): string {
+  const lines = text.split(/\r\n|\r|\n/);
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = Number(lines[i]);
+    if (code >= 290 && code <= 299) {
+      const value = lines[i + 1].trim();
+      if (value !== "0" && value !== "1") lines[i + 1] = Number(value) ? "1" : "0";
+    }
+  }
+  return lines.join("\n");
+}
+
+function runParser(text: string): ReturnType<DxfParser["parseSync"]> {
   const parser = new DxfParser();
   // dxf-parser ships no HATCH or VIEWPORT handler; register our own.
   const register = (
@@ -341,7 +357,19 @@ export function parseDxf(text: string): DxfDocument {
   ).registerEntityHandler.bind(parser);
   register(HatchHandler);
   register(ViewportHandler);
-  const dxf = parser.parseSync(text);
+  return parser.parseSync(text);
+}
+
+/** Parse DXF text into the normalized Aspicio document model. */
+export function parseDxf(text: string): DxfDocument {
+  let dxf: ReturnType<DxfParser["parseSync"]>;
+  try {
+    dxf = runParser(text);
+  } catch (err) {
+    // Retry once with lenient boolean groups; rethrow anything else.
+    if (!(err instanceof TypeError && /cast to Boolean/.test(err.message))) throw err;
+    dxf = runParser(coerceBooleanGroups(text));
+  }
   if (!dxf) throw new Error("Failed to parse DXF: parser returned no document");
 
   const unsupported: Record<string, number> = {};
