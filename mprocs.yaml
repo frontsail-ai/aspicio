@@ -1,0 +1,10 @@
+# Everyday local dev: the demo app plus the DXF API (`just run`, or plain
+# `mprocs`). Ports are pinned so URLs stay stable across restarts; the e2e
+# suites pin 417x, so these deliberately live elsewhere.
+procs:
+  demo:
+    cwd: apps/demo
+    shell: bunx vp dev --port 5173
+  api:
+    cwd: apps/api
+    shell: bun run src/dev.ts
