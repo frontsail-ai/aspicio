@@ -57,6 +57,14 @@ async function connect() {
   return client;
 }
 
+test("server instructions steer hosts toward the interactive viewer", async () => {
+  const client = await connect();
+  const instructions = client.getInstructions();
+  expect(instructions).toContain("view_dxf");
+  expect(instructions).toMatch(/offer the viewer and ask/);
+  await client.close();
+});
+
 test("view_dxf declares its UI resource in tool metadata (current + legacy key)", async () => {
   const client = await connect();
   const { tools } = await client.listTools();

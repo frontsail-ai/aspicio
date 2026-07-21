@@ -52,7 +52,17 @@ export function renderLink(origin: string, source: string, width: number): strin
  * plus the MCP Apps viewer (AGT-14). `widgetHtml` is the built widget bundle;
  * tests inject a stub so they never depend on the widget build. */
 function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): McpServer {
-  const server = new McpServer({ name: "aspicio", version: "1.0.0" });
+  const server = new McpServer(
+    { name: "aspicio", version: "1.0.0" },
+    {
+      instructions:
+        "When the user asks to see, show, or explore a drawing, prefer the interactive viewer " +
+        "(view_dxf) over a static render — panning, zooming, and layer toggles are far more " +
+        "useful to them than a fixed image. If your platform requires the user to approve " +
+        "interactive tools first, offer the viewer and ask instead of silently falling back " +
+        "to a static render. Use describe_dxf and render_dxf for your own analysis.",
+    },
+  );
 
   server.registerTool(
     "describe_dxf",
@@ -74,7 +84,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     {
       title: "Render a DXF to an image",
       description:
-        "Render a DXF drawing to a PNG image you can look at. Use this to answer visual questions (what does it look like, where is a feature) — it returns an image, not text. For structural facts and measurements, prefer describe_dxf; never measure pixels. Some chat UIs do not display the returned image to the user: for URL sources the result also includes a direct image link — show it to the user (e.g. as a markdown image) when they need to see the render.",
+        "Render a DXF drawing to a PNG image you can look at. Use this to answer visual questions (what does it look like, where is a feature) — it returns an image, not text. For structural facts and measurements, prefer describe_dxf; never measure pixels. Some chat UIs do not display the returned image to the user: for URL sources the result also includes a direct image link — show it to the user (e.g. as a markdown image) when they need to see the render. When the user wants to see or explore the drawing themselves, prefer view_dxf (interactive viewer) — if your platform gates it behind user approval, offer it and ask rather than substituting a static render.",
       inputSchema: {
         source: z.string().describe(SOURCE_DESC),
         width: z
