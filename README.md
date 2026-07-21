@@ -202,8 +202,8 @@ upload flow so remote surfaces can handle local files.
 | [`@aspicio/vue`](packages/vue)           | Vue 3 bindings: the same three components with typed props and emits                                                |
 | [`@aspicio/svelte`](packages/svelte)     | Svelte 5 bindings: the same three components as raw .svelte source                                                  |
 | [`@aspicio/mcp`](packages/mcp)           | MCP server for AI agents: `describe_dxf` + `render_dxf`                                                             |
-| [`@aspicio/api`](apps/api)               | DXF HTTP API Worker (private): `/describe`, `/render`, `/mcp`                                                       |
-| [`@aspicio/widget`](apps/widget)         | MCP Apps in-chat viewer widget (private), served by the api Worker                                                  |
+| [`@aspicio/api`](apps/api)               | DXF HTTP API server (private): `/describe`, `/render`, `/mcp`                                                       |
+| [`@aspicio/widget`](apps/widget)         | MCP Apps in-chat viewer widget (private), served by the api server                                                  |
 | [`@aspicio/demo`](apps/demo)             | Standalone demo app (private) — also the reference integration                                                      |
 
 How the viewer packages fit together: every framework path funnels into

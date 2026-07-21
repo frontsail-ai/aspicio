@@ -23,7 +23,7 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
 | Viewer facade   | `packages/core/src/viewer.ts`                                                              | The one public object: load, camera, layers, picking, snap, export, events                                                                                                                |
 | Input           | `packages/core/src/input/`                                                                 | Attachable, framework-free gesture + keyboard routers                                                                                                                                     |
 | Bindings & apps | `packages/elements/`, `packages/react/`, `packages/vue/`, `packages/svelte/`, `apps/demo/` | UI opinion lives here, never in core (INV-1). The Lit web components are the one implementation of embed UI; the React, Vue, and Svelte packages are thin veneers over them               |
-| Agent surface   | `apps/api/` (Worker), `packages/mcp/` (stdio), `apps/widget/`                              | The same headless pipeline exposed over HTTP and MCP; shared guard semantics (INV-5). The widget is the viewer repackaged as an MCP Apps resource the api Worker serves in-chat (AGT-14)  |
+| Agent surface   | `apps/api/` (hosted API), `packages/mcp/` (stdio), `apps/widget/`                          | The same headless pipeline exposed over HTTP and MCP; shared guard semantics (INV-5). The widget is the viewer repackaged as an MCP Apps resource the api server serves in-chat (AGT-14)  |
 | Packaging       | `skills/`, `.claude-plugin/`, `.codex-plugin/`, `.mcp.json`                                | One skills source consumed by both Claude Code and Codex plugin wrappers                                                                                                                  |
 
 ## Key technical assumptions
@@ -38,7 +38,7 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
   adopt the insert's layer.
 - **Snap index is lazy** and typed-array-backed; built per loaded space on
   first use.
-- **PNG without a GPU** is SVG rasterized by resvg — WASM in Workers,
+- **PNG without a GPU** is SVG rasterized by resvg — WASM on Workers,
   native in Node (MCP). Text renders as stroke paths, so rasterization
   needs no fonts.
 - **Workspace resolution:** checks/tests resolve `@aspicio/core` from
@@ -54,7 +54,7 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
 | Three.js                     | Batched WebGL lines/fills without hand-rolled GL; tree-shakes acceptably for headless use (ear-clipping only)                                                     |
 | dxf-parser + custom handlers | Battle-tested group-code parsing; HATCH/VIEWPORT and other gaps filled via our registry                                                                           |
 | Lit (web components)         | One shadow-DOM implementation of the embed UI serves every framework; static styles ship as constructed stylesheets (CSSOM), so strict host CSPs can't strip them |
-| Vercel (Node functions)      | Custom domains on frontsail.ai via plain CNAMEs (DNS stays in Route 53); CI deploys prebuilt artifacts; Workers deploys continue during the listing transition    |
+| Vercel (Node functions)      | Custom domains on frontsail.app via plain CNAMEs (DNS stays in Route 53); CI deploys prebuilt artifacts; Workers deploys continue during the listing transition   |
 | resvg                        | The one rasterizer with both WASM (Worker) and native (Node) builds producing identical output                                                                    |
 | MCP (stdio, official SDK)    | Vendor-neutral agent protocol — one server serves Claude, Codex, Cursor; contract-tested against the wire protocol                                                |
 | MCP Apps (`ext-apps` SDK)    | The real viewer shipped as one self-contained in-chat widget from the api Worker — a single implementation for ChatGPT, Claude, and any spec host                 |

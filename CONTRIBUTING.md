@@ -24,7 +24,7 @@ vp run ready     # check + test + build everything (the repo gate)
   gestures (happy-dom), the viewer facade (mocked renderer), and the
   React component lifecycle (mocked core).
 - **Agent-surface tests** (`apps/api/tests/`, `packages/mcp/tests/`,
-  `apps/widget/tests/`, Vitest): the Worker's routing, fetch guards,
+  `apps/widget/tests/`, Vitest): the hosted API's routing, fetch guards,
   rate limiting, and remote MCP contract (in-memory Streamable HTTP
   round-trips — including the MCP Apps viewer resource and `view_dxf`
   payload); the stdio MCP tools; the widget's state logic; and the
@@ -43,8 +43,10 @@ new logic ships with unit tests (INV-7).
 
 CI runs the same gates on every PR, plus a smoke suite against the
 production build ([ci.yml](.github/workflows/ci.yml)). Pushes to `master`
-deploy the demo and the DXF API to Cloudflare Workers, and every PR gets
-preview URLs posted back as comments
+deploy the demo and the DXF API to Vercel (the canonical
+aspicio.frontsail.app / aspicio-api.frontsail.app hosts, smoke-tested
+post-deploy) and, during the transition, to Cloudflare Workers; every
+PR gets Workers preview URLs posted back as comments
 ([deploy.yml](.github/workflows/deploy.yml)).
 
 ## Adding entity support
