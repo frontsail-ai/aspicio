@@ -56,8 +56,15 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
   const server = new McpServer(
     // The Worker deploys from master, not from release tags; the honest
     // version is the registry-pinned one in server.json (bumped pre-tag),
-    // which the drift guards already keep coherent.
-    { name: "aspicio", version: registry.version },
+    // which the drift guards already keep coherent. Title and icon ride
+    // along so hosts can label the connector properly.
+    {
+      name: "aspicio",
+      title: registry.title,
+      version: registry.version,
+      icons: registry.icons,
+      websiteUrl: registry.websiteUrl,
+    },
     {
       instructions:
         "When the user asks to see, show, or explore a drawing, prefer the interactive viewer " +

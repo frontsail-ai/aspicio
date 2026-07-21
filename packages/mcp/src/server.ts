@@ -10,7 +10,15 @@ const SOURCE_DESC = "An http(s) URL to a .dxf, a local file path, or inline DXF 
 
 /** Build the Aspicio MCP server with the `describe_dxf` and `render_dxf` tools. */
 export function createServer(): McpServer {
-  const server = new McpServer({ name: "aspicio", version: pkg.version });
+  const server = new McpServer({
+    name: "aspicio",
+    title: "Aspicio",
+    version: pkg.version,
+    icons: [
+      { src: "https://aspicio.dmitri-66a.workers.dev/favicon.svg", mimeType: "image/svg+xml" },
+    ],
+    websiteUrl: "https://aspicio.dmitri-66a.workers.dev",
+  });
 
   server.registerTool(
     "describe_dxf",

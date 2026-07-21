@@ -11,31 +11,40 @@ const read = (p: string): string => readFileSync(join(ROOT, p), "utf8");
 interface ServerJson {
   $schema: string;
   name: string;
+  title: string;
+  description: string;
+  websiteUrl: string;
+  icons: Array<{ src: string; mimeType?: string }>;
   version: string;
   packages: Array<{
-    registry_type: string;
+    registryType: string;
     identifier: string;
     version: string;
-    runtime_hint?: string;
+    runtimeHint?: string;
     transport: { type: string };
   }>;
   remotes: Array<{ type: string; url: string }>;
 }
 
-test("server.json matches the registry schema shape (2025-07-09)", () => {
+test("server.json matches the registry schema shape (2025-12-11)", () => {
   const s = JSON.parse(read("server.json")) as ServerJson;
-  // The exact traps that broke the first draft: the $schema URL variant that
-  // actually resolves, top-level version (not version_detail), and the
-  // registry_type/identifier/transport package fields.
+  // The exact traps that broke earlier drafts: the $schema URL variant that
+  // actually resolves, top-level version (not version_detail), the camelCase
+  // package fields (2025-12-11 renamed registry_type → registryType), and
+  // the 100-char description cap the newer schema enforces.
   expect(s.$schema).toMatch(/\/server\.schema\.json$/);
   expect(s.version).toMatch(/^\d+\.\d+\.\d+$/);
+  expect(s.description.length).toBeLessThanOrEqual(100);
   expect(s.packages).toHaveLength(1);
   const pkg = s.packages[0];
-  expect(pkg.registry_type).toBe("npm");
+  expect(pkg.registryType).toBe("npm");
   expect(pkg.transport).toEqual({ type: "stdio" });
   expect(pkg.version).toBe(s.version);
   expect(s.remotes[0].type).toBe("streamable-http");
   expect(s.remotes[0].url).toMatch(/^https:\/\/.+\/mcp$/);
+  // Directory UIs hotlink the icon; it must be an absolute https image.
+  expect(s.title).toBe("Aspicio");
+  expect(s.icons[0].src).toMatch(/^https:\/\/.+\.(svg|png|webp)$/);
 });
 
 test("registry metadata agrees on the one load-bearing package name", () => {

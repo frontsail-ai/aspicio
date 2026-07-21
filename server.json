@@ -1,18 +1,26 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.frontsail-ai/aspicio",
-  "description": "Open, inspect, and render DXF/CAD drawings: structured JSON facts (layers, units, bounds, text content) and PNG renders for AI agents.",
+  "title": "Aspicio",
+  "description": "DXF drawings for AI agents: structured facts, PNG renders, and an interactive in-chat viewer.",
+  "websiteUrl": "https://aspicio.dmitri-66a.workers.dev",
+  "icons": [
+    {
+      "src": "https://aspicio.dmitri-66a.workers.dev/favicon.svg",
+      "mimeType": "image/svg+xml"
+    }
+  ],
+  "version": "0.6.0",
   "repository": {
     "url": "https://github.com/frontsail-ai/aspicio",
     "source": "github"
   },
-  "version": "0.6.0",
   "packages": [
     {
-      "registry_type": "npm",
+      "registryType": "npm",
       "identifier": "@aspicio/mcp",
       "version": "0.6.0",
-      "runtime_hint": "npx",
+      "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
       }

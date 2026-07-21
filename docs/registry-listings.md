@@ -30,7 +30,8 @@ login. Re-run `publish` after each release — the `server.json` version
 bump is a step in [releasing.md](releasing.md). Before the first real
 submission, run `mcp-publisher publish --dry-run`: the tool validates
 against the current schema and is the ground truth if it has moved past
-2025-07-09.
+2025-12-11 (that revision renamed the package fields to camelCase and
+capped `description` at 100 chars — both bit us once already).
 
 ## 2. Smithery (smithery.ai)
 
