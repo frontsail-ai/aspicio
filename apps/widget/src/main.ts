@@ -13,8 +13,16 @@
 import { DxfViewer } from "@aspicio/core";
 import { App } from "@modelcontextprotocol/ext-apps";
 import type { McpUiDisplayMode } from "@modelcontextprotocol/ext-apps";
-import { MAX_EMBED_BYTES } from "./meta.ts";
-import { actionForToolResult, cssColor, statusChip, type ViewerAction } from "./state.ts";
+import { INLINE_EMBED_BYTES, LOAD_CHUNK_BYTES, LOAD_TOOL_NAME, type LoadResult } from "./meta.ts";
+import {
+  actionForToolResult,
+  base64ToBytes,
+  concatChunks,
+  cssColor,
+  formatBytes,
+  statusChip,
+  type ViewerAction,
+} from "./state.ts";
 
 const CANVAS_BG = 0x16181d; // theme-fixed: CAD linework needs a dark canvas
 
@@ -236,6 +244,18 @@ function showPreparing(): void {
     </div>`;
 }
 
+/** The widget is pulling the drawing itself (large file, not embedded). */
+function showLoading(byteLength: number): void {
+  root.dataset.state = "preparing";
+  el("state").innerHTML = `
+    <div class="card">
+      ${ICONS.drawing}
+      <div class="title">Loading drawing</div>
+      <div class="msg">Fetching ${formatBytes(byteLength)} into the viewer…</div>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>`;
+}
+
 /** A result explicitly carried no drawing — distinct from still waiting. */
 function showMissing(): void {
   root.dataset.state = "preparing";
@@ -262,13 +282,12 @@ function showError(detail: string): void {
 
 function showTooLarge(byteLength: number): void {
   root.dataset.state = "toolarge";
-  const mb = (n: number): string => `${(n / 1024 / 1024).toFixed(1)} MB`;
   el("state").innerHTML = `
     <div class="card">
       ${ICONS.box}
-      <div class="title">Too large to view inline<span class="compact-size"> · ${mb(byteLength)}</span></div>
-      <div class="figure">${mb(byteLength)} <span class="dim">/ ${mb(MAX_EMBED_BYTES)} limit</span></div>
-      <div class="msg">The drawing arrived as facts only. Ask the assistant to render an image of it instead.</div>
+      <div class="title">Too large to view inline<span class="compact-size"> · ${formatBytes(byteLength)}</span></div>
+      <div class="figure">${formatBytes(byteLength)} <span class="dim">/ ${formatBytes(INLINE_EMBED_BYTES)} inline limit</span></div>
+      <div class="msg">The drawing was passed as inline text and can't be handed to the viewer. Ask the assistant to host it at a URL, or render an image of it instead.</div>
       <button id="copy-btn" class="oc-btn" type="button" aria-label="Copy suggested request">${ICONS.copy} Copy suggested request</button>
     </div>`;
   el("copy-btn").addEventListener("click", () => {
@@ -413,23 +432,77 @@ new ResizeObserver(() => {
 // Tool results → widget state
 // ---------------------------------------------------------------------------
 
+/** Tell the model what actually happened in the widget — success and failure
+ * alike — so follow-up turns reason from facts, not guesses. Best-effort:
+ * hosts without the capability just don't get the update. */
+function reportStatus(text: string): void {
+  void app
+    .updateModelContext({ content: [{ type: "text", text: `[Aspicio viewer status] ${text}` }] })
+    .catch(() => {});
+}
+
+/** Pull the drawing through the app-only load tool: whole-file first, then
+ * byte-range chunks if the single response is capped or truncated. */
+async function pullDrawing(source: string, byteLength: number): Promise<ArrayBuffer> {
+  const call = async (args: Record<string, unknown>): Promise<LoadResult> => {
+    const r = await app.callServerTool({ name: LOAD_TOOL_NAME, arguments: { source, ...args } });
+    if (r.isError) {
+      const text = (r.content as Array<{ text?: string }> | undefined)?.[0]?.text;
+      throw new Error(text ?? "the drawing could not be fetched");
+    }
+    const sc = r.structuredContent as LoadResult | undefined;
+    if (!sc?.dxfBase64) throw new Error("the host returned no drawing data");
+    return sc;
+  };
+  try {
+    const full = await call({});
+    const bytes = base64ToBytes(full.dxfBase64);
+    if (bytes.byteLength === full.byteLength) return bytes;
+    // Truncated single-shot — fall through to chunked retrieval.
+  } catch {
+    // Single-shot failed (host cap or transient) — try chunks before giving up.
+  }
+  const chunks: Uint8Array[] = [];
+  for (let offset = 0; offset < byteLength; offset += LOAD_CHUNK_BYTES) {
+    const part = await call({ offset, length: LOAD_CHUNK_BYTES });
+    chunks.push(new Uint8Array(base64ToBytes(part.dxfBase64)));
+  }
+  return concatChunks(chunks);
+}
+
+async function showDrawing(bytes: ArrayBuffer, byteLength: number): Promise<void> {
+  await viewer.load(bytes);
+  renderLayers();
+  const chip = statusChip(viewer.getLayers().length, byteLength);
+  el("chip").textContent = chip;
+  el("chip-fs").textContent = chip;
+  root.dataset.state = "loaded";
+  viewer.fitView();
+  reportStatus(`loaded: ${chip.toLowerCase()} rendered interactively.`);
+}
+
 async function apply(action: ViewerAction): Promise<void> {
   switch (action.kind) {
-    case "load": {
-      await viewer.load(action.bytes);
-      renderLayers();
-      const chip = statusChip(viewer.getLayers().length, action.byteLength);
-      el("chip").textContent = chip;
-      el("chip-fs").textContent = chip;
-      root.dataset.state = "loaded";
-      viewer.fitView();
+    case "load":
+      await showDrawing(action.bytes, action.byteLength);
+      break;
+    case "pull": {
+      showLoading(action.byteLength);
+      const bytes = await pullDrawing(action.source, action.byteLength);
+      await showDrawing(bytes, action.byteLength);
       break;
     }
     case "too-large":
       showTooLarge(action.byteLength);
+      reportStatus(
+        `failed: drawing not shown — inline source of ${formatBytes(action.byteLength)} exceeds the ${formatBytes(INLINE_EMBED_BYTES)} embed limit. Pass an http(s) URL instead, or use render_dxf.`,
+      );
       break;
     case "missing":
       showMissing();
+      reportStatus(
+        "failed: the tool result carried no drawing payload (the host may have dropped it). Call view_dxf again with the drawing's URL.",
+      );
       break;
   }
 }
@@ -437,8 +510,14 @@ async function apply(action: ViewerAction): Promise<void> {
 const app = new App({ name: "aspicio-viewer", version: "0.0.0" }, {});
 // Register before connect() so a result replayed during the handshake lands.
 app.ontoolresult = (result) => {
-  void apply(actionForToolResult(result)).catch((err: Error) => {
-    showError(`The file isn't valid DXF${err.message ? ` — ${err.message}.` : "."}`);
+  const action = actionForToolResult(result);
+  void apply(action).catch((err: Error) => {
+    const detail =
+      action.kind === "pull"
+        ? `Could not load the drawing — ${err.message}.`
+        : `The file isn't valid DXF${err.message ? ` — ${err.message}.` : "."}`;
+    showError(detail);
+    reportStatus(`failed: ${detail}`);
   });
 };
 app.onhostcontextchanged = (ctx) => {

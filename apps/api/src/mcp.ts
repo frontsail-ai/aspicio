@@ -6,7 +6,12 @@ import {
 } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { MAX_EMBED_BYTES, VIEWER_META_KEY, VIEWER_RESOURCE_URI } from "@aspicio/widget/meta";
+import {
+  INLINE_EMBED_BYTES,
+  LOAD_TOOL_NAME,
+  VIEWER_META_KEY,
+  VIEWER_RESOURCE_URI,
+} from "@aspicio/widget/meta";
 import type { ViewerMeta } from "@aspicio/widget/meta";
 import { z } from "zod";
 import { fetchDxf } from "./fetch.ts";
@@ -109,7 +114,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string): McpServer {
     {
       title: "Open a DXF in the interactive viewer",
       description:
-        "Open an interactive DXF viewer the user can pan, zoom, and toggle layers in (renders in-chat on MCP Apps-capable hosts). Use this when the user wants to see or explore the drawing themselves; for your own analysis use describe_dxf (facts) or render_dxf (image). The viewer shows only the drawing from this call.",
+        "Open an interactive DXF viewer the user can pan, zoom, and toggle layers in (renders in-chat on MCP Apps-capable hosts). Use this when the user wants to see or explore the drawing themselves; for your own analysis use describe_dxf (facts) or render_dxf (image). The viewer shows only the drawing from this call. Delivery is handled by the widget itself: small drawings are embedded in the result and larger URL-sourced drawings are fetched by the widget through its own tool call — never re-fetch or inline the file for the viewer's sake, and don't blind-retry if the user reports an empty viewer (the viewer posts its actual status back to the conversation context).",
       inputSchema: {
         source: z.string().describe(SOURCE_DESC),
         allow_file_open: z
@@ -125,32 +130,70 @@ function createServer(renderPng: RenderPng, widgetHtml?: string): McpServer {
       const bytes = await loadDxf(source);
       const doc = parseDxfBytes(bytes);
       const summary = describeDrawing(doc, tessellate(doc, {}));
-      // The drawing itself travels widget-only in `_meta` (invisible to the
-      // model); the model narrates from structuredContent.
+      const allowFilePicker = allow_file_open === true;
+      const trimmed = source.trim();
+      const isUrl = /^https?:\/\//i.test(trimmed);
+      // The drawing travels widget-only (invisible to the model): embedded in
+      // `_meta` when small, pulled by the widget via LOAD_TOOL_NAME when the
+      // source is a URL — hosts cap inline results (claude.ai ~150K chars),
+      // so big payloads are not deliverable through the result itself.
       const viewerMeta: ViewerMeta =
-        bytes.byteLength <= MAX_EMBED_BYTES
-          ? {
-              dxfBase64: toBase64(bytes),
-              byteLength: bytes.byteLength,
-              allowFilePicker: allow_file_open === true,
-            }
-          : {
-              tooLarge: true,
-              byteLength: bytes.byteLength,
-              allowFilePicker: allow_file_open === true,
-            };
+        bytes.byteLength <= INLINE_EMBED_BYTES
+          ? { dxfBase64: toBase64(bytes), byteLength: bytes.byteLength, allowFilePicker }
+          : isUrl
+            ? { source: trimmed, byteLength: bytes.byteLength, allowFilePicker }
+            : { tooLarge: true, byteLength: bytes.byteLength, allowFilePicker };
+      const text =
+        viewerMeta.dxfBase64 !== undefined
+          ? "Opened the drawing in the interactive viewer."
+          : viewerMeta.source !== undefined
+            ? "Viewer opened; it is fetching the drawing itself and will report its status."
+            : "The drawing was passed inline and exceeds the viewer's embed limit; returned the structured summary instead. Host it at an http(s) URL to view it interactively.";
       return {
-        content: [
-          {
-            type: "text",
-            text:
-              bytes.byteLength <= MAX_EMBED_BYTES
-                ? "Opened the drawing in the interactive viewer."
-                : "Drawing exceeds the inline-viewer size cap; returned the structured summary instead.",
-          },
-        ],
+        content: [{ type: "text", text }],
         structuredContent: summary as unknown as Record<string, unknown>,
         _meta: { [VIEWER_META_KEY]: viewerMeta },
+      };
+    },
+  );
+
+  // The widget's data channel (AGT-14): app-only visibility keeps it out of
+  // the model's tool list; the widget calls it over the bridge to pull the
+  // drawing, whole or in byte ranges when a host caps single responses.
+  registerAppTool(
+    server,
+    LOAD_TOOL_NAME,
+    {
+      title: "Load a DXF for the viewer widget",
+      description:
+        "Internal: returns DXF bytes (base64) for the in-chat viewer. Called by the widget, not the model.",
+      inputSchema: {
+        source: z.string().describe("http(s) URL of the DXF (same guards as the other tools)"),
+        offset: z.number().int().min(0).optional().describe("Byte offset of the requested range"),
+        length: z
+          .number()
+          .int()
+          .min(1)
+          .max(4_000_000)
+          .optional()
+          .describe("Byte length of the requested range"),
+      },
+      _meta: { ui: { resourceUri: VIEWER_RESOURCE_URI, visibility: ["app"] } },
+    },
+    async ({ source, offset, length }) => {
+      const bytes = await loadDxf(source);
+      const start = offset ?? 0;
+      const slice =
+        offset === undefined && length === undefined
+          ? bytes
+          : bytes.subarray(start, length === undefined ? undefined : start + length);
+      return {
+        content: [{ type: "text", text: `${slice.byteLength} bytes at offset ${start}` }],
+        structuredContent: {
+          dxfBase64: toBase64(slice),
+          byteLength: bytes.byteLength,
+          offset: start,
+        },
       };
     },
   );
