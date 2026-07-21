@@ -4,7 +4,7 @@
   "description": "Aspicio — a TypeScript DXF viewer library (WebGL, mobile-first).",
   "homepage": "https://github.com/frontsail-ai/aspicio/tree/master/packages/core#readme",
   "license": "MIT",
-  "author": "Dmitri Kochelorov <kochelorov.dmitri@gmail.com>",
+  "author": "Dmitri Kochelorov <dmitri@frontsail.ai>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/frontsail-ai/aspicio.git",

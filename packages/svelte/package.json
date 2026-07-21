@@ -4,7 +4,7 @@
   "description": "Svelte 5 bindings for the Aspicio DXF viewer.",
   "homepage": "https://github.com/frontsail-ai/aspicio/tree/master/packages/svelte#readme",
   "license": "MIT",
-  "author": "Dmitri Kochelorov <kochelorov.dmitri@gmail.com>",
+  "author": "Dmitri Kochelorov <dmitri@frontsail.ai>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/frontsail-ai/aspicio.git",
