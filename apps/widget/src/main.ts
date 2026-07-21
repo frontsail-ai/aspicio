@@ -30,7 +30,10 @@ const CANVAS_BG = 0x16181d; // theme-fixed: CAD linework needs a dark canvas
 // Styles — host tokens with per-theme fallbacks (design spec, section 06).
 // ---------------------------------------------------------------------------
 
-const STYLE = `
+/** Document-level: theme tokens (the host-facing interface — hosts supply
+ * the outer variables) and page sizing. Everything structural lives inside
+ * the shadow root, out of reach of host-injected stylesheets. */
+const TOKEN_STYLE = `
   :root {
     --w-sans: var(--font-sans, system-ui, -apple-system, sans-serif);
     --w-mono: var(--font-mono, ui-monospace, Menlo, monospace);
@@ -60,10 +63,13 @@ const STYLE = `
     --w-shadow: var(--shadow-md, 0 2px 8px rgba(0,0,0,0.4));
   }
   html, body { margin: 0; height: 100%; }
-  body { font-family: var(--w-sans); }
+`;
+
+const STYLE = `
+  :host { display: block; height: 100%; }
   button { font-family: inherit; }
 
-  #root { display: flex; flex-direction: column; height: 100%; min-height: 220px; background: var(--w-frame-bg); }
+  #root { display: flex; flex-direction: column; height: 100%; min-height: 220px; background: var(--w-frame-bg); font-family: var(--w-sans); }
 
   /* Fullscreen top bar (hidden inline) */
   #chrome { height: 44px; flex: none; display: none; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--w-hairline); }
@@ -192,8 +198,15 @@ const ICONS = {
 // ---------------------------------------------------------------------------
 
 document.documentElement.dataset.theme = "dark";
-document.head.appendChild(document.createElement("style")).textContent = STYLE;
-document.body.innerHTML = `
+document.head.appendChild(document.createElement("style")).textContent = TOKEN_STYLE;
+// Shadow DOM: hosts (ChatGPT) inject their own stylesheets into widget
+// documents, which corrupted the layer panel in the wild. Document styles
+// cannot pierce the shadow boundary; the theme variables above still
+// inherit through — the one host influence we want.
+const shadowHost = document.body.appendChild(document.createElement("div"));
+shadowHost.style.height = "100%";
+const shadow = shadowHost.attachShadow({ mode: "open" });
+shadow.innerHTML = `<style>${STYLE}</style>
   <div id="root" data-mode="inline" data-state="preparing">
     <div id="chrome">
       <span class="label">DXF drawing</span>
@@ -221,7 +234,7 @@ document.body.innerHTML = `
   </div>
 `;
 
-const el = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
+const el = (id: string): HTMLElement => shadow.getElementById(id) as HTMLElement;
 const root = el("root");
 
 const viewer = new DxfViewer(el("viewer"), { background: CANVAS_BG });
