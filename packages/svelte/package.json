@@ -1,0 +1,49 @@
+{
+  "name": "@aspicio/svelte",
+  "version": "0.0.0",
+  "description": "Svelte 5 bindings for the Aspicio DXF viewer.",
+  "homepage": "https://github.com/frontsail-ai/aspicio/tree/master/packages/svelte#readme",
+  "license": "MIT",
+  "author": "Dmitri Kochelorov <dmitri@frontsail.ai>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frontsail-ai/aspicio.git",
+    "directory": "packages/svelte"
+  },
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "svelte": "./src/index.js",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "svelte": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "@aspicio/core": "workspace:^",
+    "@aspicio/elements": "workspace:^"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "happy-dom": "^20.0.0",
+    "svelte": "^5.56.0",
+    "typescript": "^7.0.2",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0",
+    "three": ">=0.184.0 <1.0.0"
+  }
+}

@@ -9,6 +9,7 @@
     <a href="https://www.npmjs.com/package/@aspicio/elements"><img src="https://img.shields.io/npm/v/%40aspicio%2Felements?label=%40aspicio%2Felements" alt="npm: @aspicio/elements" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/react"><img src="https://img.shields.io/npm/v/%40aspicio%2Freact?label=%40aspicio%2Freact" alt="npm: @aspicio/react" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/vue"><img src="https://img.shields.io/npm/v/%40aspicio%2Fvue?label=%40aspicio%2Fvue" alt="npm: @aspicio/vue" /></a>
+    <a href="https://www.npmjs.com/package/@aspicio/svelte"><img src="https://img.shields.io/npm/v/%40aspicio%2Fsvelte?label=%40aspicio%2Fsvelte" alt="npm: @aspicio/svelte" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/mcp"><img src="https://img.shields.io/npm/v/%40aspicio%2Fmcp?label=%40aspicio%2Fmcp" alt="npm: @aspicio/mcp" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
   </p>
@@ -20,8 +21,8 @@ framework-free `parse → tessellate` pipeline that runs in the browser, in
 Node, and in Cloudflare Workers. A person gets an interactive WebGL viewer
 of a CAD drawing; an AI agent gets structured JSON facts and a rendered
 PNG of the same file. Every surface — the browser viewer, the web
-components and their React and Vue bindings, the headless renderer, the
-HTTP API, and the MCP server — is a thin adapter over the same engine,
+components and their React, Vue, and Svelte bindings, the headless
+renderer, the HTTP API, and the MCP server — is a thin adapter over the same engine,
 so a drawing is equally readable everywhere.
 
 ```
@@ -40,7 +41,7 @@ specs: [docs/product-specs/](docs/product-specs/README.md)
 One embed, every flavor — and every path below renders the same web
 components, so the result is pixel-identical no matter which you pick.
 
-### Web components — plain HTML, Svelte, any framework
+### Web components — plain HTML, any framework
 
 One tag gives you the layer panel plus an interactive preview; no
 bindings needed:
@@ -77,6 +78,19 @@ import { DxfEmbed } from "@aspicio/vue";
 <template>
   <DxfEmbed src-url="/drawing.dxf" style="height: 480px" />
 </template>
+```
+
+### Svelte
+
+The same components as raw Svelte 5 source with typed callback props,
+via [`@aspicio/svelte`](packages/svelte):
+
+```svelte
+<script>
+  import { DxfEmbed } from "@aspicio/svelte";
+</script>
+
+<DxfEmbed srcUrl="/drawing.dxf" style="height: 480px" />
 ```
 
 ### Vanilla TypeScript
@@ -169,7 +183,7 @@ model provider. Full details:
 ## Available today · direction
 
 Everything above is shipped and live: viewer + demo, core, web
-components, React and Vue packages, headless describe/render, stdio and hosted MCP, the in-chat
+components, React, Vue, and Svelte packages, headless describe/render, stdio and hosted MCP, the in-chat
 MCP Apps viewer, the HTTP API with OpenAPI, and plugin packaging for
 Claude Code and Codex.
 
@@ -186,6 +200,7 @@ upload flow so remote surfaces can handle local files.
 | [`@aspicio/elements`](packages/elements) | Web components: `<aspicio-embed>`, `<aspicio-preview>`, `<aspicio-layer-panel>` — plain HTML, Svelte, any framework |
 | [`@aspicio/react`](packages/react)       | React bindings: `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`                                                     |
 | [`@aspicio/vue`](packages/vue)           | Vue 3 bindings: the same three components with typed props and emits                                                |
+| [`@aspicio/svelte`](packages/svelte)     | Svelte 5 bindings: the same three components as raw .svelte source                                                  |
 | [`@aspicio/mcp`](packages/mcp)           | MCP server for AI agents: `describe_dxf` + `render_dxf`                                                             |
 | [`@aspicio/api`](apps/api)               | DXF HTTP API Worker (private): `/describe`, `/render`, `/mcp`                                                       |
 | [`@aspicio/widget`](apps/widget)         | MCP Apps in-chat viewer widget (private), served by the api Worker                                                  |
@@ -193,9 +208,8 @@ upload flow so remote surfaces can handle local files.
 
 How the viewer packages fit together: every framework path funnels into
 the same Lit web components — one implementation of the embed UI — which
-sit on the framework-free core. React and Vue get thin veneers with
-idiomatic props; Svelte consumes the elements natively, so its support
-is recipes, not a wrapper package (dashed = planned docs, not shipped).
+sit on the framework-free core. React, Vue, and Svelte get thin veneers
+with idiomatic props; plain HTML consumes the elements directly.
 
 ```mermaid
 flowchart TD
@@ -206,6 +220,7 @@ flowchart TD
 
     REACT["<b>@aspicio/react</b><br/>&lt;DxfEmbed&gt; · &lt;DxfPreview&gt; · &lt;DxfLayerPanel&gt;<br/><i>thin @lit/react veneer, API-stable</i>"]
     VUE["<b>@aspicio/vue</b><br/>&lt;DxfEmbed&gt; · &lt;DxfPreview&gt; · &lt;DxfLayerPanel&gt;<br/><i>thin Vue 3 veneer, typed emits</i>"]
+    SVELTE["<b>@aspicio/svelte</b><br/>&lt;DxfEmbed&gt; · &lt;DxfPreview&gt; · &lt;DxfLayerPanel&gt;<br/><i>raw Svelte 5 source, compiled by your bundler</i>"]
     ELEMENTS["<b>@aspicio/elements</b><br/>&lt;aspicio-embed&gt; · &lt;aspicio-preview&gt; · &lt;aspicio-layer-panel&gt;<br/><i>Lit web components — the one embed-UI implementation</i>"]
     CORE["<b>@aspicio/core</b><br/>parse → tessellate → render<br/><i>camera · input · picking · SVG/PNG export · headless describe</i>"]
 
@@ -214,16 +229,15 @@ flowchart TD
     HTMLAPP -->|"attributes + DOM events"| ELEMENTS
     VUEAPP -->|"idiomatic props + emits"| VUE
     VUE -->|"wraps"| ELEMENTS
-    SVELTEAPP -.->|"native custom elements<br/>(recipes coming)"| ELEMENTS
+    SVELTEAPP -->|"typed callback props"| SVELTE
+    SVELTE -->|"wraps"| ELEMENTS
     ELEMENTS -->|"drives"| CORE
     HTMLAPP -.->|"or hand-rolled UI on the DxfViewer API"| CORE
 
     classDef pkg fill:#191c22,stroke:#4c8dff,color:#e7e3da
     classDef app fill:#1f232b,stroke:#3a3f4a,color:#9aa0ab
-    classDef planned stroke-dasharray: 5 4
-    class REACT,VUE,ELEMENTS,CORE pkg
+    class REACT,VUE,SVELTE,ELEMENTS,CORE pkg
     class REACTAPP,HTMLAPP,VUEAPP,SVELTEAPP app
-    class SVELTEAPP planned
 ```
 
 ## Development

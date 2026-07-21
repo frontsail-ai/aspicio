@@ -11,8 +11,9 @@ released under the MIT license.
 
 ## Why Aspicio
 
-- One engine, every surface: the browser viewer, React components,
-  headless renderer, HTTP API, and MCP server are thin adapters over
+- One engine, every surface: the browser viewer, the web components
+  and their React/Vue/Svelte bindings, the headless renderer, HTTP
+  API, and MCP server are thin adapters over
   the same parse → tessellate core, so a drawing reads identically
   everywhere — no drift between what a person sees and what an agent
   is told.
@@ -49,8 +50,12 @@ released under the MIT license.
   `GET /describe?src=<dxf-url>` and
   `GET /render?src=<dxf-url>&format=png|svg`, self-described via
   OpenAPI 3.1.
-- npm packages: `@aspicio/core` (viewer + headless pipeline) and
-  `@aspicio/react` (`<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`).
+- npm packages: `@aspicio/core` (viewer + headless pipeline),
+  `@aspicio/elements` (framework-neutral web components:
+  `<aspicio-embed>`, `<aspicio-preview>`, `<aspicio-layer-panel>`),
+  and `@aspicio/react` / `@aspicio/vue` / `@aspicio/svelte` (the same
+  three components — `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>` —
+  as thin framework bindings over the elements).
 
 ## Docs
 

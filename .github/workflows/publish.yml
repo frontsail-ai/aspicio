@@ -70,7 +70,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           bun -e '
-            for (const path of ["packages/core/package.json", "packages/elements/package.json", "packages/react/package.json", "packages/vue/package.json", "packages/mcp/package.json"]) {
+            for (const path of ["packages/core/package.json", "packages/elements/package.json", "packages/react/package.json", "packages/vue/package.json", "packages/svelte/package.json", "packages/mcp/package.json"]) {
               const pkg = await Bun.file(path).json();
               pkg.version = process.env.VERSION;
               for (const deps of [pkg.dependencies, pkg.peerDependencies]) {
@@ -85,7 +85,7 @@ jobs:
 
       - name: Verify packed dependency ranges
         run: |
-          for dir in packages/elements packages/react packages/vue packages/mcp; do
+          for dir in packages/elements packages/react packages/vue packages/svelte packages/mcp; do
             rm -rf /tmp/verify && (cd "$dir" && bun pm pack --destination /tmp/verify --quiet)
             RANGES=$(tar -xzOf /tmp/verify/*.tgz package/package.json | bun -e '
               const pkg = await new Response(Bun.stdin.stream()).json();
@@ -124,6 +124,12 @@ jobs:
       - name: Publish @aspicio/vue
         run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         working-directory: packages/vue
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
+
+      - name: Publish @aspicio/svelte
+        run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+        working-directory: packages/svelte
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
 

@@ -56,7 +56,7 @@ drawings, so neither convention regresses silently.
 ### INV-9: Public packages version together
 
 `@aspicio/core`, `@aspicio/elements`, `@aspicio/react`, `@aspicio/vue`,
-and `@aspicio/mcp` are stamped with the same version at release, and
+`@aspicio/svelte`, and `@aspicio/mcp` are stamped with the same version at release, and
 inter-package ranges never leak the workspace protocol into published
 tarballs.
 
