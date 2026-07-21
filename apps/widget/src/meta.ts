@@ -16,7 +16,7 @@ export const VIEWER_META_KEY = "aspicio/viewer";
 
 /** URI of the viewer UI resource the `view_dxf` tool definition points at.
  * Also the host's cache key — version it on breaking widget changes. */
-export const VIEWER_RESOURCE_URI = "ui://aspicio/viewer.html";
+export const VIEWER_RESOURCE_URI = "ui://aspicio/viewer-v2.html";
 
 /** Embed-in-result ceiling: stay well under claude.ai's ~150K-character
  * inline tool-result cap after base64 (+ summary + envelope). */
