@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "bun run src/dev.ts",
     "build:vercel": "vp build --config vite.vercel.config.ts",
     "check": "tsc --noEmit",
     "test": "vp test"

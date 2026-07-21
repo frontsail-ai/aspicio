@@ -46,6 +46,8 @@ curl -X POST --data-binary @plan.dxf "https://<worker>/render?format=png&width=1
 
 ```bash
 cd apps/api
+bunx vp run dev          # local server on :8788 (native resvg; build the
+                         # widget first for the view_dxf viewer resource)
 bunx vp test             # unit tests (rasterizer injected — the full
                          # contract suite runs the real handler in-memory)
 bunx vp run build:vercel # package the deployable bundle into vercel-dist/
