@@ -195,3 +195,22 @@ test("the widget's load tool is app-only and serves whole files and byte ranges"
   expect(parts.join("")).toBe(SAMPLE);
   await client.close();
 });
+
+test("structured tools declare output schemas and validate real results (AGT-9)", async () => {
+  const client = await connect();
+  const { tools } = await client.listTools();
+  const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
+  for (const name of ["describe_dxf", "view_dxf", LOAD_TOOL_NAME]) {
+    expect(byName[name]?.outputSchema, `${name} outputSchema`).toBeDefined();
+  }
+  // The image is render_dxf's output — deliberately schema-free.
+  expect(byName.render_dxf?.outputSchema).toBeUndefined();
+  // The client validates structuredContent against declared schemas on every
+  // call, so a real summary passing through is the core-drift guard.
+  const r = await client.callTool({ name: "describe_dxf", arguments: { source: SAMPLE } });
+  const sc = r.structuredContent as { entityCount: number; layers: Array<{ name: string }> };
+  expect(sc.entityCount).toBe(1);
+  expect(sc.layers.map((l) => l.name)).toContain("WALLS");
+  expect(JSON.parse((r.content as Array<{ text: string }>)[0].text)).toEqual(sc);
+  await client.close();
+});

@@ -33,6 +33,35 @@ async function loadDxf(source: string): Promise<Uint8Array> {
 }
 
 /** Chunked encode — String.fromCharCode(...4MB) would blow the arg limit. */
+// Mirrors DrawingSummary (packages/core describe.ts). Declared as the output
+// schema of describe_dxf and view_dxf so models consume results reliably;
+// the contract tests round-trip real summaries through a validating client,
+// so drift from core fails CI.
+const DRAWING_SUMMARY_SHAPE = {
+  units: z.string().describe('Drawing-unit label (e.g. "mm"), "" when unitless'),
+  bounds: z
+    .object({ minX: z.number(), minY: z.number(), maxX: z.number(), maxY: z.number() })
+    .nullable()
+    .describe("World-space extents, null for an empty drawing"),
+  size: z
+    .object({ width: z.number(), height: z.number() })
+    .nullable()
+    .describe("Bounding-box size in drawing units, null when empty"),
+  entityCount: z.number().int(),
+  segmentCount: z.number().int(),
+  layers: z.array(
+    z.object({
+      name: z.string(),
+      entityCount: z.number().int(),
+      visible: z.boolean(),
+      color: z.string().describe("The color actually drawn (dominant), as #rrggbb"),
+    }),
+  ),
+  entityTypes: z.record(z.string(), z.number()).describe("Top-level entities per DXF type"),
+  unsupported: z.record(z.string(), z.number()).describe("Per-type counts of skipped entities"),
+  texts: z.array(z.string()).describe("Unique TEXT/MTEXT strings, blocks included"),
+};
+
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000)
@@ -83,11 +112,15 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
       description:
         "Return a structured JSON summary of a DXF drawing — units, bounding box, layers (with the color actually drawn), per-type entity counts, the drawing's text content (title blocks and dimension values included), and any skipped/unsupported types. Use this to answer structural questions (what layers exist, how many parts, what size, what does it say) without rendering an image.",
       inputSchema: { source: z.string().describe(SOURCE_DESC) },
+      outputSchema: DRAWING_SUMMARY_SHAPE,
     },
     async ({ source }) => {
       const doc = parseDxfBytes(await loadDxf(source));
       const summary = describeDrawing(doc, tessellate(doc, {}));
-      return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+      return {
+        content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
+        structuredContent: summary as unknown as Record<string, unknown>,
+      };
     },
   );
 
@@ -95,6 +128,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     "render_dxf",
     {
       title: "Render a DXF to an image",
+      // No outputSchema on purpose: the result IS the image, not data.
       annotations: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
       description:
         "Render a DXF drawing to a PNG image you can look at. Use this to answer visual questions (what does it look like, where is a feature) — it returns an image, not text. For structural facts and measurements, prefer describe_dxf; never measure pixels. Some chat UIs do not display the returned image to the user: for URL sources the result also includes a direct image link — show it to the user (e.g. as a markdown image) when they need to see the render. When the user wants to see or explore the drawing themselves, prefer view_dxf (interactive viewer) — if your platform gates it behind user approval, offer it and ask rather than substituting a static render.",
@@ -165,6 +199,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
             "Show open-file controls in the viewer (default false: viewer is locked to this drawing)",
           ),
       },
+      outputSchema: DRAWING_SUMMARY_SHAPE,
       _meta: { ui: { resourceUri: VIEWER_RESOURCE_URI } },
     },
     async ({ source, allow_file_open }) => {
@@ -219,6 +254,11 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
           .max(4_000_000)
           .optional()
           .describe("Byte length of the requested range"),
+      },
+      outputSchema: {
+        dxfBase64: z.string().describe("The requested bytes, base64"),
+        byteLength: z.number().int().describe("Total size of the whole file"),
+        offset: z.number().int().describe("Byte offset this slice starts at"),
       },
       _meta: { ui: { resourceUri: VIEWER_RESOURCE_URI, visibility: ["app"] } },
     },

@@ -84,3 +84,20 @@ test("a broken source surfaces as a protocol error result, not a crash", async (
   expect(content[0].type).toBe("text");
   expect(content[0].text).toMatch(/file not found|Unexpected|Empty/i);
 });
+
+test("describe_dxf declares an output schema and returns matching structured content", async () => {
+  const client = await connect();
+  const { tools } = await client.listTools();
+  const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
+  expect(byName.describe_dxf?.outputSchema).toBeDefined();
+  // The image is render_dxf's output — deliberately schema-free.
+  expect(byName.render_dxf?.outputSchema).toBeUndefined();
+  // The client validates structuredContent against the declared schema on
+  // every call, so a real summary passing through is the core-drift guard.
+  const res = await client.callTool({ name: "describe_dxf", arguments: { source: DXF } });
+  const sc = res.structuredContent as { entityCount: number; layers: Array<{ name: string }> };
+  expect(sc.entityCount).toBe(2);
+  expect(sc.layers.map((l) => l.name)).toContain("WALLS");
+  const text = (res.content as Array<{ text: string }>)[0].text;
+  expect(JSON.parse(text)).toEqual(sc);
+});
