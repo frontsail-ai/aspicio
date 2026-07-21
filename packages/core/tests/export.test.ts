@@ -51,9 +51,23 @@ test("hidden layers are excluded from the SVG", () => {
   expect(svg).not.toContain('fill="#0000ff"'); // B (the solid) excluded
 });
 
-test("an empty tessellation yields a valid empty SVG", () => {
+test("an empty tessellation yields a nonzero-size SVG rasterizers accept", () => {
   const svg = tessellationToSvg(tessellate(makeDoc([])));
-  expect(svg).toContain("<svg");
+  expect(svg).toContain('viewBox="0 0 1 1"');
+  expect(svg).toContain('width="1" height="1"');
+});
+
+test("the viewBox pads the drawing so edge strokes are not clipped", () => {
+  // A 10-unit line (centered by the tessellation offset): 1% of the
+  // extent of padding on every side.
+  const svg = tessellationToSvg(tessellate(makeDoc([redLine])));
+  expect(svg).toContain('viewBox="-5.1 -0.1 10.2 0.2"');
+});
+
+test("a degenerate extent (single horizontal line) still has height", () => {
+  const svg = tessellationToSvg(tessellate(makeDoc([redLine])));
+  const [, h] = svg.match(/height="([\d.]+)"/) ?? [];
+  expect(Number(h)).toBeGreaterThan(0);
 });
 
 test("a background option adds a backdrop rect", () => {

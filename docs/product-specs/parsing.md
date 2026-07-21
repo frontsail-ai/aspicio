@@ -63,3 +63,9 @@ position, height, and rotation for rendering with the built-in stroke font.
 
 Dash patterns resolve entity → layer → continuous; lineweights resolve
 entity → block override → layer → hairline. Text is never dashed.
+
+### PARSE-11: Out-of-range boolean header flags are tolerated
+
+Real-world files carry non-0/1 values at boolean group codes 290–299
+(e.g. `$XCLIPFRAME 2`, a 0/1/2 enum since DXF 2010). Such values are
+coerced to 0/1 instead of failing the whole parse.

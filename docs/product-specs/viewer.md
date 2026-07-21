@@ -77,7 +77,10 @@ and typing into form fields, and detaches cleanly.
 
 Exports the whole drawing (visible layers only) as a standalone vector
 SVG: text as stroke paths (no font dependency), lineweights as stroke
-widths, fills as filled paths, optional solid background.
+widths, fills as filled paths, optional solid background. The viewBox
+pads the drawing slightly so edge strokes are not clipped, and an empty
+or degenerate drawing still yields a nonzero-size SVG that rasterizers
+accept.
 
 ### VIEW-13: PNG export is WYSIWYG
 

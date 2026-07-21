@@ -32,14 +32,25 @@ export function tessellationToSvg(
   options: SvgExportOptions = {},
 ): string {
   const b = tessellation.bounds;
-  if (!b) return `<svg xmlns="${SVG_NS}" width="0" height="0"></svg>`;
+  if (!b) {
+    // No geometry: a minimal but renderable SVG (zero sizes break rasterizers).
+    const bg = options.background
+      ? `<rect width="1" height="1" fill="${options.background}"/>`
+      : "";
+    return `<svg xmlns="${SVG_NS}" viewBox="0 0 1 1" width="1" height="1">${bg}</svg>`;
+  }
 
   const o = tessellation.offset;
-  const minX = b.minX - o.x;
-  const minY = b.minY - o.y;
-  const w = b.maxX - b.minX;
-  const h = b.maxY - b.minY;
-  const hair = Math.max(Math.max(w, h) * 0.0006, 1e-4);
+  // Pad the tight bounds so strokes on the drawing's edge are not half
+  // clipped, and clamp degenerate extents (a single point or axis-aligned
+  // line) to a nonzero size.
+  const extent = Math.max(b.maxX - b.minX, b.maxY - b.minY) || 1;
+  const pad = extent * 0.01;
+  const minX = b.minX - o.x - pad;
+  const minY = b.minY - o.y - pad;
+  const w = b.maxX - b.minX + 2 * pad;
+  const h = b.maxY - b.minY + 2 * pad;
+  const hair = Math.max(extent * 0.0006, 1e-4);
 
   const fillPaths = new Map<string, string[]>(); // color → triangle path data
   const linePaths = new Map<string, { stroke: string; width: number; d: string[] }>();
@@ -83,8 +94,9 @@ export function tessellationToSvg(
   const bg = options.background
     ? `<rect x="${n(minX)}" y="${n(minY)}" width="${n(w)}" height="${n(h)}" fill="${options.background}"/>`
     : "";
-  // Flip y around the drawing's vertical extent so y-up content reads upright.
-  const flip = `matrix(1 0 0 -1 0 ${n(minY + (b.maxY - o.y))})`;
+  // Flip y around the drawing's (unpadded) vertical extent so y-up content
+  // reads upright and stays centered in the padded viewBox.
+  const flip = `matrix(1 0 0 -1 0 ${n(b.minY - o.y + (b.maxY - o.y))})`;
   return (
     `<svg xmlns="${SVG_NS}" viewBox="${n(minX)} ${n(minY)} ${n(w)} ${n(h)}" ` +
     `width="${n(w)}" height="${n(h)}">${bg}<g transform="${flip}">${parts.join("")}</g></svg>`
