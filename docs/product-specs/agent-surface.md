@@ -96,7 +96,9 @@ HTML resource carrying the bundled WebGL viewer. The widget renders
 exactly the drawing delivered by the tool call — the DXF travels
 widget-only in the result metadata, never to the model — and offers no
 way to open other files unless the tool call explicitly enabled file
-controls. The widget makes no network requests. It follows the host's
+controls. The widget makes no network requests, and it renders fully —
+layer swatch colors included — under host security policies that refuse
+inline style attributes. It follows the host's
 light/dark theme and inline/fullscreen display modes; the drawing canvas
 stays dark in both. Delivery adapts to host result caps: small drawings
 arrive embedded in the result, larger URL-sourced drawings are pulled by
