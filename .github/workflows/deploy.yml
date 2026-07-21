@@ -122,3 +122,88 @@ jobs:
                 body,
               });
             }
+
+  # ------------------------------------------------------------------
+  # Vercel (transition target — Workers above stay live until listings
+  # migrate). Production-only; PR previews remain on the Workers flow.
+  # One-time setup: create the two Vercel projects, then add repo secrets
+  # VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID_DEMO,
+  # VERCEL_PROJECT_ID_API. Until the secrets exist this job skips itself.
+  # ------------------------------------------------------------------
+  vercel:
+    name: Deploy ${{ matrix.target }} (Vercel)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: demo
+            build: bunx vp run @aspicio/demo#build
+            dir: apps/demo/dist
+            project_secret: VERCEL_PROJECT_ID_DEMO
+          - target: api
+            build: >-
+              bunx vp run -F @aspicio/core -F @aspicio/widget build &&
+              bunx vp run @aspicio/api#build:vercel
+            dir: apps/api/vercel-dist
+            project_secret: VERCEL_PROJECT_ID_API
+    steps:
+      - name: Note skip when Vercel secrets are absent
+        if: env.VERCEL_TOKEN == ''
+        run: echo "VERCEL_TOKEN not configured — skipping Vercel deploy."
+
+      - uses: actions/checkout@v4
+        if: env.VERCEL_TOKEN != ''
+
+      - uses: oven-sh/setup-bun@v2
+        if: env.VERCEL_TOKEN != ''
+        with:
+          bun-version: 1.3.14
+
+      - uses: actions/setup-node@v4
+        if: env.VERCEL_TOKEN != ''
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        if: env.VERCEL_TOKEN != ''
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        if: env.VERCEL_TOKEN != ''
+        run: ${{ matrix.build }}
+
+      - name: Deploy to Vercel
+        if: env.VERCEL_TOKEN != ''
+        id: deploy
+        env:
+          VERCEL_PROJECT_ID: ${{ secrets[matrix.project_secret] }}
+        run: |
+          URL=$(bunx vercel deploy --prod --yes --cwd "${{ matrix.dir }}" --token "$VERCEL_TOKEN")
+          echo "Deployed: $URL"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test (api)
+        if: env.VERCEL_TOKEN != '' && matrix.target == 'api'
+        run: |
+          URL="${{ steps.deploy.outputs.url }}"
+          curl -sf "$URL/health" | grep -q '"status": *"ok"'
+          curl -sf "$URL/openapi.json" | grep -q '"openapi"'
+          curl -sf -X POST "$URL/mcp" \
+            -H "content-type: application/json" \
+            -H "accept: application/json, text/event-stream" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
+            | grep -q '"aspicio"'
+          echo "API smoke passed."
+
+      - name: Smoke test (demo)
+        if: env.VERCEL_TOKEN != '' && matrix.target == 'demo'
+        run: |
+          URL="${{ steps.deploy.outputs.url }}"
+          curl -sf "$URL/" | grep -qi "aspicio"
+          curl -sf "$URL/llms.txt" | grep -q "Aspicio"
+          echo "Demo smoke passed."

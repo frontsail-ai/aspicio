@@ -29,7 +29,9 @@ export const openapi = {
       "DXF endpoints are rate-limited per client IP.",
     license: { name: "MIT", url: "https://github.com/frontsail-ai/aspicio/blob/master/LICENSE" },
   },
-  servers: [{ url: "https://aspicio-api.dmitri-66a.workers.dev" }],
+  // Placeholder — the handler overwrites `servers` with the origin that
+  // actually served the request (the API answers on several domains).
+  servers: [{ url: "https://aspicio-api.frontsail.ai" }],
   // Deliberately public: no authentication. Declared explicitly so importers
   // (ChatGPT Actions, generators) treat it as auth "none".
   security: [],

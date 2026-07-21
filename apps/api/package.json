@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "build:vercel": "vp build --config vite.vercel.config.ts",
     "check": "tsc --noEmit",
     "test": "vp test"
   },
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250109.0",
+    "@resvg/resvg-js": "^2.6.2",
     "typescript": "~6.0.2",
     "vite-plus": "catalog:",
     "wrangler": "^4.0.0"

@@ -41,7 +41,9 @@ index endpoints stay exempt.
 
 Errors are JSON with meaningful statuses: 400 bad input, 413 too large,
 422 unparseable DXF, 429 rate-limited, 502 upstream fetch failure.
-Unknown routes are 404; a health endpoint reports ok.
+Unknown routes are 404; a health endpoint reports ok. A 429 may instead
+be emitted by the platform firewall in front of the API, with a
+platform-standard body.
 
 ### AGT-12: The API self-describes via OpenAPI
 
@@ -81,7 +83,7 @@ show the picture.
 
 ### AGT-13: Remote MCP endpoint
 
-The API Worker also serves the MCP protocol over Streamable HTTP,
+The hosted API also serves the MCP protocol over Streamable HTTP,
 statelessly, at a dedicated endpoint — the same describe/render tools as
 the local server, with sources limited to URLs (same guards as AGT-4) and
 inline text (no file paths on a hosted server). Web clients that support
