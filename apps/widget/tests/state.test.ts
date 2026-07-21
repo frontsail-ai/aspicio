@@ -6,6 +6,7 @@ import {
   concatChunks,
   cssColor,
   formatBytes,
+  layerDisplayNames,
   statusChip,
 } from "../src/state.ts";
 
@@ -83,4 +84,64 @@ test("byte sizes format as KB below 1 MB and one-decimal MB above", () => {
 test("the status chip is singular-safe", () => {
   expect(statusChip(6, 128 * 1024)).toBe("6 LAYERS · 128 KB");
   expect(statusChip(1, 2048)).toBe("1 LAYER · 2 KB");
+});
+
+// Xref-name dedup: a long shared machine prefix collapses to "…" so the part
+// that differs is what the row shows; the full name survives for the tooltip.
+
+test("a 12+ char prefix shared by more than 3 layers collapses in display", () => {
+  const shared = [
+    "xref-Plan-08$0$A-WALL",
+    "xref-Plan-08$0$A-DOOR",
+    "xref-Plan-08$0$A-GLAZ",
+    "xref-Plan-08$0$E-LITE",
+  ];
+  const out = layerDisplayNames([...shared, "Dimensions"]);
+  expect(out.map((n) => n.display)).toEqual([
+    "…A-WALL",
+    "…A-DOOR",
+    "…A-GLAZ",
+    "…E-LITE",
+    "Dimensions",
+  ]);
+  expect(out[0].full).toBe("xref-Plan-08$0$A-WALL");
+});
+
+test("prefixes shared by 3 or fewer layers stay verbatim", () => {
+  const names = ["xref-Plan-08$0$A-WALL", "xref-Plan-08$0$A-DOOR", "xref-Plan-08$0$A-GLAZ"];
+  expect(layerDisplayNames(names).map((n) => n.display)).toEqual(names);
+});
+
+test("short shared prefixes stay verbatim", () => {
+  const names = ["A-WALL", "A-DOOR", "A-GLAZ", "A-FLOR", "A-ROOF"];
+  expect(layerDisplayNames(names).map((n) => n.display)).toEqual(names);
+});
+
+test("the longest qualifying prefix wins and groups dedup independently", () => {
+  const a = [
+    "ref-Bishop-Overland-08$0$WALL",
+    "ref-Bishop-Overland-08$0$DOOR",
+    "ref-Bishop-Overland-08$0$GLAZ",
+    "ref-Bishop-Overland-08$0$LITE",
+  ];
+  const b = [
+    "site-survey_main_ROADS",
+    "site-survey_main_TREES",
+    "site-survey_main_WATER",
+    "site-survey_main_FENCE",
+  ];
+  const out = layerDisplayNames([...a, ...b]);
+  expect(out.slice(0, 4).map((n) => n.display)).toEqual(["…WALL", "…DOOR", "…GLAZ", "…LITE"]);
+  expect(out.slice(4).map((n) => n.display)).toEqual(["…ROADS", "…TREES", "…WATER", "…FENCE"]);
+});
+
+test("a layer that IS the shared prefix keeps its full name", () => {
+  const out = layerDisplayNames([
+    "xref-Plan-08$0$",
+    "xref-Plan-08$0$A",
+    "xref-Plan-08$0$B",
+    "xref-Plan-08$0$C",
+    "xref-Plan-08$0$D",
+  ]);
+  expect(out[0].display).toBe("xref-Plan-08$0$");
 });

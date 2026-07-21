@@ -21,6 +21,7 @@ import {
   concatChunks,
   cssColor,
   formatBytes,
+  layerDisplayNames,
   statusChip,
   type ViewerAction,
 } from "./state.ts";
@@ -294,6 +295,18 @@ function showMissing(): void {
     </div>`;
 }
 
+/** Parsed fine, but nothing drawable — distinct from a load failure. */
+function showEmpty(): void {
+  root.dataset.state = "empty";
+  el("state").innerHTML = `
+    <div class="card">
+      ${ICONS.drawing}
+      <div class="title">Drawing is empty</div>
+      <div class="msg">The file parsed, but it contains no drawable entities.</div>
+      <div class="sub">Ask the assistant to inspect the file (describe_dxf shows what's inside).</div>
+    </div>`;
+}
+
 function showError(detail: string): void {
   root.dataset.state = "error";
   el("state").innerHTML = `
@@ -362,9 +375,12 @@ function wireLayerHome(home: HTMLElement): void {
   home.innerHTML = layersMarkup();
   // Names go in via textContent — layer names are drawing data, not markup.
   const layers = viewer.getLayers();
+  const names = layerDisplayNames(layers.map((l) => l.name));
   for (const label of home.querySelectorAll("label")) {
     const layer = layers[Number(label.dataset.i)];
-    (label.querySelector(".name") as HTMLElement).textContent = layer.name;
+    (label.querySelector(".name") as HTMLElement).textContent =
+      names[Number(label.dataset.i)].display;
+    label.title = layer.name;
     const input = label.querySelector("input") as HTMLInputElement;
     input.addEventListener("change", () => {
       viewer.setLayerVisible(layer.name, input.checked);
@@ -531,6 +547,13 @@ async function showDrawing(bytes: ArrayBuffer, byteLength: number, gen: number):
   if (gen !== generation) return;
   await viewer.load(bytes);
   if (gen !== generation) return;
+  if (viewer.stats.entityCount === 0) {
+    showEmpty();
+    reportStatus(
+      "loaded: the drawing contains no drawable entities, so there is nothing to display. Use describe_dxf to inspect the file.",
+    );
+    return;
+  }
   renderLayers();
   const chip = statusChip(viewer.getLayers().length, byteLength);
   el("chip").textContent = chip;
