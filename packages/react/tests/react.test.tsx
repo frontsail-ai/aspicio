@@ -283,6 +283,16 @@ test("DxfEmbed panel interactions drive the viewer", async () => {
   expect(lastViewer().setLayerVisible).toHaveBeenCalledWith("CUT", false);
 });
 
+test("DxfEmbed panel=right docks the layer list after the preview", async () => {
+  const { container } = render(<DxfEmbed src="dxf-data" panel="right" />);
+  await flush();
+  const embed = shadowOf(container, "aspicio-embed");
+  const panel = embed.querySelector("aspicio-layer-panel");
+  expect(panel).not.toBeNull();
+  expect(panel?.classList.contains("panel-right")).toBe(true);
+  expect(rowByName(panel!.shadowRoot!, "CUT")).toBeTruthy();
+});
+
 test("DxfEmbed with panel=none renders no layer list", async () => {
   const { container } = render(<DxfEmbed src="dxf-data" panel="none" />);
   await flush();

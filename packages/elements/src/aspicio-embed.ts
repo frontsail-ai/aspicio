@@ -176,6 +176,7 @@ export class AspicioEmbed extends LitElement {
           @load-error=${this.#redispatch}
         ></aspicio-preview>
       </div>
+      ${this.panel === "right" ? this.#renderPanel() : nothing}
     `;
   }
 }

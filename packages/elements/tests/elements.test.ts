@@ -421,6 +421,21 @@ test("renders panel and preview together and loads src", async () => {
   expect(embed.viewer).toBe(lastViewer() as never);
 });
 
+test("panel=right docks the layer list after the preview", async () => {
+  const embed = mount("aspicio-embed", { src: "dxf-data" });
+  embed.setAttribute("panel", "right");
+  await flush();
+  const panel = panelOf(embed);
+  expect(panel).not.toBeNull();
+  expect(panel?.classList.contains("panel-right")).toBe(true);
+  // The panel sits after the canvas wrap, so it docks on the right in flex order.
+  const children = [...shadow(embed).children].filter((c) => c.tagName !== "STYLE");
+  expect(children.indexOf(panel as Element)).toBeGreaterThan(
+    children.findIndex((c) => c.classList.contains("canvas-wrap")),
+  );
+  expect(rowNames(panel as AspicioLayerPanel)).toEqual(["CUT", "MARK"]);
+});
+
 test("panel=none renders no layer list", async () => {
   const embed = mount("aspicio-embed", { src: "dxf-data" });
   embed.setAttribute("panel", "none");
