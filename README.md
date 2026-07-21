@@ -161,3 +161,8 @@ vp run ready     # check + test + build everything (the repo gate)
 
 Testing, CI/deploy, releasing, and contribution guidance:
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+Aspicio is developed and maintained by
+[FrontSail AI](https://frontsail.ai/).
