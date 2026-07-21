@@ -93,10 +93,15 @@ widget-only in the result metadata, never to the model — and offers no
 way to open other files unless the tool call explicitly enabled file
 controls. The widget makes no network requests. It follows the host's
 light/dark theme and inline/fullscreen display modes; the drawing canvas
-stays dark in both. Drawings over the embed cap degrade to the
-structured summary plus an explicit too-large notice. Hosts without the
-extension ignore the UI metadata and still get a usable text-and-facts
-result.
+stays dark in both. Delivery adapts to host result caps: small drawings
+arrive embedded in the result, larger URL-sourced drawings are pulled by
+the widget itself through an app-only tool (whole-file first, byte-range
+chunks as fallback), and an inline source over the embed cap degrades to
+the structured summary plus an explicit too-large notice. The widget
+reports its terminal state — loaded or failed, with the reason — back to
+the conversation context, so the model narrates what actually happened.
+Hosts without the extension ignore the UI metadata and still get a
+usable text-and-facts result.
 
 ### AGT-10: One-step plugin install
 

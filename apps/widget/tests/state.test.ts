@@ -1,8 +1,9 @@
 import { expect, test } from "vite-plus/test";
-import { MAX_EMBED_BYTES, VIEWER_META_KEY, type ViewerMeta } from "../src/meta.ts";
+import { INLINE_EMBED_BYTES, VIEWER_META_KEY, type ViewerMeta } from "../src/meta.ts";
 import {
   actionForToolResult,
   base64ToBytes,
+  concatChunks,
   cssColor,
   formatBytes,
   statusChip,
@@ -35,11 +36,30 @@ test("file-picker controls stay off unless the server enabled them (AGT-14)", ()
   expect(absent).toMatchObject({ kind: "load", allowFilePicker: false });
 });
 
-test("an over-cap drawing degrades to a too-large notice, never a load", () => {
+test("a source-only payload becomes a pull action (large URL drawings)", () => {
   const action = actionForToolResult(
-    meta({ tooLarge: true, byteLength: MAX_EMBED_BYTES + 1, allowFilePicker: false }),
+    meta({ source: "https://x.test/big.dxf", byteLength: 1_117_143, allowFilePicker: false }),
   );
-  expect(action).toEqual({ kind: "too-large", byteLength: MAX_EMBED_BYTES + 1 });
+  expect(action).toEqual({
+    kind: "pull",
+    source: "https://x.test/big.dxf",
+    byteLength: 1_117_143,
+    allowFilePicker: false,
+  });
+});
+
+test("an undeliverable drawing degrades to a too-large notice, never a load", () => {
+  const action = actionForToolResult(
+    meta({ tooLarge: true, byteLength: INLINE_EMBED_BYTES + 1, allowFilePicker: false }),
+  );
+  expect(action).toEqual({ kind: "too-large", byteLength: INLINE_EMBED_BYTES + 1 });
+});
+
+test("pulled chunks reassemble in order", () => {
+  const joined = new Uint8Array(
+    concatChunks([new Uint8Array([1, 2, 3]), new Uint8Array([4, 5]), new Uint8Array([6])]),
+  );
+  expect([...joined]).toEqual([1, 2, 3, 4, 5, 6]);
 });
 
 test("base64 round-trips binary bytes", () => {

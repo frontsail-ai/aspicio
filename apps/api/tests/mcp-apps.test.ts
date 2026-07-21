@@ -1,5 +1,10 @@
-import { MAX_EMBED_BYTES, VIEWER_META_KEY, VIEWER_RESOURCE_URI } from "@aspicio/widget/meta";
-import type { ViewerMeta } from "@aspicio/widget/meta";
+import {
+  INLINE_EMBED_BYTES,
+  LOAD_TOOL_NAME,
+  VIEWER_META_KEY,
+  VIEWER_RESOURCE_URI,
+} from "@aspicio/widget/meta";
+import type { LoadResult, ViewerMeta } from "@aspicio/widget/meta";
 import { expect, test } from "vite-plus/test";
 import { handleRequest } from "../src/handler.ts";
 
@@ -99,16 +104,51 @@ test("file-open controls are off unless the tool call enables them (AGT-14)", as
   await client.close();
 });
 
-test("an over-cap drawing degrades to facts plus a too-large marker", async () => {
-  // Pad past the embed cap with 999-group comments the parser accepts.
+test("an over-cap inline drawing degrades to facts plus a too-large marker", async () => {
+  // Pad past the embed cap with 999-group comments the parser accepts. An
+  // inline source can't be re-fetched, so there is no pull path either.
   const pad = `999\n${"x".repeat(120)}\n`;
-  const big = pad.repeat(Math.ceil((MAX_EMBED_BYTES + 1) / pad.length)) + SAMPLE;
+  const big = pad.repeat(Math.ceil((INLINE_EMBED_BYTES + 1) / pad.length)) + SAMPLE;
   const client = await connect();
   const r = await client.callTool({ name: "view_dxf", arguments: { source: big } });
   const meta = (r._meta as Record<string, ViewerMeta>)[VIEWER_META_KEY];
   expect(meta.dxfBase64).toBeUndefined();
+  expect(meta.source).toBeUndefined();
   expect(meta.tooLarge).toBe(true);
-  expect(meta.byteLength).toBeGreaterThan(MAX_EMBED_BYTES);
+  expect(meta.byteLength).toBeGreaterThan(INLINE_EMBED_BYTES);
   expect((r.structuredContent as { entityCount: number }).entityCount).toBe(1);
+  await client.close();
+});
+
+test("the widget's load tool is app-only and serves whole files and byte ranges", async () => {
+  const client = await connect();
+  // App-only visibility: listed to the host, flagged for hiding from models.
+  const { tools } = await client.listTools();
+  const load = tools.find((t) => t.name === LOAD_TOOL_NAME);
+  const meta = (load?._meta ?? {}) as { ui?: { visibility?: string[]; resourceUri?: string } };
+  expect(meta.ui?.visibility).toEqual(["app"]);
+  expect(meta.ui?.resourceUri).toBe(VIEWER_RESOURCE_URI);
+
+  // Whole file round-trips byte-exact.
+  const whole = await client.callTool({ name: LOAD_TOOL_NAME, arguments: { source: SAMPLE } });
+  const w = whole.structuredContent as LoadResult;
+  expect(atob(w.dxfBase64)).toBe(SAMPLE);
+  expect(w.byteLength).toBe(SAMPLE.length);
+  expect(w.offset).toBe(0);
+
+  // Byte-range chunks reassemble to the original.
+  const chunk = 40;
+  const parts: string[] = [];
+  for (let offset = 0; offset < SAMPLE.length; offset += chunk) {
+    const r = await client.callTool({
+      name: LOAD_TOOL_NAME,
+      arguments: { source: SAMPLE, offset, length: chunk },
+    });
+    const sc = r.structuredContent as LoadResult;
+    expect(sc.offset).toBe(offset);
+    expect(sc.byteLength).toBe(SAMPLE.length);
+    parts.push(atob(sc.dxfBase64));
+  }
+  expect(parts.join("")).toBe(SAMPLE);
   await client.close();
 });
