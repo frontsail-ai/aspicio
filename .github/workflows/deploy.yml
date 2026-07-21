@@ -145,12 +145,14 @@ jobs:
             build: bunx vp run @aspicio/demo#build
             dir: apps/demo/dist
             project_secret: VERCEL_PROJECT_ID_DEMO
+            alias: aspicio-demo.vercel.app
           - target: api
             build: >-
               bunx vp run -F @aspicio/core -F @aspicio/widget build &&
               bunx vp run @aspicio/api#build:vercel
             dir: apps/api/vercel-dist
             project_secret: VERCEL_PROJECT_ID_API
+            alias: aspicio-api.vercel.app
     steps:
       - name: Note skip when Vercel secrets are absent
         if: env.VERCEL_TOKEN == ''
@@ -188,9 +190,11 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: Smoke test (api)
+        # The deployment-scoped URL the CLI prints sits behind Vercel
+        # Authentication; the production alias is the public surface.
         if: env.VERCEL_TOKEN != '' && matrix.target == 'api'
         run: |
-          URL="${{ steps.deploy.outputs.url }}"
+          URL="https://${{ matrix.alias }}"
           curl -sf "$URL/health" | grep -q '"status": *"ok"'
           curl -sf "$URL/openapi.json" | grep -q '"openapi"'
           curl -sf -X POST "$URL/mcp" \
@@ -203,7 +207,7 @@ jobs:
       - name: Smoke test (demo)
         if: env.VERCEL_TOKEN != '' && matrix.target == 'demo'
         run: |
-          URL="${{ steps.deploy.outputs.url }}"
+          URL="https://${{ matrix.alias }}"
           curl -sf "$URL/" | grep -qi "aspicio"
           curl -sf "$URL/llms.txt" | grep -q "Aspicio"
           echo "Demo smoke passed."
