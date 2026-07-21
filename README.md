@@ -153,6 +153,39 @@ upload flow so remote surfaces can handle local files.
 
 ## Packages
 
+How the viewer packages fit together: every framework path funnels into
+the same Lit web components — one implementation of the embed UI — which
+sit on the framework-free core. React gets a thin veneer with idiomatic
+props; Vue and Svelte consume the elements natively, so their support is
+recipes, not wrapper packages (dashed = planned docs, not shipped).
+
+```mermaid
+flowchart TD
+    REACTAPP["React app"]
+    HTMLAPP["Plain HTML / vanilla JS app"]
+    VUEAPP["Vue app"]
+    SVELTEAPP["Svelte app"]
+
+    REACT["<b>@aspicio/react</b><br/>&lt;DxfEmbed&gt; · &lt;DxfPreview&gt; · &lt;DxfLayerPanel&gt;<br/><i>thin @lit/react veneer, API-stable</i>"]
+    ELEMENTS["<b>@aspicio/elements</b><br/>&lt;aspicio-embed&gt; · &lt;aspicio-preview&gt; · &lt;aspicio-layer-panel&gt;<br/><i>Lit web components — the one embed-UI implementation</i>"]
+    CORE["<b>@aspicio/core</b><br/>parse → tessellate → render<br/><i>camera · input · picking · SVG/PNG export · headless describe</i>"]
+
+    REACTAPP -->|"idiomatic props, ref → DxfViewer"| REACT
+    REACT -->|"wraps"| ELEMENTS
+    HTMLAPP -->|"attributes + DOM events"| ELEMENTS
+    VUEAPP -.->|"native custom elements<br/>(recipes coming)"| ELEMENTS
+    SVELTEAPP -.->|"native custom elements<br/>(recipes coming)"| ELEMENTS
+    ELEMENTS -->|"drives"| CORE
+    HTMLAPP -.->|"or hand-rolled UI on the DxfViewer API"| CORE
+
+    classDef pkg fill:#191c22,stroke:#4c8dff,color:#e7e3da
+    classDef app fill:#1f232b,stroke:#3a3f4a,color:#9aa0ab
+    classDef planned stroke-dasharray: 5 4
+    class REACT,ELEMENTS,CORE pkg
+    class REACTAPP,HTMLAPP,VUEAPP,SVELTEAPP app
+    class VUEAPP,SVELTEAPP planned
+```
+
 | Package                                  | Description                                                                                               |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | [`@aspicio/core`](packages/core)         | The viewer library: parsing, tessellation, rendering, camera, input                                       |
