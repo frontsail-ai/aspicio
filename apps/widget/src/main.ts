@@ -159,7 +159,9 @@ const STYLE = `
   .layer-rows label.off .box { background: transparent; border: 1.5px solid var(--w-border); }
   .layer-rows label.off .box svg { display: none; }
   .layer-rows input:focus-visible + .box { outline: 2px solid #2D6CDF; outline-offset: 1px; }
-  .layer-rows .swatch { width: 18px; flex: none; border-top: 3px solid transparent; }
+  /* The 1px keyline keeps white/yellow swatches legible on the light panel
+   * (and near-black ones on the dark panel) — DXF color 7 is white. */
+  .layer-rows .swatch { width: 18px; flex: none; border-top: 3px solid transparent; box-shadow: 0 0 0 1px var(--w-border); }
   .layer-rows .name { font: 400 13px var(--w-sans); color: var(--w-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   #panel { position: absolute; top: 46px; right: 10px; width: 216px; max-height: calc(100% - 56px); background: var(--w-panel-bg); border: 1px solid var(--w-border); border-radius: var(--w-r-md); box-shadow: var(--w-shadow); overflow: hidden; display: none; flex-direction: column; }
