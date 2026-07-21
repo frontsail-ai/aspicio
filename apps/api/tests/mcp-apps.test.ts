@@ -78,6 +78,17 @@ test("the remote server reports the registry-pinned version (#63)", async () => 
   await client.close();
 });
 
+test("every tool declares read-only open-world annotations (directory reviews check them)", async () => {
+  const client = await connect();
+  const { tools } = await client.listTools();
+  expect(tools.length).toBeGreaterThanOrEqual(4);
+  for (const tool of tools) {
+    expect(tool.annotations?.readOnlyHint, `${tool.name} readOnlyHint`).toBe(true);
+    expect(tool.annotations?.openWorldHint, `${tool.name} openWorldHint`).toBe(true);
+  }
+  await client.close();
+});
+
 test("view_dxf declares its UI resource in tool metadata (current + legacy key)", async () => {
   const client = await connect();
   const { tools } = await client.listTools();

@@ -54,7 +54,9 @@ The index endpoint links to it.
 
 A local stdio MCP server exposes `describe_dxf` and `render_dxf`, whose
 descriptions carry the when-to-use guidance so any MCP client uses them
-correctly without a bundled skill.
+correctly without a bundled skill. Every tool (local and remote) declares
+read-only, open-world annotations — none mutates state, and sources may
+be fetched from the open web.
 
 ### AGT-7: MCP source forms
 

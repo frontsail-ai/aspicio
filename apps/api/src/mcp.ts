@@ -79,6 +79,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     "describe_dxf",
     {
       title: "Describe a DXF drawing",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Return a structured JSON summary of a DXF drawing — units, bounding box, layers (with the color actually drawn), per-type entity counts, the drawing's text content (title blocks and dimension values included), and any skipped/unsupported types. Use this to answer structural questions (what layers exist, how many parts, what size, what does it say) without rendering an image.",
       inputSchema: { source: z.string().describe(SOURCE_DESC) },
@@ -94,6 +95,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     "render_dxf",
     {
       title: "Render a DXF to an image",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Render a DXF drawing to a PNG image you can look at. Use this to answer visual questions (what does it look like, where is a feature) — it returns an image, not text. For structural facts and measurements, prefer describe_dxf; never measure pixels. Some chat UIs do not display the returned image to the user: for URL sources the result also includes a direct image link — show it to the user (e.g. as a markdown image) when they need to see the render. When the user wants to see or explore the drawing themselves, prefer view_dxf (interactive viewer) — if your platform gates it behind user approval, offer it and ask rather than substituting a static render.",
       inputSchema: {
@@ -151,6 +153,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     "view_dxf",
     {
       title: "Open a DXF in the interactive viewer",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Open an interactive DXF viewer the user can pan, zoom, and toggle layers in (renders in-chat on MCP Apps-capable hosts). Use this when the user wants to see or explore the drawing themselves; for your own analysis use describe_dxf (facts) or render_dxf (image). The viewer shows only the drawing from this call. Delivery is handled by the widget itself: small drawings are embedded in the result and larger URL-sourced drawings are fetched by the widget through its own tool call — never re-fetch or inline the file for the viewer's sake, and don't blind-retry if the user reports an empty viewer (the viewer posts its actual status back to the conversation context).",
       inputSchema: {
@@ -203,6 +206,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     LOAD_TOOL_NAME,
     {
       title: "Load a DXF for the viewer widget",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "Internal: returns DXF bytes (base64) for the in-chat viewer. Called by the widget, not the model.",
       inputSchema: {

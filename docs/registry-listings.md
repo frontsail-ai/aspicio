@@ -45,6 +45,13 @@ against the current schema and is the ground truth if it has moved past
 2025-12-11 (that revision renamed the package fields to camelCase and
 capped `description` at 100 chars — both bit us once already).
 
+### ChatGPT app directory (when submitting)
+
+Submission assets live in-repo: icon `apps/demo/public/icon-64.png`
+(64×64 PNG, <5 KB), privacy `https://aspicio.dmitri-66a.workers.dev/privacy/`,
+terms `…/terms/`, support contact `support@frontsail.ai`. All tools carry
+read-only/open-world annotations (drift-guarded).
+
 ## 2. Smithery (smithery.ai)
 
 Sign in with GitHub → Add server → point it at this repo. It reads
