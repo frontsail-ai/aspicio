@@ -48,11 +48,14 @@ test("server.json matches the registry schema shape (2025-12-11)", () => {
 });
 
 test("registry metadata agrees on the one load-bearing package name", () => {
-  const pkgName = (JSON.parse(read("packages/mcp/package.json")) as { name: string }).name;
+  const pkg = JSON.parse(read("packages/mcp/package.json")) as { name: string; mcpName: string };
   const server = JSON.parse(read("server.json")) as ServerJson;
-  expect(server.packages[0].identifier).toBe(pkgName);
+  expect(server.packages[0].identifier).toBe(pkg.name);
+  // The registry verifies npm ownership by matching the published package's
+  // mcpName against the server name — a mismatch rejects the submission.
+  expect(pkg.mcpName).toBe(server.name);
   // Smithery launches the same package via npx.
-  expect(read("smithery.yaml")).toContain(pkgName);
+  expect(read("smithery.yaml")).toContain(pkg.name);
   expect(read("smithery.yaml")).toContain("type: stdio");
 });
 
