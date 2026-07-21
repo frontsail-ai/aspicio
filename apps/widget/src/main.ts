@@ -381,14 +381,23 @@ function syncLayerRows(): void {
   }
 }
 
+const HINT_HTML = `<div class="hint">Drag to pan · Scroll to zoom<br>Double-click to fit</div>`;
+
 function renderLayers(): void {
   wireLayerHome(el("panel"));
   const sidebar = el("sidebar");
   wireLayerHome(sidebar);
-  sidebar.insertAdjacentHTML(
-    "beforeend",
-    `<div class="hint">Drag to pan · Scroll to zoom<br>Double-click to fit</div>`,
-  );
+  sidebar.insertAdjacentHTML("beforeend", HINT_HTML);
+}
+
+/** Self-heal a layer home: hosts have been observed mangling widget DOM
+ * (ChatGPT's style/DOM machinery emptied the panel in the wild). If rows no
+ * longer match the drawing, rebuild them — opening must always work. */
+function healLayerHome(home: HTMLElement, withHint: boolean): void {
+  if (root.dataset.state !== "loaded") return;
+  if (home.querySelectorAll("label").length === viewer.getLayers().length) return;
+  wireLayerHome(home);
+  if (withHint) home.insertAdjacentHTML("beforeend", HINT_HTML);
 }
 
 // ---------------------------------------------------------------------------
@@ -396,13 +405,7 @@ function renderLayers(): void {
 // ---------------------------------------------------------------------------
 
 function setPanelOpen(open: boolean): void {
-  // Self-heal: hosts have been observed mangling widget DOM (ChatGPT's
-  // style/DOM machinery emptied this panel in the wild). If rows no longer
-  // match the drawing, rebuild them — reopening must always work.
-  if (open && root.dataset.state === "loaded") {
-    const expected = viewer.getLayers().length;
-    if (el("panel").querySelectorAll("label").length !== expected) wireLayerHome(el("panel"));
-  }
+  if (open) healLayerHome(el("panel"), false);
   el("panel").classList.toggle("open", open);
   el("layers-btn").setAttribute("aria-expanded", String(open));
 }
@@ -423,6 +426,7 @@ document.addEventListener("keydown", (ev) => {
 
 function setMode(mode: McpUiDisplayMode): void {
   root.dataset.mode = mode === "fullscreen" ? "fullscreen" : "inline";
+  if (mode === "fullscreen") healLayerHome(el("sidebar"), true);
   setPanelOpen(false);
 }
 
@@ -463,9 +467,16 @@ function reportStatus(text: string): void {
 
 /** Pull the drawing through the app-only load tool: whole-file first, then
  * byte-range chunks if the single response is capped or truncated. */
+/** Per-request cap so a host that accepts the call but never answers can't
+ * strand the widget in "Loading…" (SDK default is 60s; chunks compound). */
+const PULL_TIMEOUT_MS = 30_000;
+
 async function pullDrawing(source: string, byteLength: number): Promise<ArrayBuffer> {
   const call = async (args: Record<string, unknown>): Promise<LoadResult> => {
-    const r = await app.callServerTool({ name: LOAD_TOOL_NAME, arguments: { source, ...args } });
+    const r = await app.callServerTool(
+      { name: LOAD_TOOL_NAME, arguments: { source, ...args } },
+      { timeout: PULL_TIMEOUT_MS },
+    );
     if (r.isError) {
       const text = (r.content as Array<{ text?: string }> | undefined)?.[0]?.text;
       throw new Error(text ?? "the drawing could not be fetched");
@@ -490,8 +501,14 @@ async function pullDrawing(source: string, byteLength: number): Promise<ArrayBuf
   return concatChunks(chunks);
 }
 
-async function showDrawing(bytes: ArrayBuffer, byteLength: number): Promise<void> {
+// Each tool result bumps the generation; async work from an older result
+// (a slow pull racing a fresh drawing) checks it before touching the UI.
+let generation = 0;
+
+async function showDrawing(bytes: ArrayBuffer, byteLength: number, gen: number): Promise<void> {
+  if (gen !== generation) return;
   await viewer.load(bytes);
+  if (gen !== generation) return;
   renderLayers();
   const chip = statusChip(viewer.getLayers().length, byteLength);
   el("chip").textContent = chip;
@@ -501,15 +518,15 @@ async function showDrawing(bytes: ArrayBuffer, byteLength: number): Promise<void
   reportStatus(`loaded: ${chip.toLowerCase()} rendered interactively.`);
 }
 
-async function apply(action: ViewerAction): Promise<void> {
+async function apply(action: ViewerAction, gen: number): Promise<void> {
   switch (action.kind) {
     case "load":
-      await showDrawing(action.bytes, action.byteLength);
+      await showDrawing(action.bytes, action.byteLength, gen);
       break;
     case "pull": {
       showLoading(action.byteLength);
       const bytes = await pullDrawing(action.source, action.byteLength);
-      await showDrawing(bytes, action.byteLength);
+      await showDrawing(bytes, action.byteLength, gen);
       break;
     }
     case "too-large":
@@ -531,7 +548,9 @@ const app = new App({ name: "aspicio-viewer", version: "0.0.0" }, {});
 // Register before connect() so a result replayed during the handshake lands.
 app.ontoolresult = (result) => {
   const action = actionForToolResult(result);
-  void apply(action).catch((err: Error) => {
+  const gen = ++generation;
+  void apply(action, gen).catch((err: Error) => {
+    if (gen !== generation) return; // a newer result owns the UI now
     const detail =
       action.kind === "pull"
         ? `Could not load the drawing — ${err.message}.`
