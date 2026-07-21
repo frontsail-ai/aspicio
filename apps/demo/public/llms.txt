@@ -1,0 +1,67 @@
+# Aspicio
+
+> Aspicio (Latin: "I look at") is an open-source, TypeScript-first DXF
+> engine: one framework-free parse → tessellate pipeline that serves
+> people (an interactive WebGL viewer), applications (React components
+> and a headless renderer), and AI agents (structured facts, PNG
+> renders, and an interactive in-chat viewer over HTTP and MCP).
+
+Aspicio is developed and maintained by [FrontSail AI](https://frontsail.ai/),
+released under the MIT license.
+
+## Why Aspicio
+
+- One engine, every surface: the browser viewer, React components,
+  headless renderer, HTTP API, and MCP server are thin adapters over
+  the same parse → tessellate core, so a drawing reads identically
+  everywhere — no drift between what a person sees and what an agent
+  is told.
+- Built for AI agents, not retrofitted: `describe_dxf` returns
+  structured JSON facts (units, bounds, layers with the colors actually
+  drawn, entity counts, and the drawing's text content), so an agent
+  reads a title block or a dimension value directly — no OCR, no
+  vision round-trip.
+- An interactive in-chat viewer via the open MCP Apps extension:
+  `view_dxf` puts a pannable, zoomable, layer-toggling WebGL viewer
+  directly in ChatGPT or Claude conversations. The widget is locked to
+  the drawing the tool call delivered and makes no network requests.
+- Broad entity coverage that never fails hard: lines, arcs, circles,
+  ellipses, polylines with bulges, splines, TEXT/MTEXT, DIMENSION,
+  SOLID/HATCH fills, nested INSERT blocks — anything unsupported is
+  counted and reported, never fatal.
+- Runs anywhere TypeScript runs: browser, Node, and Cloudflare
+  Workers. WebGL rendering is batched to one draw call per layer, so
+  large drawings stay interactive.
+- Privacy-first hosted services: no accounts, no stored drawings, and
+  guarded URL fetches (private-network blocking, size caps, redirect
+  validation, timeouts). Everything is open source.
+
+## Use it
+
+- [Live demo](https://aspicio.dmitri-66a.workers.dev/): drop in a DXF
+  and explore it — layer panel, measuring, picking, export.
+- [Hosted MCP server](https://aspicio-api.dmitri-66a.workers.dev/mcp):
+  remote MCP over Streamable HTTP — `describe_dxf`, `render_dxf`, and
+  the `view_dxf` in-chat viewer. No install.
+- Local MCP server: `npx -y @aspicio/mcp` — adds local-file support,
+  reads drawings in-process, never uploads them.
+- [HTTP API](https://aspicio-api.dmitri-66a.workers.dev/openapi.json):
+  `GET /describe?src=<dxf-url>` and
+  `GET /render?src=<dxf-url>&format=png|svg`, self-described via
+  OpenAPI 3.1.
+- npm packages: `@aspicio/core` (viewer + headless pipeline) and
+  `@aspicio/react` (`<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`).
+
+## Docs
+
+- [Repository](https://github.com/frontsail-ai/aspicio): source,
+  issues, and contribution guide.
+- [Architecture](https://github.com/frontsail-ai/aspicio/blob/master/docs/architecture.md):
+  the pipeline and its layers.
+- [Privacy policy](https://aspicio.dmitri-66a.workers.dev/privacy/) ·
+  [Terms of use](https://aspicio.dmitri-66a.workers.dev/terms/)
+
+## About
+
+Developed and maintained by [FrontSail AI](https://frontsail.ai/) —
+contact [support@frontsail.ai](mailto:support@frontsail.ai).

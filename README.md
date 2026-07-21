@@ -122,7 +122,9 @@ URL fetches are guarded (private-network blocking, size caps, redirect
 validation, timeouts). The stdio server reads local files in-process and
 never uploads the DXF to any Aspicio service — though, as with any tool
 result, your MCP client passes the returned summary or image to its
-model provider.
+model provider. Full details:
+[privacy policy](https://aspicio.dmitri-66a.workers.dev/privacy/) ·
+[terms](https://aspicio.dmitri-66a.workers.dev/terms/).
 
 ## Available today · direction
 
@@ -159,3 +161,8 @@ vp run ready     # check + test + build everything (the repo gate)
 
 Testing, CI/deploy, releasing, and contribution guidance:
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+Aspicio is developed and maintained by
+[FrontSail AI](https://frontsail.ai/).

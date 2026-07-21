@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy · Aspicio</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: #16181d;
+        color: #cfd3dc;
+        font:
+          16px/1.65 system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 48px 24px 80px;
+      }
+      h1 {
+        font-size: 28px;
+        color: #edeef2;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 19px;
+        color: #edeef2;
+        margin: 36px 0 8px;
+      }
+      p,
+      li {
+        color: #b7bcc7;
+      }
+      a {
+        color: #8fb0ec;
+      }
+      .meta {
+        color: #6b7280;
+        font-size: 14px;
+        margin-bottom: 32px;
+      }
+      code {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 14px;
+        background: #22252d;
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Privacy Policy</h1>
+      <p class="meta">
+        Aspicio · effective July 21, 2026 · <a href="/">demo</a> · <a href="/terms/">terms</a>
+      </p>
+
+      <p>
+        Aspicio is an open-source DXF viewer with a hosted API and MCP server, developed and
+        maintained by <a href="https://frontsail.ai/">FrontSail AI</a>. This policy covers the
+        hosted services (the demo site, the HTTP API, and the remote MCP endpoint) and the locally
+        installed tools. The short version: we don't want your data. There are no accounts, and we
+        keep no drawings.
+      </p>
+
+      <h2>What we collect</h2>
+      <ul>
+        <li>
+          No personal data. There are no accounts or sign-ups, so we never see names or email
+          addresses. We run no analytics and set no cookies.
+        </li>
+        <li>
+          Drawings you submit are processed in memory. When you (or your AI assistant) send a DXF to
+          the hosted API or remote MCP server, whether as a URL to fetch or as request content, the
+          service produces the response (facts, an image, or viewer data) and does not store the
+          file.
+        </li>
+        <li>
+          Operational logs. Cloudflare, our infrastructure provider, records standard request
+          metadata (IP address, URL, timestamps). We use those logs for rate limiting and abuse
+          prevention, nothing else, and they expire quickly.
+        </li>
+      </ul>
+
+      <h2>Purposes</h2>
+      <p>
+        Exactly one: providing the service. That means turning the drawings you send into facts,
+        images, or viewer data, and keeping the service available through rate limits and abuse
+        prevention.
+      </p>
+
+      <h2>Recipients</h2>
+      <ul>
+        <li>Cloudflare operates the infrastructure the hosted services run on.</li>
+        <li>
+          When you use Aspicio through an AI assistant (ChatGPT, Claude, or any MCP client),
+          <em>your assistant</em> relays the results we return to its model provider under that
+          provider's terms. We send nothing to model providers ourselves.
+        </li>
+        <li>We do not sell or share data with anyone else.</li>
+      </ul>
+
+      <h2>Retention</h2>
+      <p>
+        We keep no drawings; each request is processed in memory and forgotten. Cloudflare retains
+        its operational logs briefly, per its standard log windows, and then they are gone.
+      </p>
+
+      <h2>Your controls</h2>
+      <ul>
+        <li>
+          Don't send sensitive drawings to the hosted services. For local files, use the local
+          server (<code>npx -y @aspicio/mcp</code>), which reads files in-process and never uploads
+          them to any Aspicio service.
+        </li>
+        <li>
+          Everything is open source (<a href="https://github.com/frontsail-ai/aspicio"
+            >github.com/frontsail-ai/aspicio</a
+          >), so you can verify the above or run the whole pipeline yourself.
+        </li>
+        <li>
+          Questions or requests:
+          <a href="mailto:support@frontsail.ai">support@frontsail.ai</a> or a
+          <a href="https://github.com/frontsail-ai/aspicio/issues">GitHub issue</a>.
+        </li>
+      </ul>
+
+      <h2>Changes</h2>
+      <p>
+        If this policy changes, the new version is published here with an updated effective date;
+        the history lives in the repository.
+      </p>
+    </main>
+  </body>
+</html>
