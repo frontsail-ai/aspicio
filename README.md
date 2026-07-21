@@ -92,6 +92,8 @@ instead of guessing at it:
   network requests; hosts without MCP Apps still get the structured
   facts.
 
+<img src="docs/demo-widget.gif" alt="The in-chat viewer loading a 1.1 MB floor-plan DXF, toggling dimension and text layers, and expanding to fullscreen" />
+
 | Surface                                               | Local files | URLs | Inline DXF |
 | ----------------------------------------------------- | ----------- | ---- | ---------- |
 | stdio MCP — `npx -y @aspicio/mcp`                     | ✅          | ✅   | ✅         |
