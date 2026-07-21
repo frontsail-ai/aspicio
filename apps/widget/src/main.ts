@@ -13,6 +13,7 @@
 import { DxfViewer } from "@aspicio/core";
 import { App } from "@modelcontextprotocol/ext-apps";
 import type { McpUiDisplayMode } from "@modelcontextprotocol/ext-apps";
+import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { INLINE_EMBED_BYTES, LOAD_CHUNK_BYTES, LOAD_TOOL_NAME, type LoadResult } from "./meta.ts";
 import {
   actionForToolResult,
@@ -30,7 +31,10 @@ const CANVAS_BG = 0x16181d; // theme-fixed: CAD linework needs a dark canvas
 // Styles — host tokens with per-theme fallbacks (design spec, section 06).
 // ---------------------------------------------------------------------------
 
-const STYLE = `
+/** Document-level: theme tokens (the host-facing interface — hosts supply
+ * the outer variables) and page sizing. Everything structural lives inside
+ * the shadow root, out of reach of host-injected stylesheets. */
+const TOKEN_STYLE = `
   :root {
     --w-sans: var(--font-sans, system-ui, -apple-system, sans-serif);
     --w-mono: var(--font-mono, ui-monospace, Menlo, monospace);
@@ -60,10 +64,13 @@ const STYLE = `
     --w-shadow: var(--shadow-md, 0 2px 8px rgba(0,0,0,0.4));
   }
   html, body { margin: 0; height: 100%; }
-  body { font-family: var(--w-sans); }
+`;
+
+const STYLE = `
+  :host { display: block; height: 100%; }
   button { font-family: inherit; }
 
-  #root { display: flex; flex-direction: column; height: 100%; min-height: 220px; background: var(--w-frame-bg); }
+  #root { display: flex; flex-direction: column; height: 100%; min-height: 220px; background: var(--w-frame-bg); font-family: var(--w-sans); }
 
   /* Fullscreen top bar (hidden inline) */
   #chrome { height: 44px; flex: none; display: none; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--w-hairline); }
@@ -117,7 +124,10 @@ const STYLE = `
   .oc-btn.icon { width: 30px; padding: 0; }
   .oc-btn[aria-expanded="true"] { background: rgba(45,108,223,0.22); border-color: #2D6CDF; color: #9DBCF3; }
 
-  #cluster { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+  /* The container is a hit-target hole: with buttons hidden at rest it must
+   * not eat canvas clicks/drags. Buttons re-enable their own events. */
+  #cluster { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; pointer-events: none; }
+  #cluster > button { pointer-events: auto; }
   #root[data-mode="fullscreen"] #cluster, #root:not([data-state="loaded"]) #cluster { display: none; }
   #expand-btn { margin-left: 4px; }
   @media (hover: hover) {
@@ -192,8 +202,19 @@ const ICONS = {
 // ---------------------------------------------------------------------------
 
 document.documentElement.dataset.theme = "dark";
-document.head.appendChild(document.createElement("style")).textContent = STYLE;
-document.body.innerHTML = `
+document.head.appendChild(document.createElement("style")).textContent = TOKEN_STYLE;
+// Shadow DOM: hosts (ChatGPT) inject their own stylesheets into widget
+// documents, which corrupted the layer panel in the wild. Document styles
+// cannot pierce the shadow boundary; the theme variables above still
+// inherit through — the one host influence we want.
+const shadowHost = document.body.appendChild(document.createElement("div"));
+// The host element is the one light-DOM piece a host stylesheet can still
+// reach. Inline !important outranks any author stylesheet in the cascade,
+// so reset everything and pin the two properties the layout needs.
+shadowHost.style.cssText =
+  "all: initial !important; display: block !important; height: 100% !important;";
+const shadow = shadowHost.attachShadow({ mode: "open" });
+shadow.innerHTML = `<style>${STYLE}</style>
   <div id="root" data-mode="inline" data-state="preparing">
     <div id="chrome">
       <span class="label">DXF drawing</span>
@@ -221,7 +242,7 @@ document.body.innerHTML = `
   </div>
 `;
 
-const el = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
+const el = (id: string): HTMLElement => shadow.getElementById(id) as HTMLElement;
 const root = el("root");
 
 const viewer = new DxfViewer(el("viewer"), { background: CANVAS_BG });
@@ -368,14 +389,23 @@ function syncLayerRows(): void {
   }
 }
 
+const HINT_HTML = `<div class="hint">Drag to pan · Scroll to zoom<br>Double-click to fit</div>`;
+
 function renderLayers(): void {
   wireLayerHome(el("panel"));
   const sidebar = el("sidebar");
   wireLayerHome(sidebar);
-  sidebar.insertAdjacentHTML(
-    "beforeend",
-    `<div class="hint">Drag to pan · Scroll to zoom<br>Double-click to fit</div>`,
-  );
+  sidebar.insertAdjacentHTML("beforeend", HINT_HTML);
+}
+
+/** Self-heal a layer home: hosts have been observed mangling widget DOM
+ * (ChatGPT's style/DOM machinery emptied the panel in the wild). If rows no
+ * longer match the drawing, rebuild them — opening must always work. */
+function healLayerHome(home: HTMLElement, withHint: boolean): void {
+  if (root.dataset.state !== "loaded") return;
+  if (home.querySelectorAll("label").length === viewer.getLayers().length) return;
+  wireLayerHome(home);
+  if (withHint) home.insertAdjacentHTML("beforeend", HINT_HTML);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,6 +413,7 @@ function renderLayers(): void {
 // ---------------------------------------------------------------------------
 
 function setPanelOpen(open: boolean): void {
+  if (open) healLayerHome(el("panel"), false);
   el("panel").classList.toggle("open", open);
   el("layers-btn").setAttribute("aria-expanded", String(open));
 }
@@ -403,6 +434,7 @@ document.addEventListener("keydown", (ev) => {
 
 function setMode(mode: McpUiDisplayMode): void {
   root.dataset.mode = mode === "fullscreen" ? "fullscreen" : "inline";
+  if (mode === "fullscreen") healLayerHome(el("sidebar"), true);
   setPanelOpen(false);
 }
 
@@ -443,9 +475,16 @@ function reportStatus(text: string): void {
 
 /** Pull the drawing through the app-only load tool: whole-file first, then
  * byte-range chunks if the single response is capped or truncated. */
+/** Per-request cap so a host that accepts the call but never answers can't
+ * strand the widget in "Loading…" (SDK default is 60s; chunks compound). */
+const PULL_TIMEOUT_MS = 30_000;
+
 async function pullDrawing(source: string, byteLength: number): Promise<ArrayBuffer> {
   const call = async (args: Record<string, unknown>): Promise<LoadResult> => {
-    const r = await app.callServerTool({ name: LOAD_TOOL_NAME, arguments: { source, ...args } });
+    const r = await app.callServerTool(
+      { name: LOAD_TOOL_NAME, arguments: { source, ...args } },
+      { timeout: PULL_TIMEOUT_MS },
+    );
     if (r.isError) {
       const text = (r.content as Array<{ text?: string }> | undefined)?.[0]?.text;
       throw new Error(text ?? "the drawing could not be fetched");
@@ -459,8 +498,12 @@ async function pullDrawing(source: string, byteLength: number): Promise<ArrayBuf
     const bytes = base64ToBytes(full.dxfBase64);
     if (bytes.byteLength === full.byteLength) return bytes;
     // Truncated single-shot — fall through to chunked retrieval.
-  } catch {
-    // Single-shot failed (host cap or transient) — try chunks before giving up.
+  } catch (err) {
+    // A timeout means the host is silent — chunk calls would only re-wait
+    // the same 30s each. Fail now instead of compounding.
+    if ((err as { code?: number }).code === ErrorCode.RequestTimeout)
+      throw new Error("the host did not respond to the drawing request");
+    // Any other failure (host cap, transient) — try chunks before giving up.
   }
   const chunks: Uint8Array[] = [];
   for (let offset = 0; offset < byteLength; offset += LOAD_CHUNK_BYTES) {
@@ -470,8 +513,14 @@ async function pullDrawing(source: string, byteLength: number): Promise<ArrayBuf
   return concatChunks(chunks);
 }
 
-async function showDrawing(bytes: ArrayBuffer, byteLength: number): Promise<void> {
+// Each tool result bumps the generation; async work from an older result
+// (a slow pull racing a fresh drawing) checks it before touching the UI.
+let generation = 0;
+
+async function showDrawing(bytes: ArrayBuffer, byteLength: number, gen: number): Promise<void> {
+  if (gen !== generation) return;
   await viewer.load(bytes);
+  if (gen !== generation) return;
   renderLayers();
   const chip = statusChip(viewer.getLayers().length, byteLength);
   el("chip").textContent = chip;
@@ -481,15 +530,15 @@ async function showDrawing(bytes: ArrayBuffer, byteLength: number): Promise<void
   reportStatus(`loaded: ${chip.toLowerCase()} rendered interactively.`);
 }
 
-async function apply(action: ViewerAction): Promise<void> {
+async function apply(action: ViewerAction, gen: number): Promise<void> {
   switch (action.kind) {
     case "load":
-      await showDrawing(action.bytes, action.byteLength);
+      await showDrawing(action.bytes, action.byteLength, gen);
       break;
     case "pull": {
       showLoading(action.byteLength);
       const bytes = await pullDrawing(action.source, action.byteLength);
-      await showDrawing(bytes, action.byteLength);
+      await showDrawing(bytes, action.byteLength, gen);
       break;
     }
     case "too-large":
@@ -511,7 +560,9 @@ const app = new App({ name: "aspicio-viewer", version: "0.0.0" }, {});
 // Register before connect() so a result replayed during the handshake lands.
 app.ontoolresult = (result) => {
   const action = actionForToolResult(result);
-  void apply(action).catch((err: Error) => {
+  const gen = ++generation;
+  void apply(action, gen).catch((err: Error) => {
+    if (gen !== generation) return; // a newer result owns the UI now
     const detail =
       action.kind === "pull"
         ? `Could not load the drawing — ${err.message}.`
