@@ -59,3 +59,37 @@ export function statusChip(layerCount: number, byteLength: number): string {
   const layers = `${layerCount} LAYER${layerCount === 1 ? "" : "S"}`;
   return `${layers} · ${formatBytes(byteLength)}`;
 }
+
+/**
+ * Display names for the layer list. Xref-qualified drawings repeat a long
+ * machine prefix on most rows ("xref-Plan-08$0$A-WALL", …), drowning the
+ * part that differs. When more than 3 names share a separator-terminated
+ * prefix of 12+ characters, the shared prefix collapses to "…" in the
+ * display name; the full name stays alongside for the tooltip.
+ */
+export function layerDisplayNames(names: string[]): { display: string; full: string }[] {
+  const counts = new Map<string, number>();
+  for (const name of names) {
+    for (let i = 11; i < name.length - 1; i++) {
+      if ("$-_".includes(name[i]))
+        counts.set(name.slice(0, i + 1), (counts.get(name.slice(0, i + 1)) ?? 0) + 1);
+    }
+  }
+  return names.map((full) => {
+    // A row that IS a group's shared prefix (the xref root) stays verbatim —
+    // stripping it by a shorter prefix would leave a meaningless stub.
+    if ((counts.get(full) ?? 0) > 3) return { full, display: full };
+    let best = "";
+    for (const [prefix, n] of counts) {
+      if (
+        n > 3 &&
+        prefix.length > best.length &&
+        full.length > prefix.length &&
+        full.startsWith(prefix)
+      ) {
+        best = prefix;
+      }
+    }
+    return { full, display: best ? `…${full.slice(best.length)}` : full };
+  });
+}

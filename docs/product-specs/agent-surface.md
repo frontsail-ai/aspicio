@@ -102,8 +102,13 @@ stays dark in both. Delivery adapts to host result caps: small drawings
 arrive embedded in the result, larger URL-sourced drawings are pulled by
 the widget itself through an app-only tool (whole-file first, byte-range
 chunks as fallback), and an inline source over the embed cap degrades to
-the structured summary plus an explicit too-large notice. The widget
-reports its terminal state — loaded or failed, with the reason — back to
+the structured summary plus an explicit too-large notice. A drawing that
+parses to no drawable entities shows an explicit empty-drawing notice,
+never a blank viewer. In the layer list, a long machine prefix shared by
+many rows (xref-qualified names) collapses in the display; the full name
+stays available on the row. The widget
+reports its terminal state — loaded, empty, or failed, with the reason —
+back to
 the conversation context, so the model narrates what actually happened.
 Hosts without the extension ignore the UI metadata and still get a
 usable text-and-facts result.
