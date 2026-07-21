@@ -80,6 +80,14 @@ jobs:
         run: bun run e2e
         working-directory: apps/vue-example
 
+      - name: E2E the Svelte embed example
+        run: bun run e2e
+        working-directory: apps/svelte-example
+
+      - name: E2E the vanilla core example
+        run: bun run e2e
+        working-directory: apps/vanilla-example
+
       - name: Build all packages
         run: bunx vp run -r build
 
@@ -109,6 +117,17 @@ jobs:
         working-directory: apps/vue-example
         env:
           E2E_PREVIEW: "1"
+
+      - name: Smoke test the built Svelte embed example
+        run: bun run e2e
+        working-directory: apps/svelte-example
+        env:
+          E2E_PREVIEW: "1"
+
+      # Needs apps/widget/dist (built above) — the showcase iframes it.
+      - name: E2E the widget showcase
+        run: bun run e2e
+        working-directory: apps/widget-example
 
       - name: Upload Playwright traces on failure
         if: failure()

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aspicio · vanilla core example</title>
+    <style>
+      body {
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #101318;
+        color: #dfe3ea;
+        font-family: system-ui, sans-serif;
+      }
+      header {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        padding: 10px 16px;
+        border-bottom: 1px solid #2c3140;
+        font-size: 13px;
+      }
+      header .stats {
+        color: #8b93a5;
+      }
+      main {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+      }
+      /* Deliberately custom chrome: this example proves the raw DxfViewer
+         API, not the ready-made panel — so it looks intentionally different. */
+      aside {
+        width: 210px;
+        flex-shrink: 0;
+        border-right: 1px solid #2c3140;
+        padding: 10px;
+        font-size: 13px;
+        overflow-y: auto;
+      }
+      aside h2 {
+        margin: 0 0 8px;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        color: #8b93a5;
+      }
+      aside label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 3px 0;
+        cursor: pointer;
+      }
+      aside .swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      aside button {
+        margin-top: 10px;
+        width: 100%;
+        padding: 6px;
+        background: #1d2230;
+        color: inherit;
+        border: 1px solid #2c3140;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #stage {
+        flex: 1;
+        min-width: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>ASPICIO · VANILLA CORE</strong>
+      <span class="stats" id="stats"></span>
+      <span class="stats">hand-rolled chrome on the raw DxfViewer API</span>
+    </header>
+    <main>
+      <aside>
+        <h2>LAYERS</h2>
+        <div id="layers"></div>
+        <button id="fit" type="button">Fit view</button>
+      </aside>
+      <div id="stage"></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
