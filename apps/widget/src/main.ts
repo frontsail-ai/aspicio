@@ -112,6 +112,7 @@ const STYLE = `
     #state .compact-size { display: inline; }
   }
   @keyframes crease-march { to { stroke-dashoffset: -12; } }
+  .crease { animation: crease-march 1.2s linear infinite; }
   @keyframes dot-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
   #state .dots { display: flex; gap: 6px; }
   #state .dots span { width: 5px; height: 5px; background: #5A6270; }
@@ -197,7 +198,7 @@ const ICONS = {
     '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
   warn: `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E8756B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
   box: `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5A6270" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`,
-  drawing: `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#5A6270" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14" stroke="#2D6CDF" stroke-dasharray="3 3" style="animation: crease-march 1.2s linear infinite"/></svg>`,
+  drawing: `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#5A6270" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14" stroke="#2D6CDF" stroke-dasharray="3 3" class="crease"/></svg>`,
   copy: svg(
     '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   ),
@@ -351,11 +352,10 @@ function layersMarkup(): string {
   const rows = viewer
     .getLayers()
     .map((layer, i) => {
-      const color = cssColor(layer.effectiveColors?.[0] ?? layer.color);
       return `<label class="${layer.visible ? "" : "off"}" data-i="${i}">
         <input type="checkbox" ${layer.visible ? "checked" : ""}>
         <span class="box">${ICONS.check}</span>
-        <span class="swatch" style="border-top-color: ${color}"></span>
+        <span class="swatch"></span>
         <span class="name"></span>
       </label>`;
     })
@@ -374,6 +374,9 @@ function layersMarkup(): string {
 function wireLayerHome(home: HTMLElement): void {
   home.innerHTML = layersMarkup();
   // Names go in via textContent — layer names are drawing data, not markup.
+  // Swatch colors go in via the CSSOM: hosts ship CSPs that refuse to parse
+  // inline style attributes (style-src-attr), but programmatic assignment
+  // is exempt.
   const layers = viewer.getLayers();
   const names = layerDisplayNames(layers.map((l) => l.name));
   for (const label of home.querySelectorAll("label")) {
@@ -381,6 +384,9 @@ function wireLayerHome(home: HTMLElement): void {
     (label.querySelector(".name") as HTMLElement).textContent =
       names[Number(label.dataset.i)].display;
     label.title = layer.name;
+    (label.querySelector(".swatch") as HTMLElement).style.borderTopColor = cssColor(
+      layer.effectiveColors?.[0] ?? layer.color,
+    );
     const input = label.querySelector("input") as HTMLInputElement;
     input.addEventListener("change", () => {
       viewer.setLayerVisible(layer.name, input.checked);

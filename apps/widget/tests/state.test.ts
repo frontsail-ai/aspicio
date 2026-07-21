@@ -145,3 +145,17 @@ test("a layer that IS the shared prefix keeps its full name", () => {
   ]);
   expect(out[0].display).toBe("xref-Plan-08$0$");
 });
+
+test("widget source carries no inline style attributes (host CSP blocks them)", async () => {
+  // Hosts sandbox the widget behind CSPs that refuse to parse style
+  // attributes (style-src-attr) while <style> sheets keep working — an
+  // attribute-styled swatch renders invisibly in-host. Dynamic styling must
+  // go through the CSSOM instead.
+  const { readFileSync, readdirSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const srcDir = join(import.meta.dirname, "../src");
+  for (const file of readdirSync(srcDir)) {
+    const text = readFileSync(join(srcDir, file), "utf8");
+    expect(text, `${file} must not use style= attributes`).not.toMatch(/style="/);
+  }
+});
