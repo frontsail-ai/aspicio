@@ -14,7 +14,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write # GitHub Release creation
   id-token: write # registry publish via GitHub OIDC
 
 concurrency:
@@ -162,3 +162,15 @@ jobs:
           curl -sSfL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
           ./mcp-publisher login github-oidc
           ./mcp-publisher publish
+
+      # A tag without a Release is invisible on GitHub — v0.7.0 and v0.8.0
+      # both shipped without one until backfilled by hand. Generated notes
+      # land automatically; enrich them with a curated summary afterwards
+      # (docs/releasing.md).
+      - name: Create the GitHub Release
+        if: ${{ github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            --title "$GITHUB_REF_NAME" || echo "release already exists — leaving it untouched"
