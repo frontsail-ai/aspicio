@@ -47,10 +47,17 @@ capped `description` at 100 chars — both bit us once already).
 
 ### ChatGPT app directory (when submitting)
 
-Submission assets live in-repo: icon `apps/demo/public/icon-64.png`
-(64×64 PNG, <5 KB), privacy `https://aspicio.dmitri-66a.workers.dev/privacy/`,
-terms `…/terms/`, support contact `support@frontsail.ai`. All tools carry
-read-only/open-world annotations (drift-guarded).
+Submission assets live in-repo: directory icon
+`apps/demo/public/icon-256.png` (form wants ≥256×256), composer icon
+`apps/demo/public/icon-48.png` (≥48×48), legacy `icon-64.png`, privacy
+`https://aspicio.dmitri-66a.workers.dev/privacy/`, terms `…/terms/`,
+support contact `support@frontsail.ai`. All tools carry explicit
+readOnly/openWorld/destructive hints (drift-guarded) — the form blocks
+on any missing hint. `chatgpt-app-submission.json` at the repo root is
+the import file the form's Info step accepts (generated per the
+`$chatgpt-app-submission` skill contract from
+`openai/openai-developers-for-claude`); regenerate it if tools, hints,
+or app copy change.
 
 ## 2. Smithery (smithery.ai)
 

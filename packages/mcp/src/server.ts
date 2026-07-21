@@ -24,7 +24,7 @@ export function createServer(): McpServer {
     "describe_dxf",
     {
       title: "Describe a DXF drawing",
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
       description:
         "Return a structured JSON summary of a DXF drawing — units, bounding box, layers (with the color actually drawn), per-type entity counts, and any skipped/unsupported types. Use this to answer structural questions (what layers exist, how many parts, what size, is it to scale) without rendering an image.",
       inputSchema: { source: z.string().describe(SOURCE_DESC) },
@@ -39,7 +39,7 @@ export function createServer(): McpServer {
     "render_dxf",
     {
       title: "Render a DXF to an image",
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
       description:
         "Render a DXF drawing to a PNG image you can look at. Use this to answer visual questions (what does it look like, where is a feature, does it look right) — it returns an image, not text. For structural facts, prefer describe_dxf.",
       inputSchema: {

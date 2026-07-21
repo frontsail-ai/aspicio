@@ -1,0 +1,128 @@
+{
+  "$schema": "https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "Aspicio",
+    "subtitle": "View and inspect DXF drawings",
+    "description": "Aspicio turns DXF CAD drawings into things ChatGPT can work with: structured facts (units, bounds, layers with the colors actually drawn, entity counts, and the drawing's text content), rendered PNG images, and an interactive in-chat viewer with pan, zoom, layer toggles, and fullscreen. Point it at a drawing URL or paste DXF text to read title blocks and dimension values, check layer structure, and visually inspect floor plans, die-cut layouts, and mechanical parts without leaving the conversation.",
+    "category": "DESIGN"
+  },
+  "tools": {
+    "describe_dxf": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Parses the drawing and returns computed facts (units, bounds, layers, entity counts, text content); it stores nothing and modifies nothing.",
+        "open_world_justification": "Fetches the user-supplied http(s) DXF URL with guarded GET requests (private networks blocked, size-capped, rate-limited); it never writes to external systems.",
+        "destructive_justification": "Performs no deletion, overwrite, or other irreversible action; every response is derived per-request from the input drawing."
+      }
+    },
+    "render_dxf": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Rasterizes the drawing to a PNG in memory and returns it; no state is created or changed.",
+        "open_world_justification": "Fetches the user-supplied http(s) DXF URL with guarded GET requests; it publishes nothing and posts nothing.",
+        "destructive_justification": "Rendering is a pure read-and-transform; nothing is deleted, overwritten, or sent anywhere irreversible."
+      }
+    },
+    "view_dxf": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Returns a structured summary plus widget-only drawing data for the in-chat viewer; it reads the drawing and changes nothing.",
+        "open_world_justification": "May fetch the user-supplied http(s) DXF URL with guarded GET requests; the viewer widget itself makes no network requests and writes nothing external.",
+        "destructive_justification": "Opening the viewer has no side effects; the widget is locked to the delivered drawing and cannot alter or delete anything."
+      }
+    },
+    "load_dxf_for_viewer": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "App-only data channel: returns the drawing's bytes (whole or a byte range) to the viewer widget; it reads and returns data only.",
+        "open_world_justification": "Fetches the same user-supplied http(s) DXF URL under the same guards as the other tools; it never writes externally.",
+        "destructive_justification": "Serving bytes to the widget deletes and changes nothing."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "Structural questions about a drawing are answered from facts, not vision.",
+      "user_prompt": "What layers are in this drawing, and what size is it? https://raw.githubusercontent.com/jscad/sample-files/master/dxf/dxf-parser/floorplan.dxf",
+      "file_attachment_urls": null,
+      "tools_triggered": "describe_dxf",
+      "expected_output": "Lists the drawing's layers with their drawn colors, reports units and bounding-box size, and summarizes entity counts from the structured JSON facts.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Text content (title blocks, dimension values) is read directly from the drawing.",
+      "user_prompt": "Read me the text and any dimension values in this DXF: https://raw.githubusercontent.com/jscad/sample-files/master/dxf/dxf-parser/floorplan.dxf",
+      "file_attachment_urls": null,
+      "tools_triggered": "describe_dxf",
+      "expected_output": "Returns the drawing's TEXT/MTEXT strings, including text inside blocks and dimensions, without rendering or OCR.",
+      "expected_output_url": null
+    },
+    {
+      "description": "A static render is produced when the model needs to look at the drawing.",
+      "user_prompt": "Render this DXF as an image at width 800: https://raw.githubusercontent.com/jscad/sample-files/master/dxf/dxf-parser/floorplan.dxf",
+      "file_attachment_urls": null,
+      "tools_triggered": "render_dxf",
+      "expected_output": "Returns a PNG render of the drawing plus a direct image link the assistant can show if the chat UI hides MCP image blocks.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Asking to see or explore a drawing opens the interactive in-chat viewer.",
+      "user_prompt": "Let me explore this floor plan interactively: https://raw.githubusercontent.com/jscad/sample-files/master/dxf/dxf-parser/floorplan.dxf",
+      "file_attachment_urls": null,
+      "tools_triggered": "view_dxf",
+      "expected_output": "The in-chat viewer widget opens with the drawing (pan, zoom, layer toggles, fullscreen); larger URL drawings are fetched by the widget itself, and the model narrates the viewer's reported status.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Inline DXF text pasted into the conversation is inspected without any URL.",
+      "user_prompt": "Here is a DXF I pasted as text — tell me what entities it contains. 0\nSECTION\n2\nENTITIES\n0\nLINE\n8\nWALLS\n10\n0\n20\n0\n11\n10\n21\n0\n0\nENDSEC\n0\nEOF",
+      "file_attachment_urls": null,
+      "tools_triggered": "describe_dxf",
+      "expected_output": "Parses the pasted DXF text and reports its entities (one LINE on layer WALLS) with units and bounds.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Other CAD formats are out of scope; the app handles DXF only.",
+      "user_prompt": "Convert this STEP file to STL for 3D printing.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked; it reads DXF drawings and does not convert other CAD formats.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Editing or modifying drawings is not supported; the app is view-only.",
+      "user_prompt": "Delete the DIMENSIONS layer from my drawing file and save it back.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked to edit; all tools are read-only, and the assistant should explain that Aspicio inspects and displays drawings but does not modify them.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Nearby design requests without a DXF drawing should not trigger the app.",
+      "user_prompt": "Design a floor plan for a two-bedroom apartment.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked because there is no existing DXF to inspect, render, or view; drawing creation is outside its capabilities.",
+      "expected_output_url": null
+    }
+  ]
+}
