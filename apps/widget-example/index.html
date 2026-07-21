@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aspicio · widget showcase</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #14161c;
+        color: #e2e5ec;
+        font-family: system-ui, sans-serif;
+      }
+      header {
+        padding: 12px 18px;
+        border-bottom: 1px solid #2a2e3a;
+        font-size: 13px;
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+      }
+      header .hint {
+        color: #79808f;
+        font-size: 11px;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px 18px;
+      }
+      nav button {
+        padding: 6px 12px;
+        background: #1d212b;
+        color: inherit;
+        border: 1px solid #2a2e3a;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      nav button[aria-pressed="true"] {
+        border-color: #4c8dff;
+        color: #9dbcf5;
+      }
+      #frame-holder {
+        padding: 6px 18px 24px;
+      }
+      #frame-holder iframe {
+        border: 1px solid #2a2e3a;
+        border-radius: 8px;
+        background: #000;
+        display: block;
+      }
+      #meta {
+        padding: 0 18px 10px;
+        color: #79808f;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>ASPICIO · MCP APPS WIDGET SHOWCASE</strong>
+      <span class="hint"
+        >the in-chat viewer, driven by a fake host (AppBridge) — pick a configuration</span
+      >
+    </header>
+    <nav id="configs"></nav>
+    <div id="meta"></div>
+    <div id="frame-holder"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
