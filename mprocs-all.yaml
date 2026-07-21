@@ -1,0 +1,30 @@
+# The whole fleet: every app plus the DXF API (`just run-all`). Same port
+# discipline as mprocs.yaml — stable, non-overlapping, clear of the e2e
+# suites' 417x range.
+procs:
+  demo:
+    cwd: apps/demo
+    shell: bunx vp dev --port 5173
+  api:
+    cwd: apps/api
+    env:
+      PORT: "8788"
+    shell: bun run src/dev.ts
+  react-example:
+    cwd: apps/react-example
+    shell: bunx vp dev --port 5181
+  vue-example:
+    cwd: apps/vue-example
+    shell: bunx vp dev --port 5182
+  svelte-example:
+    cwd: apps/svelte-example
+    shell: bunx vp dev --port 5183
+  vanilla-example:
+    cwd: apps/vanilla-example
+    shell: bunx vp dev --port 5184
+  elements-example:
+    cwd: apps/elements-example
+    shell: bunx vp dev --port 5185
+  widget-example:
+    cwd: apps/widget-example
+    shell: bunx vp dev --port 5186

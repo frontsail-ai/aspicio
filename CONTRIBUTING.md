@@ -17,6 +17,15 @@ vp run e2e       # run browser e2e tests (Playwright)
 vp run ready     # check + test + build everything (the repo gate)
 ```
 
+With [just](https://just.systems) and [mprocs](https://github.com/pvolok/mprocs)
+installed (`brew install just mprocs`), the multi-process shortcuts:
+
+```bash
+just run       # demo app + API side by side (mprocs.yaml)
+just run-all   # every app + API, pinned ports (mprocs-all.yaml)
+just check     # the repo gate (vp run ready)
+```
+
 ## Testing
 
 - **Unit tests** (`packages/core/tests/`, `packages/react/tests/`,
