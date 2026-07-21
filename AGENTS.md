@@ -7,15 +7,15 @@ MCP server, and installable skills/plugins. Live demo:
 
 ## Tech stack
 
-| What               | Choice                                                                                               |
-| ------------------ | ---------------------------------------------------------------------------------------------------- |
-| Language / runtime | TypeScript; bun (package manager + runtime backend)                                                  |
-| Toolchain          | Vite+ (`vp`) — dev, build, test (vitest), lint/format (oxlint/oxfmt), pack (tsdown)                  |
-| Rendering          | Three.js WebGL (viewer); resvg WASM/native for headless PNG                                          |
-| Parsing            | dxf-parser + custom entity handlers                                                                  |
-| E2E                | Playwright e2e suites: demo + every example app (react/elements/vue/svelte/vanilla/widget)           |
-| Hosting / deploy   | Vercel (custom domains on frontsail.app) + Cloudflare Workers during transition, from GitHub Actions |
-| Agent protocol     | MCP (official SDK; stdio + Streamable HTTP) + MCP Apps in-chat viewer                                |
+| What               | Choice                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| Language / runtime | TypeScript; bun (package manager + runtime backend)                                        |
+| Toolchain          | Vite+ (`vp`) — dev, build, test (vitest), lint/format (oxlint/oxfmt), pack (tsdown)        |
+| Rendering          | Three.js WebGL (viewer); resvg WASM/native for headless PNG                                |
+| Parsing            | dxf-parser + custom entity handlers                                                        |
+| E2E                | Playwright e2e suites: demo + every example app (react/elements/vue/svelte/vanilla/widget) |
+| Hosting / deploy   | Vercel (custom domains on frontsail.app), prebuilt artifacts deployed from GitHub Actions  |
+| Agent protocol     | MCP (official SDK; stdio + Streamable HTTP) + MCP Apps in-chat viewer                      |
 
 ## Architecture in 30 seconds
 

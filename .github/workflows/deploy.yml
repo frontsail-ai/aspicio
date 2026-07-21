@@ -1,13 +1,14 @@
-# Deploys two Cloudflare Workers: the demo (static assets) and the DXF API.
-#   push → master : production deploy (`wrangler deploy`)
-#   pull_request  : preview version (`wrangler versions upload`); its URL is
-#                   posted back as a sticky comment on the PR
+# Deploys the demo and the DXF API to Vercel.
+#   push → master : production deploy + smoke tests against the public aliases
+#   pull_request  : preview deploy; its URL is posted back as a sticky comment
+#                   (preview URLs sit behind Vercel SSO — team eyes only)
 #
 # One-time setup:
-#   1. Create a Cloudflare API token with the "Workers Scripts: Edit" permission.
-#   2. Add repo secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
-#   (No resource to pre-create — `wrangler deploy` creates each Worker on first run.)
-name: Deploy (Cloudflare Workers)
+#   1. Create the two Vercel projects (aspicio-demo, aspicio-api) — CLI-linked,
+#      no git integration (CI is the only deployer).
+#   2. Add repo secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID_DEMO,
+#      VERCEL_PROJECT_ID_API. Until they exist this workflow skips itself.
+name: Deploy
 
 on:
   push:
@@ -16,12 +17,11 @@ on:
 
 # Supersede in-flight deploys for the same branch/PR.
 concurrency:
-  group: cf-deploy-${{ github.ref }}
+  group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
-  deployments: write # let wrangler-action record a GitHub deployment
   pull-requests: write # comment the preview URL on PRs
   issues: write # PR comments go through the issues API
 
@@ -29,111 +29,7 @@ jobs:
   deploy:
     name: Deploy ${{ matrix.target }}
     runs-on: ubuntu-latest
-    # Fork PRs can't read secrets — skip them (no preview) instead of failing.
-    if: >-
-      github.event_name == 'push' ||
-      github.event.pull_request.head.repo.full_name == github.repository
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: demo
-            # The demo Worker is assets-only; vite builds them (resolving
-            # @aspicio/core from source via its alias).
-            build: "@aspicio/demo#build"
-            workdir: "."
-            marker: aspicio-preview
-            label: "🚀 **Preview deployed**"
-          - target: api
-            # wrangler bundles the API Worker itself, but resolves
-            # @aspicio/core through node_modules → its built dist, and
-            # imports the widget's built dist/widget.html as text.
-            build: "-F @aspicio/core -F @aspicio/widget build"
-            workdir: apps/api
-            marker: aspicio-api-preview
-            label: "🛠️ **API preview deployed**"
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.14
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build
-        run: bunx vp run ${{ matrix.build }}
-
-      - name: Deploy to Cloudflare Workers
-        id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          workingDirectory: ${{ matrix.workdir }}
-          # Subdirectories have no lockfile, so the action's autodetect would
-          # fall back to npm — which rejects the repo's bun devEngines pin.
-          packageManager: bun
-          command: ${{ github.event_name == 'pull_request' && 'versions upload' || 'deploy' }}
-
-      # Post (and keep updating) one sticky PR comment per target.
-      - name: Comment the preview URL on the PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        env:
-          MARKER: ${{ matrix.marker }}
-          LABEL: ${{ matrix.label }}
-          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
-          WRANGLER_OUTPUT: ${{ steps.deploy.outputs.command-output }}${{ steps.deploy.outputs.command-stderr }}
-        with:
-          script: |
-            const marker = `<!-- ${process.env.MARKER} -->`;
-            const url =
-              process.env.DEPLOY_URL ||
-              (process.env.WRANGLER_OUTPUT.match(/https:\/\/[a-z0-9-]+\.workers\.dev\S*/i) || [])[0];
-            const sha = context.sha.slice(0, 7);
-            const body = url
-              ? `${marker}\n${process.env.LABEL} for \`${sha}\`: ${url}`
-              : `${marker}\n⚠️ Preview version uploaded for \`${sha}\`, but no preview URL was found in the wrangler output.`;
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.find((c) => c.body?.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
-
-  # ------------------------------------------------------------------
-  # Vercel (transition target — Workers above stay live until listings
-  # migrate). Production-only; PR previews remain on the Workers flow.
-  # One-time setup: create the two Vercel projects, then add repo secrets
-  # VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID_DEMO,
-  # VERCEL_PROJECT_ID_API. Until the secrets exist this job skips itself.
-  # ------------------------------------------------------------------
-  vercel:
-    name: Deploy ${{ matrix.target }} (Vercel)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    # Fork PRs can't read secrets — the token check below skips them cleanly.
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -146,6 +42,8 @@ jobs:
             dir: apps/demo/dist
             project_secret: VERCEL_PROJECT_ID_DEMO
             alias: aspicio-demo.vercel.app
+            marker: aspicio-preview
+            label: "🚀 **Preview deployed**"
           - target: api
             build: >-
               bunx vp run -F @aspicio/core -F @aspicio/widget build &&
@@ -153,6 +51,8 @@ jobs:
             dir: apps/api/vercel-dist
             project_secret: VERCEL_PROJECT_ID_API
             alias: aspicio-api.vercel.app
+            marker: aspicio-api-preview
+            label: "🛠️ **API preview deployed**"
     steps:
       - name: Note skip when Vercel secrets are absent
         if: env.VERCEL_TOKEN == ''
@@ -184,15 +84,16 @@ jobs:
         id: deploy
         env:
           VERCEL_PROJECT_ID: ${{ secrets[matrix.project_secret] }}
+          PROD_FLAG: ${{ github.event_name == 'push' && '--prod' || '' }}
         run: |
-          URL=$(bunx vercel deploy --prod --yes --cwd "${{ matrix.dir }}" --token "$VERCEL_TOKEN")
+          URL=$(bunx vercel deploy $PROD_FLAG --yes --cwd "${{ matrix.dir }}" --token "$VERCEL_TOKEN")
           echo "Deployed: $URL"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
+      # Production smoke runs against the public alias — deployment-scoped
+      # URLs (and previews) sit behind Vercel Authentication.
       - name: Smoke test (api)
-        # The deployment-scoped URL the CLI prints sits behind Vercel
-        # Authentication; the production alias is the public surface.
-        if: env.VERCEL_TOKEN != '' && matrix.target == 'api'
+        if: env.VERCEL_TOKEN != '' && matrix.target == 'api' && github.event_name == 'push'
         run: |
           URL="https://${{ matrix.alias }}"
           curl -sf "$URL/health" | grep -q '"status": *"ok"'
@@ -205,9 +106,47 @@ jobs:
           echo "API smoke passed."
 
       - name: Smoke test (demo)
-        if: env.VERCEL_TOKEN != '' && matrix.target == 'demo'
+        if: env.VERCEL_TOKEN != '' && matrix.target == 'demo' && github.event_name == 'push'
         run: |
           URL="https://${{ matrix.alias }}"
           curl -sf "$URL/" | grep -qi "aspicio"
           curl -sf "$URL/llms.txt" | grep -q "Aspicio"
           echo "Demo smoke passed."
+
+      # Post (and keep updating) one sticky PR comment per target.
+      - name: Comment the preview URL on the PR
+        if: env.VERCEL_TOKEN != '' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          MARKER: ${{ matrix.marker }}
+          LABEL: ${{ matrix.label }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+        with:
+          script: |
+            const marker = `<!-- ${process.env.MARKER} -->`;
+            const sha = context.sha.slice(0, 7);
+            const url = process.env.DEPLOY_URL;
+            const body = url
+              ? `${marker}\n${process.env.LABEL} for \`${sha}\`: ${url} (Vercel login required)`
+              : `${marker}\n⚠️ Preview deployed for \`${sha}\`, but no URL was captured.`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
