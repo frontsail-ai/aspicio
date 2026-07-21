@@ -14,7 +14,8 @@
     "paths": {
       "@aspicio/core": ["../../packages/core/src/index.ts"],
       "@aspicio/widget/meta": ["../widget/src/meta.ts"]
-    }
+    },
+    "resolveJsonModule": true
   },
   "include": ["src/**/*.ts", "../widget/src/meta.ts"]
 }

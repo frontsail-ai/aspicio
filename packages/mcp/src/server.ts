@@ -1,12 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+// Baked at build time, after the release workflow stamps the manifest — so
+// `initialize` reports the real published version, not the repo's 0.0.0
+// placeholder (registries display this field).
+import pkg from "../package.json";
 import { describeDxf, loadDxf, renderPng } from "./tools.ts";
 
 const SOURCE_DESC = "An http(s) URL to a .dxf, a local file path, or inline DXF text.";
 
 /** Build the Aspicio MCP server with the `describe_dxf` and `render_dxf` tools. */
 export function createServer(): McpServer {
-  const server = new McpServer({ name: "aspicio", version: "0.0.0" });
+  const server = new McpServer({ name: "aspicio", version: pkg.version });
 
   server.registerTool(
     "describe_dxf",
