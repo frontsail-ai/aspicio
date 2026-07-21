@@ -18,7 +18,8 @@ export interface LoadedDetail {
  * Properties: `src` (text | File | Blob | ArrayBuffer), `options`
  * (applied at creation; changing them recreates the viewer), and the
  * readonly `viewer` (the full DxfViewer for camera control, layer
- * toggling, hit-testing, exports).
+ * toggling, hit-testing, exports). Between `src` and `src-url`, the most
+ * recently set source wins; if both are set at creation, `src-url` does.
  * Events: `loaded` ({layers, stats}), `load-error` ({error}),
  * `viewer-change` ({viewer}), `hover-layer` ({layer}).
  */
@@ -45,6 +46,8 @@ export class AspicioPreview extends LitElement {
 
   #viewer: DxfViewer | null = null;
   #firstCycleDone = false;
+  /** Which source was set most recently — the one loads use (ELEM-3). */
+  #activeSource: "src" | "url" | null = null;
   #loadToken = 0;
   /** Options snapshot the live viewer was created with. */
   #appliedOptionsKey = "{}";
@@ -66,6 +69,21 @@ export class AspicioPreview extends LitElement {
   /** The live DxfViewer instance, or null before first render / after disconnect. */
   get viewer(): DxfViewer | null {
     return this.#viewer;
+  }
+
+  willUpdate(changed: PropertyValues): void {
+    if (!changed.has("src") && !changed.has("srcUrl")) return;
+    // The most recently set source wins (ELEM-3): an attribute lingering in
+    // the markup must not shadow a later `src` assignment. When both change
+    // in the same cycle (e.g. both set in the initial markup), src-url keeps
+    // its documented precedence.
+    if (changed.has("src") && this.src != null) this.#activeSource = "src";
+    if (changed.has("srcUrl") && this.srcUrl != null) this.#activeSource = "url";
+    // A cleared active source falls back to the other one, if set.
+    if (this.#activeSource === "src" && this.src == null)
+      this.#activeSource = this.srcUrl != null ? "url" : null;
+    if (this.#activeSource === "url" && this.srcUrl == null)
+      this.#activeSource = this.src != null ? "src" : null;
   }
 
   static styles = [
@@ -182,7 +200,7 @@ export class AspicioPreview extends LitElement {
     this.#emit("viewer-change", { viewer: instance });
     this.#syncHoverPick();
     this.#syncShortcuts();
-    if (this.src != null || this.srcUrl != null) this.#startLoad();
+    if (this.#activeSource != null) this.#startLoad();
   }
 
   #destroyViewer(): void {
@@ -199,10 +217,12 @@ export class AspicioPreview extends LitElement {
 
   #startLoad(): void {
     const viewer = this.#viewer;
-    if (!viewer || (this.src == null && this.srcUrl == null)) return;
+    if (!viewer || this.#activeSource == null) return;
     const token = ++this.#loadToken;
     const loading =
-      this.srcUrl != null ? viewer.loadUrl(this.srcUrl) : viewer.load(this.src as DxfSource);
+      this.#activeSource === "url"
+        ? viewer.loadUrl(this.srcUrl as string)
+        : viewer.load(this.src as DxfSource);
     loading
       .then(() => {
         if (token !== this.#loadToken || viewer !== this.#viewer) return; // superseded

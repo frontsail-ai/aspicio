@@ -131,8 +131,9 @@ used.
   `@aspicio/core` API — `fitView`, `zoomBy`, `resetRotation`,
   `setLayerVisible`, `setLayerHighlight`, `pickLayer`, `view`, `stats`,
   `toSVG`, `toPNG`.
-- Changing `src` / `src-url` loads the new document; stale in-flight
-  loads are ignored.
+- Changing `src` / `src-url` loads the new document; the most recently
+  set source wins (if both are set at creation, `src-url` does), and
+  stale in-flight loads are ignored.
 - `shortcuts` keys are scoped to the **focused** embed (click it first):
   `F` fit, `+`/`-` zoom, `R` reset rotation, `A` show all layers —
   multiple embeds on a page don't collide.

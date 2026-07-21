@@ -45,7 +45,7 @@ The components are veneers over the `@aspicio/elements` web components: internal
 <aspicio-embed src-url="/drawing.dxf" style="height: 480px"></aspicio-embed>
 ```
 
-Same behavior as `<DxfEmbed>`, attribute/property/event flavored: attributes `src-url`, `panel`, `theme`, `no-download`, `shortcuts`; properties `src`, `options`, `viewer` (the full `DxfViewer`); events `loaded`, `load-error`, `viewer-change`, `hover-layer` (CustomEvents, payload in `detail`). In Vue set `compilerOptions.isCustomElement` for `aspicio-` tags; Svelte consumes them natively.
+Same behavior as `<DxfEmbed>`, attribute/property/event flavored: attributes `src-url`, `panel`, `theme`, `no-download`, `shortcuts`; properties `src`, `options`, `viewer` (the full `DxfViewer`) — between `src` and `src-url` the most recently set source wins; events `loaded`, `load-error`, `viewer-change`, `hover-layer` (CustomEvents, payload in `detail`). In Vue set `compilerOptions.isCustomElement` for `aspicio-` tags; Svelte consumes them natively.
 
 ## Vanilla JS
 

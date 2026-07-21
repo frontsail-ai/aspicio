@@ -43,6 +43,23 @@ test("the shortcuts attribute enables focus-scoped keyboard control", async ({ p
     .toBe(true);
 });
 
+test("assigning the src property wins over the lingering src-url attribute", async ({ page }) => {
+  await loadEmbed(page);
+  expect(await page.evaluate(() => window.__viewer!.getLayers().map((l) => l.name))).toContain(
+    "WALLS",
+  );
+  // The markup's src-url attribute stays in the DOM; a later src assignment
+  // must still win (ELEM-3: the last-set source always wins).
+  await page.evaluate(() => {
+    const embed = document.querySelector("aspicio-embed")!;
+    (embed as HTMLElement & { src: string }).src =
+      "0\nSECTION\n2\nENTITIES\n0\nLINE\n8\nFROM-SRC-PROP\n10\n0\n20\n0\n30\n0\n11\n10\n21\n10\n31\n0\n0\nENDSEC\n0\nEOF\n";
+  });
+  await expect
+    .poll(() => page.evaluate(() => window.__viewer!.getLayers().map((l) => l.name)))
+    .toEqual(["FROM-SRC-PROP"]);
+});
+
 test("changing the src-url attribute loads the new document", async ({ page }) => {
   await loadEmbed(page);
   const entityCount = () =>

@@ -213,6 +213,40 @@ test("a newer src supersedes a slow in-flight load", async () => {
   expect(loaded).toHaveBeenCalledTimes(2); // first + third, not second
 });
 
+test("setting src after src-url loads the data — the last-set source wins", async () => {
+  const el = mount("aspicio-preview");
+  el.setAttribute("src-url", "/plan.dxf");
+  await flush();
+  expect(lastViewer().loadUrl).toHaveBeenCalledWith("/plan.dxf");
+
+  el.src = "dxf-data"; // the attribute still lingers in the markup
+  await flush();
+  expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
+
+  el.setAttribute("src-url", "/other.dxf"); // and back to a URL
+  await flush();
+  expect(lastViewer().loadUrl).toHaveBeenLastCalledWith("/other.dxf");
+});
+
+test("when both sources are set at creation, src-url wins", async () => {
+  const el = document.createElement("aspicio-preview");
+  el.src = "dxf-data";
+  el.setAttribute("src-url", "/plan.dxf");
+  document.body.appendChild(el);
+  await flush();
+  expect(lastViewer().loadUrl).toHaveBeenCalledWith("/plan.dxf");
+  expect(lastViewer().load).not.toHaveBeenCalled();
+});
+
+test("clearing the active source falls back to the other one", async () => {
+  const el = mount("aspicio-preview", { src: "dxf-data" });
+  el.setAttribute("src-url", "/plan.dxf"); // becomes active (last set)
+  await flush();
+  el.removeAttribute("src-url");
+  await flush();
+  expect(lastViewer().load).toHaveBeenLastCalledWith("dxf-data");
+});
+
 test("`load-error` fires for failed loads", async () => {
   const onError = vi.fn();
   const el = mount("aspicio-preview", { src: "ok" });

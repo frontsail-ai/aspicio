@@ -6,9 +6,9 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import type { CSSProperties } from "react";
 
 export interface DxfPreviewProps {
-  /** DXF data: text, File, Blob, or ArrayBuffer. Mutually exclusive with srcUrl. */
+  /** DXF data: text, File, Blob, or ArrayBuffer. The most recently set of src/srcUrl wins. */
   src?: DxfSource | null;
-  /** URL to fetch a DXF from. Mutually exclusive with src. */
+  /** URL to fetch a DXF from. The most recently set of src/srcUrl wins. */
   srcUrl?: string | null;
   /** Viewer options, applied at mount (changing them recreates the viewer). */
   options?: DxfViewerOptions;

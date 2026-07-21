@@ -195,6 +195,23 @@ test("a newer src supersedes a slow in-flight load", async () => {
   expect(onLoaded).toHaveBeenCalledTimes(2); // first + third, not second
 });
 
+test("switching from srcUrl to src loads the data — last-set source wins", async () => {
+  const { rerender } = render(<DxfPreview srcUrl="/plan.dxf" />);
+  await flush();
+  expect(lastViewer().loadUrl).toHaveBeenCalledWith("/plan.dxf");
+  const loadUrlCalls = lastViewer().loadUrl.mock.calls.length;
+
+  // React re-assigns both props every render; only the genuine change counts.
+  rerender(<DxfPreview srcUrl="/plan.dxf" src="dxf-data" />);
+  await flush();
+  expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
+
+  rerender(<DxfPreview srcUrl="/plan.dxf" src="dxf-data" />); // no changes
+  await flush();
+  expect(lastViewer().load).toHaveBeenCalledTimes(1);
+  expect(lastViewer().loadUrl.mock.calls.length).toBe(loadUrlCalls);
+});
+
 test("onError fires for failed loads", async () => {
   const onError = vi.fn();
   const { rerender } = render(<DxfPreview src="ok" onError={onError} />);
