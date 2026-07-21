@@ -7,7 +7,7 @@ accounts — this is the runbook.
 
 **Prerequisites (all already true after the reach-plan stack merges):**
 `@aspicio/mcp` published to npm; the remote endpoint live at
-`https://aspicio-api.dmitri-66a.workers.dev/mcp`; `server.json`,
+`https://aspicio-api.frontsail.app/mcp`; `server.json`,
 `smithery.yaml`, and `glama.json` on `master`.
 
 The supported set is deliberately these four — the canonical registry
@@ -50,7 +50,7 @@ capped `description` at 100 chars — both bit us once already).
 Submission assets live in-repo: directory icon
 `apps/demo/public/icon-256.png` (form wants ≥256×256), composer icon
 `apps/demo/public/icon-48.png` (≥48×48), legacy `icon-64.png`, privacy
-`https://aspicio.dmitri-66a.workers.dev/privacy/`, terms `…/terms/`,
+`https://aspicio.frontsail.app/privacy/`, terms `…/terms/`,
 support contact `support@frontsail.ai`. All tools carry explicit
 readOnly/openWorld/destructive hints (drift-guarded) — the form blocks
 on any missing hint. `chatgpt-app-submission.json` at the repo root is

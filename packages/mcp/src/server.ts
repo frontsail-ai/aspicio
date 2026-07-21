@@ -14,10 +14,8 @@ export function createServer(): McpServer {
     name: "aspicio",
     title: "Aspicio",
     version: pkg.version,
-    icons: [
-      { src: "https://aspicio.dmitri-66a.workers.dev/favicon.svg", mimeType: "image/svg+xml" },
-    ],
-    websiteUrl: "https://aspicio.dmitri-66a.workers.dev",
+    icons: [{ src: "https://aspicio.frontsail.app/favicon.svg", mimeType: "image/svg+xml" }],
+    websiteUrl: "https://aspicio.frontsail.app",
   });
 
   server.registerTool(
