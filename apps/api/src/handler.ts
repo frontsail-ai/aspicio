@@ -103,7 +103,9 @@ export async function handleRequest(
       case "/health":
         return json({ status: "ok" });
       case "/openapi.json":
-        return json(openapi);
+        // Advertise whichever host served the doc — the API answers on more
+        // than one domain, and a hardcoded URL lies on all but one of them.
+        return json({ ...openapi, servers: [{ url: url.origin }] });
       case "/":
         return json({
           name: "aspicio-api",
