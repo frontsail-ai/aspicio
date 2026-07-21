@@ -329,6 +329,46 @@ test("texts collects TEXT strings, including inside reachable blocks, deduped", 
   expect(summary.texts).toEqual(["ROOM A", "PART-42"]);
 });
 
+test("texts surfaces decoded control codes, not the raw %%-sequences", () => {
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "TEXT",
+    "8",
+    "0",
+    "10",
+    "0",
+    "20",
+    "0",
+    "40",
+    "5",
+    "1",
+    "%%uGREAT ROOM",
+    "0",
+    "TEXT",
+    "8",
+    "0",
+    "10",
+    "0",
+    "20",
+    "9",
+    "40",
+    "5",
+    "1",
+    "45%%d %%c30",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+  const doc = parseDxf(dxf);
+  const summary = describeDrawing(doc, tessellate(doc, {}));
+  expect(summary.texts).toEqual(["GREAT ROOM", "45° Ø30"]);
+});
+
 test("texts includes dimension values (DIMENSION → its block) and MTEXT content", () => {
   const dxf = [
     "0",

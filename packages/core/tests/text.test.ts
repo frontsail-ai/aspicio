@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { FONT_CAP_HEIGHT, glyph } from "../src/text/font.ts";
-import { layoutText, stripMText } from "../src/text/layout.ts";
+import { decodeTextSpecials, layoutText, stripMText } from "../src/text/layout.ts";
 import type { DxfDocument, Entity } from "../src/model/types.ts";
 import { parseDxf } from "../src/parse/parse.ts";
 import { tessellate } from "../src/tessellate/tessellate.ts";
@@ -79,6 +79,46 @@ test("stripMText collapses formatting to plain text", () => {
   expect(stripMText("a\\~b")).toBe("a b");
   expect(stripMText("{\\C1;red} text")).toBe("red text");
   expect(stripMText("path\\\\to")).toBe("path\\to");
+});
+
+test("stripMText decodes \\U+XXXX before directive stripping can eat it", () => {
+  expect(stripMText("45\\U+00B0")).toBe("45°");
+  // Regression: a later semicolon used to make the directive pass swallow
+  // everything from "\U" to the ";".
+  expect(stripMText("45\\U+00B0C; done")).toBe("45°C; done");
+});
+
+/* ---------- TEXT control codes (PARSE-9) ---------- */
+
+test("decodeTextSpecials substitutes %%d %%p %%c case-insensitively", () => {
+  expect(decodeTextSpecials("45%%d")).toBe("45°");
+  expect(decodeTextSpecials("%%P0.05")).toBe("±0.05");
+  expect(decodeTextSpecials("%%C30 %%c20")).toBe("Ø30 Ø20");
+});
+
+test("decodeTextSpecials strips underline/overline/strike toggles", () => {
+  expect(decodeTextSpecials("%%uDINING ROOM")).toBe("DINING ROOM");
+  expect(decodeTextSpecials("%%Ostruck%%O and %%kgone%%k")).toBe("struck and gone");
+});
+
+test("decodeTextSpecials handles %%%, %%nnn, and leaves unknown codes literal", () => {
+  expect(decodeTextSpecials("100%%%")).toBe("100%");
+  expect(decodeTextSpecials("%%065BC")).toBe("ABC");
+  expect(decodeTextSpecials("%%z stays")).toBe("%%z stays");
+  expect(decodeTextSpecials("trailing %%")).toBe("trailing %%");
+});
+
+test("decodeTextSpecials unescapes \\U+XXXX and whitespace caret codes only", () => {
+  expect(decodeTextSpecials("temp \\U+00B1 5")).toBe("temp ± 5");
+  expect(decodeTextSpecials("a^Ib")).toBe("a\tb");
+  expect(decodeTextSpecials("caret^ up")).toBe("caret^up");
+  expect(decodeTextSpecials("x^2 + y^2")).toBe("x^2 + y^2"); // math stays intact
+});
+
+test("the %%-code symbols render real strokes, not the space fallback", () => {
+  for (const ch of ["°", "±", "Ø"]) {
+    expect(layoutText(ch, { height: 10 }).length).toBeGreaterThan(0);
+  }
 });
 
 /* ---------- through the pipeline ---------- */

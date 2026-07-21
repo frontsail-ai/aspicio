@@ -58,6 +58,11 @@ needed to render scaled, clipped model content.
 
 MTEXT formatting codes are collapsed to plain text; TEXT/MTEXT keep
 position, height, and rotation for rendering with the built-in stroke font.
+Legacy control sequences decode to plain content in both: `%%d`/`%%p`/`%%c`
+become ° / ± / Ø (case-insensitive, with stroke-font glyphs), the
+`%%u`/`%%o`/`%%k` style toggles are dropped, `%%%` is a literal percent,
+`%%nnn` is character nnn, `\U+XXXX` escapes are decoded, and unknown `%%`
+sequences stay literal.
 
 ### PARSE-10: Linetypes and lineweights are resolved
 

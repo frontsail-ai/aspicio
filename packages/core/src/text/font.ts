@@ -63,6 +63,67 @@ function decodeGlyph(line: string): Glyph {
   return { strokes, advance: right - left, left };
 }
 
+/** Sample a full circle as a closed polyline (font units, y down). */
+function circleStroke(cx: number, cy: number, r: number, segments = 12): Point2[] {
+  const pts: Point2[] = [];
+  for (let i = 0; i <= segments; i++) {
+    const a = (i / segments) * 2 * Math.PI;
+    pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+  }
+  return pts;
+}
+
+/**
+ * Glyphs the Hershey ASCII table lacks but CAD text needs — the %%-code
+ * symbols ° ± Ø (PARSE-9). Coordinates follow the font convention:
+ * baseline at y=9, cap top at y=-12, y down.
+ */
+const SYNTHETIC = new Map<number, () => Glyph>([
+  // ° — small circle hugging the cap top.
+  [0xb0, () => ({ strokes: [circleStroke(0, -8, 3.5)], advance: 11, left: -5.5 })],
+  // ± — plus sign with a bar beneath.
+  [
+    0xb1,
+    () => ({
+      strokes: [
+        [
+          { x: 0, y: -10 },
+          { x: 0, y: 2 },
+        ],
+        [
+          { x: -5, y: -4 },
+          { x: 5, y: -4 },
+        ],
+        [
+          { x: -5, y: 6 },
+          { x: 5, y: 6 },
+        ],
+      ],
+      advance: 14,
+      left: -7,
+    }),
+  ],
+  // Ø — the letter O with a slash through it.
+  [
+    0xd8,
+    () => {
+      const o = glyph(0x4f);
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (const stroke of o.strokes)
+        for (const p of stroke) {
+          minX = Math.min(minX, p.x);
+          maxX = Math.max(maxX, p.x);
+        }
+      const slash: Point2[] = [
+        { x: minX - 1, y: 11 },
+        { x: maxX + 1, y: -14 },
+      ];
+      return { strokes: [...o.strokes, slash], advance: o.advance, left: o.left };
+    },
+  ],
+]);
+
 /** Glyph for a character code, or the space glyph for unmapped codes. */
 export function glyph(charCode: number): Glyph {
   const index = charCode - 32;
@@ -70,7 +131,7 @@ export function glyph(charCode: number): Glyph {
   const line = index >= 0 && index < all.length ? all[index] : all[0];
   let g = cache.get(charCode);
   if (!g) {
-    g = decodeGlyph(line);
+    g = SYNTHETIC.get(charCode)?.() ?? decodeGlyph(line);
     cache.set(charCode, g);
   }
   return g;

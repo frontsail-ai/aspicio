@@ -26,6 +26,60 @@ const BSL = String.fromCharCode(1);
 const LBR = String.fromCharCode(2);
 const RBR = String.fromCharCode(3);
 
+/** Decode DXF \U+XXXX escapes (pre-2007 files store non-ANSI text this way). */
+const decodeUnicodeEscapes = (s: string): string =>
+  s.replace(/\\[Uu]\+([0-9A-Fa-f]{4})/g, (_, hex: string) =>
+    String.fromCharCode(parseInt(hex, 16)),
+  );
+
+/** TEXT-era %%-code → character (case-insensitive). */
+const PERCENT_CHARS: Record<string, string> = { d: "°", p: "±", c: "Ø" };
+
+/**
+ * Decode legacy TEXT control sequences to plain content (PARSE-9):
+ * %%d/%%p/%%c → °/±/Ø, %%u/%%o/%%k style toggles dropped, %%% → %,
+ * %%nnn → character nnn, \U+XXXX unescaped, and the caret notation for
+ * tab/newline normalized. Unknown %% sequences stay literal.
+ */
+export function decodeTextSpecials(raw: string): string {
+  // Caret notation: only whitespace controls and the escaped caret itself —
+  // decoding every "^x" pair (chr(x-64), as some CADs do) would corrupt
+  // ordinary text like "x^2".
+  let s = raw.replace(/\^([IJM ])/g, (_, ch: string) =>
+    ch === " " ? "^" : String.fromCharCode(ch.charCodeAt(0) - 64),
+  );
+  s = decodeUnicodeEscapes(s);
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "%" && s[i + 1] === "%" && i + 2 < s.length) {
+      const code = s[i + 2].toLowerCase();
+      const special = PERCENT_CHARS[code];
+      if (special) {
+        out += special;
+        i += 2;
+        continue;
+      }
+      if (code === "u" || code === "o" || code === "k") {
+        i += 2; // underline/overline/strike-through toggle — plain text drops it
+        continue;
+      }
+      if (code === "%") {
+        out += "%";
+        i += 2;
+        continue;
+      }
+      const nnn = /^\d{3}/.exec(s.slice(i + 2));
+      if (nnn) {
+        out += String.fromCharCode(parseInt(nnn[0], 10));
+        i += 4;
+        continue;
+      }
+    }
+    out += s[i];
+  }
+  return out;
+}
+
 /**
  * Collapse MTEXT inline formatting codes to plain text. Paragraph breaks
  * become newlines; font/height/color/alignment directives are dropped;
@@ -38,6 +92,9 @@ export function stripMText(raw: string): string {
     .replace(/\\\}/g, RBR)
     .replace(/\\~/g, " ") // non-breaking space
     .replace(/\\P/g, "\n"); // paragraph break
+  // Unescape \U+XXXX before directive stripping, which would otherwise eat
+  // "\U+00B0…;" up to an unrelated semicolon.
+  s = decodeUnicodeEscapes(s);
   // Stacked fractions: \S1^2; \S1/2; \S1#2; -> 1/2
   s = s.replace(/\\S([^;^/#]*)[\^/#]([^;]*);/g, "$1/$2");
   // Formatting directives carrying an argument up to ';'.

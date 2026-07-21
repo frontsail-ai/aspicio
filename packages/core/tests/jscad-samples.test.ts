@@ -34,11 +34,13 @@ const EXPECTED: Record<string, Expected> = {
   "ellipticalarcs.dxf": { entities: 9, layers: 1, segments: 363, fillTriangles: 0 },
   "ellipticalarcs2.dxf": { entities: 4, layers: 1, segments: 180, fillTriangles: 0 },
   "empty.dxf": { entities: 0, layers: 4, segments: 0, fillTriangles: 0 },
-  "entities.dxf": { entities: 116, layers: 4, segments: 10378, fillTriangles: 120 },
+  // Segment count reflects %%-code decoding: "%%d %%p %%c" render as ° ± Ø.
+  "entities.dxf": { entities: 116, layers: 4, segments: 9629, fillTriangles: 120 },
+  // Segment count reflects %%-code decoding: %%u toggles stripped from labels.
   "floorplan.dxf": {
     entities: 961,
     layers: 24,
-    segments: 21104,
+    segments: 19698,
     fillTriangles: 0,
     unsupported: { ATTDEF: 2 },
   },

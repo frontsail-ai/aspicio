@@ -52,7 +52,7 @@ export type { ShortcutHandlers, ShortcutViewer } from "./input/shortcuts.ts";
 export { sampleSpline } from "./geom/spline.ts";
 export { dashPolyline } from "./geom/dash.ts";
 export { triangulate } from "./geom/triangulate.ts";
-export { layoutText, stripMText } from "./text/layout.ts";
+export { layoutText, stripMText, decodeTextSpecials } from "./text/layout.ts";
 export type { TextLayoutOptions } from "./text/layout.ts";
 
 export type {
