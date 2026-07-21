@@ -2,9 +2,8 @@
   "compilerOptions": {
     "target": "es2023",
     "module": "esnext",
-    "lib": ["ES2023", "DOM"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["vite-plus/client"],
-    "jsx": "react-jsx",
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 
@@ -17,8 +16,7 @@
     "esModuleInterop": true,
     "paths": {
       "@aspicio/core": ["../../packages/core/src/index.ts"],
-      "@aspicio/elements": ["../../packages/elements/src/index.ts"],
-      "@aspicio/react": ["../../packages/react/src/index.ts"]
+      "@aspicio/elements": ["../../packages/elements/src/index.ts"]
     },
 
     /* Linting */
@@ -28,10 +26,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "src",
-    "../../packages/core/src",
-    "../../packages/elements/src",
-    "../../packages/react/src"
-  ]
+  "include": ["src", "../../packages/core/src", "../../packages/elements/src"]
 }

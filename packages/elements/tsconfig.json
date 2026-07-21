@@ -1,12 +1,11 @@
 {
   "compilerOptions": {
     "target": "esnext",
-    "lib": ["es2023", "dom"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "moduleDetection": "force",
     "module": "preserve",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
-    "jsx": "react-jsx",
     "strict": true,
     "noUnusedLocals": true,
     "declaration": true,
@@ -15,10 +14,12 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "paths": {
-      "@aspicio/core": ["../core/src/index.ts"],
-      "@aspicio/elements": ["../elements/src/index.ts"]
+      "@aspicio/core": ["../core/src/index.ts"]
     },
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
-  }
+  },
+  /* dist re-declares the custom-element tag map — keep the built output
+     out of the source program or the two class identities collide. */
+  "exclude": ["dist", "node_modules"]
 }

@@ -1,16 +1,5 @@
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite-plus";
-
-/*
- * Vitest resolves packages with Node's export conditions, which hands us
- * @lit/react's SSR build — it intentionally skips the useLayoutEffect
- * that applies properties/events (NODE_MODE), so components would render
- * inert in tests. Point tests at the browser build instead.
- */
-const litReactBrowser = createRequire(import.meta.url)
-  .resolve("@lit/react")
-  .replace("/node/", "/");
 
 export default defineConfig({
   pack: {
@@ -25,8 +14,6 @@ export default defineConfig({
     // a prior `vp run build` of @aspicio/core (CI runs tests first).
     alias: {
       "@aspicio/core": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)),
-      "@aspicio/elements": fileURLToPath(new URL("../elements/src/index.ts", import.meta.url)),
-      "@lit/react": litReactBrowser,
     },
   },
   lint: {

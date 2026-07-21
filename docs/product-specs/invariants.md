@@ -55,9 +55,10 @@ drawings, so neither convention regresses silently.
 
 ### INV-9: Public packages version together
 
-`@aspicio/core`, `@aspicio/react`, and `@aspicio/mcp` are stamped with the
-same version at release, and inter-package ranges never leak the workspace
-protocol into published tarballs.
+`@aspicio/core`, `@aspicio/elements`, `@aspicio/react`, and
+`@aspicio/mcp` are stamped with the same version at release, and
+inter-package ranges never leak the workspace protocol into published
+tarballs.
 
 ### INV-10: Agent-facing docs never overclaim
 

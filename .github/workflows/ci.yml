@@ -72,12 +72,31 @@ jobs:
         run: bun run e2e
         working-directory: apps/react-example
 
+      - name: E2E the web components example
+        run: bun run e2e
+        working-directory: apps/elements-example
+
       - name: Build all packages
         run: bunx vp run -r build
 
       - name: Smoke test the built app
         run: bunx playwright test -c e2e/playwright.config.ts --grep "loads the sample|renders every layer"
         working-directory: apps/demo
+        env:
+          E2E_PREVIEW: "1"
+
+      # Production bundles behave differently from dev (tree-shaking almost
+      # shipped blank embeds once) — re-run both embed suites against the
+      # built apps.
+      - name: Smoke test the built React embed example
+        run: bun run e2e
+        working-directory: apps/react-example
+        env:
+          E2E_PREVIEW: "1"
+
+      - name: Smoke test the built web components example
+        run: bun run e2e
+        working-directory: apps/elements-example
         env:
           E2E_PREVIEW: "1"
 

@@ -1,6 +1,8 @@
 # React bindings
 
-Behavior of the React components wrapping the viewer.
+Behavior of the React components wrapping the viewer. The components are
+thin veneers over the web components (see [elements.md](elements.md)) —
+these specs define the React-facing contract that must hold regardless.
 
 Prefix: `REACT`.
 
@@ -44,8 +46,11 @@ on one page never collide.
 ### REACT-7: Theming
 
 The demo look (dark panel, blueprint grid) ships by default;
-`theme="none"` inherits host styles instead. Webfonts are never loaded by
-the library.
+`theme="none"` drops it for a minimal structure instead. Component
+internals are shadow-DOM-encapsulated (ELEM-7): hosts retheme through
+`--aspicio-*` custom properties and `::part()` hooks — not by cascading
+page CSS into the internals — and `panelStyle` still applies inline
+styles to the panel. Webfonts are never loaded by the library.
 
 ### REACT-8: SSR and StrictMode safe
 

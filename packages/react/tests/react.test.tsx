@@ -72,7 +72,7 @@ const mock = vi.hoisted(() => {
 
 vi.mock("@aspicio/core", () => ({
   DxfViewer: mock.MockViewer,
-  // A faithful attachShortcuts so the shortcuts effect can be exercised.
+  // A faithful attachShortcuts so the shortcuts wiring can be exercised.
   attachShortcuts: (target: EventTarget, viewer: MockShortcutViewer) => {
     const onKey = (ev: Event): void => {
       const e = ev as KeyboardEvent;
@@ -91,8 +91,38 @@ interface MockShortcutViewer {
   setLayerVisible: (name: string, visible: boolean) => void;
 }
 
-const flush = () => act(() => Promise.resolve());
+/* ---------- helpers ---------- */
+
+// The components render web components; settle both React and Lit cycles.
+const flush = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
 const lastViewer = () => mock.instances[mock.instances.length - 1];
+
+/** Shadow root of the first matching element — the components' DOM is shadow DOM. */
+function shadowOf(container: HTMLElement, selector: string): ShadowRoot {
+  const el = container.querySelector(selector);
+  if (!el?.shadowRoot) throw new Error(`no shadow root for ${selector}`);
+  return el.shadowRoot;
+}
+
+const panelShadow = (container: HTMLElement): ShadowRoot => {
+  const embed = shadowOf(container, "aspicio-embed");
+  const panel = embed.querySelector("aspicio-layer-panel");
+  if (!panel?.shadowRoot) throw new Error("no panel in embed");
+  return panel.shadowRoot;
+};
+const embedPreviewShadow = (container: HTMLElement): ShadowRoot => {
+  const embed = shadowOf(container, "aspicio-embed");
+  const preview = embed.querySelector("aspicio-preview");
+  if (!preview?.shadowRoot) throw new Error("no preview in embed");
+  return preview.shadowRoot;
+};
+const rowByName = (root: ShadowRoot, name: string): HTMLElement => {
+  const row = [...root.querySelectorAll<HTMLElement>(".row")].find(
+    (r) => r.querySelector(".name")?.textContent?.trim() === name,
+  );
+  if (!row) throw new Error(`row ${name} not found`);
+  return row;
+};
 
 beforeEach(() => {
   mock.instances.length = 0;
@@ -102,11 +132,12 @@ afterEach(cleanup);
 
 /* ---------- DxfPreview ---------- */
 
-test("mounts a viewer into the container and disposes on unmount", async () => {
+test("mounts a viewer into the element and disposes on unmount", async () => {
   const { container, unmount } = render(<DxfPreview className="preview" />);
   await flush();
   expect(mock.instances).toHaveLength(1);
-  expect(lastViewer().container).toBe(container.querySelector(".preview"));
+  const shadow = shadowOf(container, "aspicio-preview.preview");
+  expect(lastViewer().container).toBe(shadow.querySelector(".canvas-host"));
   unmount();
   expect(lastViewer().disposed).toBe(true);
 });
@@ -118,7 +149,6 @@ test("survives StrictMode double-mounting", async () => {
     </StrictMode>,
   );
   await flush();
-  // Mount, cleanup, mount again: the earlier instance is disposed, one lives.
   const alive = mock.instances.filter((v) => !v.disposed);
   expect(alive).toHaveLength(1);
   unmount();
@@ -130,6 +160,7 @@ test("loads src data and reports layers and stats", async () => {
   render(<DxfPreview src="dxf-data" onLoaded={onLoaded} />);
   await flush();
   expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
+  expect(lastViewer().load).toHaveBeenCalledTimes(1);
   expect(onLoaded).toHaveBeenCalledWith({
     layers: lastViewer().layers,
     stats: { entityCount: 4, segmentCount: 9, unsupported: {} },
@@ -145,16 +176,18 @@ test("srcUrl uses loadUrl", async () => {
 
 test("a newer src supersedes a slow in-flight load", async () => {
   const onLoaded = vi.fn();
-  let finishFirst: () => void = () => {};
+  let finishSecond: () => void = () => {};
   const { rerender } = render(<DxfPreview src="first" onLoaded={onLoaded} />);
   await flush();
   lastViewer().load.mockImplementationOnce(
-    () => new Promise<void>((resolve) => (finishFirst = resolve)),
+    () => new Promise<void>((resolve) => (finishSecond = resolve)),
   );
 
   rerender(<DxfPreview src="second" onLoaded={onLoaded} />);
+  await flush();
   rerender(<DxfPreview src="third" onLoaded={onLoaded} />);
-  finishFirst();
+  await flush();
+  finishSecond();
   await flush();
   // "second" resolved after "third" started: only the latest load reports.
   const calls = lastViewer().load.mock.calls.map(([arg]) => arg);
@@ -162,14 +195,25 @@ test("a newer src supersedes a slow in-flight load", async () => {
   expect(onLoaded).toHaveBeenCalledTimes(2); // first + third, not second
 });
 
+test("switching from srcUrl to src loads the data — last-set source wins", async () => {
+  const { rerender } = render(<DxfPreview srcUrl="/plan.dxf" />);
+  await flush();
+  expect(lastViewer().loadUrl).toHaveBeenCalledWith("/plan.dxf");
+  const loadUrlCalls = lastViewer().loadUrl.mock.calls.length;
+
+  // React re-assigns both props every render; only the genuine change counts.
+  rerender(<DxfPreview srcUrl="/plan.dxf" src="dxf-data" />);
+  await flush();
+  expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
+
+  rerender(<DxfPreview srcUrl="/plan.dxf" src="dxf-data" />); // no changes
+  await flush();
+  expect(lastViewer().load).toHaveBeenCalledTimes(1);
+  expect(lastViewer().loadUrl.mock.calls.length).toBe(loadUrlCalls);
+});
+
 test("onError fires for failed loads", async () => {
   const onError = vi.fn();
-  render(<DxfPreview src="bad" onError={onError} />);
-  await flush();
-  lastViewer().load.mockRejectedValueOnce(new Error("nope"));
-  // Trigger a re-load by changing src via rerender within same viewer.
-  await flush();
-  // First load already succeeded; render a failing one:
   const { rerender } = render(<DxfPreview src="ok" onError={onError} />);
   await flush();
   lastViewer().load.mockRejectedValueOnce(new Error("boom"));
@@ -192,10 +236,12 @@ test("exposes the viewer via ref and onViewer", async () => {
 test("shows the download control by default and exports on click", async () => {
   const { container } = render(<DxfPreview />);
   await flush();
-  const btn = container.querySelector('[aria-label="Download"]') as HTMLElement | null;
+  const shadow = shadowOf(container, "aspicio-preview");
+  const btn = shadow.querySelector<HTMLElement>('[aria-label="Download"]');
   expect(btn).not.toBeNull();
   fireEvent.click(btn!); // open the menu
-  const png = [...container.querySelectorAll("button")].find((b) => b.textContent === "PNG");
+  await flush();
+  const png = [...shadow.querySelectorAll("button")].find((b) => b.textContent?.trim() === "PNG");
   fireEvent.click(png!);
   expect(lastViewer().toPNG).toHaveBeenCalled();
 });
@@ -203,13 +249,15 @@ test("shows the download control by default and exports on click", async () => {
 test("showDownload={false} hides the download control", async () => {
   const { container } = render(<DxfPreview showDownload={false} />);
   await flush();
-  expect(container.querySelector('[aria-label="Download"]')).toBeNull();
+  expect(
+    shadowOf(container, "aspicio-preview").querySelector('[aria-label="Download"]'),
+  ).toBeNull();
 });
 
 test("shortcuts prop enables keyboard camera + show-all on the container", async () => {
   const { container } = render(<DxfPreview shortcuts />);
   await flush();
-  const el = container.querySelector("div") as HTMLElement;
+  const el = shadowOf(container, "aspicio-preview").querySelector(".canvas-host") as HTMLElement;
   el.dispatchEvent(new KeyboardEvent("keydown", { key: "f", bubbles: true }));
   expect(lastViewer().fitView).toHaveBeenCalled();
   el.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
@@ -219,7 +267,7 @@ test("shortcuts prop enables keyboard camera + show-all on the container", async
 test("shortcuts default off — no keyboard handling", async () => {
   const { container } = render(<DxfPreview />);
   await flush();
-  const el = container.querySelector("div") as HTMLElement;
+  const el = shadowOf(container, "aspicio-preview").querySelector(".canvas-host") as HTMLElement;
   el.dispatchEvent(new KeyboardEvent("keydown", { key: "f", bubbles: true }));
   expect(lastViewer().fitView).not.toHaveBeenCalled();
 });
@@ -229,31 +277,43 @@ test("shortcuts default off — no keyboard handling", async () => {
 test("DxfEmbed forwards showDownload to hide the download control", async () => {
   const { container } = render(<DxfEmbed showDownload={false} />);
   await flush();
-  expect(container.querySelector('[aria-label="Download"]')).toBeNull();
+  expect(embedPreviewShadow(container).querySelector('[aria-label="Download"]')).toBeNull();
 });
 
 test("DxfEmbed renders panel and preview together and loads src", async () => {
-  const { container, getByText } = render(<DxfEmbed src="dxf-data" style={{ height: 400 }} />);
+  const { container } = render(<DxfEmbed src="dxf-data" style={{ height: 400 }} />);
   await flush();
   expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
   // Panel lists the loaded layers; preview container exists beside it.
-  expect(getByText("CUT")).toBeTruthy();
-  expect(getByText("MARK")).toBeTruthy();
-  expect(container.querySelectorAll("ul")).toHaveLength(1);
+  const panel = panelShadow(container);
+  expect(rowByName(panel, "CUT")).toBeTruthy();
+  expect(rowByName(panel, "MARK")).toBeTruthy();
+  expect(panel.querySelectorAll("ul")).toHaveLength(1);
   expect(lastViewer().container).toBeTruthy();
 });
 
 test("DxfEmbed panel interactions drive the viewer", async () => {
-  const { getByLabelText } = render(<DxfEmbed src="dxf-data" />);
+  const { container } = render(<DxfEmbed src="dxf-data" />);
   await flush();
-  fireEvent.click(getByLabelText("CUT"));
+  const checkbox = panelShadow(container).querySelector<HTMLElement>('[aria-label="CUT"]');
+  fireEvent.click(checkbox!);
   expect(lastViewer().setLayerVisible).toHaveBeenCalledWith("CUT", false);
+});
+
+test("DxfEmbed panel=right docks the layer list after the preview", async () => {
+  const { container } = render(<DxfEmbed src="dxf-data" panel="right" />);
+  await flush();
+  const embed = shadowOf(container, "aspicio-embed");
+  const panel = embed.querySelector("aspicio-layer-panel");
+  expect(panel).not.toBeNull();
+  expect(panel?.classList.contains("panel-right")).toBe(true);
+  expect(rowByName(panel!.shadowRoot!, "CUT")).toBeTruthy();
 });
 
 test("DxfEmbed with panel=none renders no layer list", async () => {
   const { container } = render(<DxfEmbed src="dxf-data" panel="none" />);
   await flush();
-  expect(container.querySelector("ul")).toBeNull();
+  expect(shadowOf(container, "aspicio-embed").querySelector("aspicio-layer-panel")).toBeNull();
 });
 
 test("DxfEmbed exposes the viewer via ref", async () => {
@@ -266,22 +326,21 @@ test("DxfEmbed exposes the viewer via ref", async () => {
 test("DxfEmbed is themed like the demo app by default", async () => {
   const { container } = render(<DxfEmbed src="dxf-data" />);
   await flush();
-  const root = container.firstElementChild as HTMLElement;
-  expect(root.style.background).toContain("#0f1115");
-  expect(root.style.overflow).toBe("hidden");
-  // The themed panel background lives on the panel wrapper (first child).
-  const panel = root.firstElementChild as HTMLElement;
-  expect(panel.style.background).toContain("#191c22");
+  const embed = container.querySelector("aspicio-embed")!;
+  // Themed chrome keys off the reflected theme attribute (host CSS).
+  expect(embed.getAttribute("theme")).toBe("aspicio");
+  expect(embed.shadowRoot?.querySelector(".canvas-grid")).not.toBeNull();
   // Themed embeds default to a transparent canvas so the grid shows through.
   expect(lastViewer().options).toMatchObject({ background: null });
 });
 
-test("DxfEmbed theme=none inherits the host page", async () => {
-  const { container, getByRole } = render(<DxfEmbed src="dxf-data" theme="none" />);
+test("DxfEmbed theme=none drops the themed chrome", async () => {
+  const { container } = render(<DxfEmbed src="dxf-data" theme="none" />);
   await flush();
-  const root = container.firstElementChild as HTMLElement;
-  expect(root.style.background).toBe("");
-  expect((getByRole("list") as HTMLElement).style.background).toBe("");
+  const embed = container.querySelector("aspicio-embed")!;
+  expect(embed.getAttribute("theme")).toBe("none");
+  expect(embed.shadowRoot?.querySelector(".canvas-grid")).toBeNull();
+  expect(panelShadow(container).querySelector(".panel")).toBeNull(); // minimal list
   expect(lastViewer().options?.background).toBeUndefined();
 });
 
@@ -291,87 +350,102 @@ test("DxfEmbed keeps an explicit background over the themed default", async () =
   expect(lastViewer().options).toMatchObject({ background: 0x112233 });
 });
 
-/* ---------- DxfLayerPanel ---------- */
-
-function renderPanel() {
-  const viewer = new mock.MockViewer(document.createElement("div"));
-  const utils = render(<DxfLayerPanel viewer={viewer as unknown as DxfViewer} />);
-  return { viewer, ...utils };
-}
-
-test("renders one row per layer with effective-color swatches", () => {
-  const { getByText, container } = renderPanel();
-  expect(getByText("CUT")).toBeTruthy();
-  expect(getByText("MARK")).toBeTruthy();
-  const swatches = container.querySelectorAll("li span[aria-hidden]");
-  // CUT prefers effectiveColors[0] (red); MARK falls back to table color.
-  expect((swatches[0] as HTMLElement).style.background).toContain("#ff0000");
-  expect((swatches[1] as HTMLElement).style.background).toContain("#00ff00");
+test("DxfEmbed panelStyle reaches the inner panel (with px conversion)", async () => {
+  const { container } = render(<DxfEmbed src="dxf-data" panelStyle={{ width: 300 }} />);
+  await flush();
+  const panel = shadowOf(container, "aspicio-embed").querySelector(
+    "aspicio-layer-panel",
+  ) as HTMLElement;
+  expect(panel.style.width).toBe("300px");
 });
 
-test("checkbox toggles layer visibility", () => {
-  const { viewer, getByLabelText } = renderPanel();
-  fireEvent.click(getByLabelText("CUT"));
+/* ---------- DxfLayerPanel ---------- */
+
+function renderPanel(extra: Partial<Parameters<typeof DxfLayerPanel>[0]> = {}) {
+  const viewer = new mock.MockViewer(document.createElement("div"));
+  const utils = render(<DxfLayerPanel viewer={viewer as unknown as DxfViewer} {...extra} />);
+  const shadow = () => shadowOf(utils.container, "aspicio-layer-panel");
+  return { viewer, shadow, ...utils };
+}
+
+test("renders one row per layer with effective-color swatches", async () => {
+  const { shadow } = renderPanel();
+  await flush();
+  expect(rowByName(shadow(), "CUT")).toBeTruthy();
+  expect(rowByName(shadow(), "MARK")).toBeTruthy();
+  const swatches = shadow().querySelectorAll<HTMLElement>(".swatch");
+  // CUT prefers effectiveColors[0] (red); MARK falls back to table color.
+  expect(swatches[0].style.background).toContain("#ff0000");
+  expect(swatches[1].style.background).toContain("#00ff00");
+});
+
+test("checkbox toggles layer visibility", async () => {
+  const { viewer, shadow } = renderPanel();
+  await flush();
+  fireEvent.click(shadow().querySelector('[aria-label="CUT"]')!);
   expect(viewer.setLayerVisible).toHaveBeenCalledWith("CUT", false);
 });
 
-test("row hover highlights the layer and clears on leave", () => {
-  const { viewer, getByText } = renderPanel();
-  const row = getByText("CUT").closest("li");
-  if (!row) throw new Error("row not found");
-  fireEvent.mouseEnter(row);
+test("row hover highlights the layer and clears on leave", async () => {
+  const { viewer, shadow } = renderPanel();
+  await flush();
+  const row = rowByName(shadow(), "CUT");
+  row.dispatchEvent(new MouseEvent("mouseenter"));
   expect(viewer.setLayerHighlight).toHaveBeenCalledWith("CUT");
-  fireEvent.mouseLeave(row);
+  row.dispatchEvent(new MouseEvent("mouseleave"));
   expect(viewer.setLayerHighlight).toHaveBeenCalledWith(null);
 });
 
-test("re-syncs rows when the viewer loads a new document", () => {
-  const { viewer, queryByText } = renderPanel();
+test("re-syncs rows when the viewer loads a new document", async () => {
+  const { viewer, shadow } = renderPanel();
+  await flush();
   viewer.layers = [{ name: "NEW", color: 0x0000ff, visible: true, frozen: false, entityCount: 7 }];
   act(() => viewer.emit("loaded"));
-  expect(queryByText("NEW")).toBeTruthy();
-  expect(queryByText("CUT")).toBeNull();
+  await flush();
+  expect(rowByName(shadow(), "NEW")).toBeTruthy();
+  expect([...shadow().querySelectorAll(".name")].map((n) => n.textContent?.trim())).toEqual([
+    "NEW",
+  ]);
 });
 
-test("themed panel shows a header with the layer count and a hints footer", () => {
-  const { getByText } = renderPanel();
-  expect(getByText("LAYERS")).toBeTruthy();
-  expect(getByText("2")).toBeTruthy(); // count badge (CUT + MARK)
-  expect(getByText("solo layer")).toBeTruthy(); // a gesture hint
+test("themed panel shows a header with the layer count and a hints footer", async () => {
+  const { shadow } = renderPanel();
+  await flush();
+  expect(shadow().querySelector(".header")?.textContent).toContain("LAYERS");
+  expect(shadow().querySelector(".header-count")?.textContent?.trim()).toBe("2");
+  expect(shadow().querySelector(".hints")?.textContent).toContain("solo layer");
 });
 
-test("hints footer can be disabled", () => {
-  const viewer = new mock.MockViewer(document.createElement("div"));
-  const { queryByText } = render(
-    <DxfLayerPanel viewer={viewer as unknown as DxfViewer} hints={false} />,
-  );
-  expect(queryByText("solo layer")).toBeNull();
+test("hints footer can be disabled", async () => {
+  const { shadow } = renderPanel({ hints: false });
+  await flush();
+  expect(shadow().querySelector(".hints")).toBeNull();
 });
 
-test("double-clicking a row solos it, then EXIT restores all layers", () => {
-  const { viewer, getByText, queryByText } = renderPanel();
-  fireEvent.doubleClick(getByText("CUT").closest("li")!);
+test("double-clicking a row solos it, then EXIT restores all layers", async () => {
+  const { viewer, shadow } = renderPanel();
+  await flush();
+  fireEvent.dblClick(rowByName(shadow(), "CUT"));
+  await flush();
   // Solo hides every other layer and shows the banner (EXIT is unique to it).
   expect(viewer.setLayerVisible).toHaveBeenCalledWith("MARK", false);
   expect(viewer.setLayerVisible).toHaveBeenCalledWith("CUT", true);
-  expect(getByText("EXIT")).toBeTruthy();
+  const exit = shadow().querySelector<HTMLElement>(".solo-exit");
+  expect(exit).not.toBeNull();
 
   viewer.setLayerVisible.mockClear();
-  fireEvent.click(getByText("EXIT"));
+  fireEvent.click(exit!);
+  await flush();
   expect(viewer.setLayerVisible).toHaveBeenCalledWith("MARK", true);
-  expect(queryByText("EXIT")).toBeNull();
+  expect(shadow().querySelector(".solo-exit")).toBeNull();
 });
 
-test("reverseHighlightLayer marks the matching row", () => {
-  const viewer = new mock.MockViewer(document.createElement("div"));
-  const { getByText } = render(
-    <DxfLayerPanel viewer={viewer as unknown as DxfViewer} reverseHighlightLayer="CUT" />,
-  );
-  const cutRow = getByText("CUT").closest("li") as HTMLElement;
-  const markRow = getByText("MARK").closest("li") as HTMLElement;
-  // The reverse-highlighted row gets the accent border; the other doesn't.
-  expect(cutRow.style.borderColor).toContain("#4c8dff");
-  expect(markRow.style.borderColor).toContain("transparent");
+test("reverseHighlightLayer marks the matching row", async () => {
+  const { shadow } = renderPanel({ reverseHighlightLayer: "CUT" });
+  await flush();
+  // The reverse-highlighted row gets the accent treatment; the other doesn't.
+  expect(rowByName(shadow(), "CUT").classList.contains("reverse")).toBe(true);
+  expect(rowByName(shadow(), "MARK").classList.contains("reverse")).toBe(false);
 });
 
 /* ---------- DxfPreview canvas hover-picking ---------- */
@@ -380,7 +454,7 @@ test("onHoverLayer reports the picked layer and highlights it", async () => {
   const onHoverLayer = vi.fn();
   const { container } = render(<DxfPreview src="dxf-data" onHoverLayer={onHoverLayer} />);
   await flush();
-  const host = container.firstElementChild as HTMLElement;
+  const host = shadowOf(container, "aspicio-preview").querySelector(".canvas-host") as HTMLElement;
   host.getBoundingClientRect = () => ({ left: 0, top: 0 }) as DOMRect;
 
   host.dispatchEvent(
@@ -401,8 +475,7 @@ test("onHoverLayer reports the picked layer and highlights it", async () => {
 test("DxfEmbed wires canvas hover to the panel's reverse-highlight", async () => {
   const { container } = render(<DxfEmbed src="dxf-data" />);
   await flush();
-  // Panel is on the left, so the preview is the embed root's last child.
-  const host = container.firstElementChild!.lastElementChild as HTMLElement;
+  const host = embedPreviewShadow(container).querySelector(".canvas-host") as HTMLElement;
   host.getBoundingClientRect = () => ({ left: 0, top: 0 }) as DOMRect;
   await act(async () => {
     host.dispatchEvent(
@@ -415,7 +488,7 @@ test("DxfEmbed wires canvas hover to the panel's reverse-highlight", async () =>
     );
     await new Promise((resolve) => requestAnimationFrame(resolve));
   });
+  await flush();
 
-  const cutRow = container.querySelector("li") as HTMLElement; // first row = CUT
-  expect(cutRow.style.borderColor).toContain("#4c8dff");
+  expect(rowByName(panelShadow(container), "CUT").classList.contains("reverse")).toBe(true);
 });

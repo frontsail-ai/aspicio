@@ -1,20 +1,19 @@
 {
-  "name": "@aspicio/react",
+  "name": "@aspicio/elements",
   "version": "0.0.0",
-  "description": "React bindings for the Aspicio DXF viewer.",
-  "homepage": "https://github.com/frontsail-ai/aspicio/tree/master/packages/react#readme",
+  "description": "Framework-neutral web components for the Aspicio DXF viewer.",
+  "homepage": "https://github.com/frontsail-ai/aspicio/tree/master/packages/elements#readme",
   "license": "MIT",
   "author": "Dmitri Kochelorov <kochelorov.dmitri@gmail.com>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/frontsail-ai/aspicio.git",
-    "directory": "packages/react"
+    "directory": "packages/elements"
   },
   "files": [
     "dist"
   ],
   "type": "module",
-  "sideEffects": false,
   "exports": {
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"
@@ -31,22 +30,15 @@
   },
   "dependencies": {
     "@aspicio/core": "workspace:^",
-    "@aspicio/elements": "workspace:^",
-    "@lit/react": "^1.0.8"
+    "lit": "^3.3.3"
   },
   "devDependencies": {
-    "@testing-library/react": "^16.3.0",
-    "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.0",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "happy-dom": "^20.0.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
     "typescript": "^7.0.2",
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0",
     "three": ">=0.184.0 <1.0.0"
   }
 }
