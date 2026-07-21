@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # registry publish via GitHub OIDC
 
 concurrency:
   group: publish
@@ -116,3 +117,27 @@ jobs:
         working-directory: packages/mcp
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
+
+      # ------------------------------------------------------------------
+      # Official MCP registry: publish the listing via GitHub OIDC — the
+      # workflow's identity in this repo grants io.github.frontsail-ai/*,
+      # no tokens or manual login involved (docs/registry-listings.md).
+      - name: Stamp server.json with the release version
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          bun -e '
+            const s = await Bun.file("server.json").json();
+            s.version = process.env.VERSION;
+            s.packages[0].version = process.env.VERSION;
+            await Bun.write("server.json", JSON.stringify(s, null, 2) + "\n");
+            console.log("server.json stamped", process.env.VERSION);
+          '
+
+      - name: Publish to the MCP registry (OIDC)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        run: |
+          curl -sSfL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

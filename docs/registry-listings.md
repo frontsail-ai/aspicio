@@ -19,15 +19,27 @@ tooling. mcp.so was considered and skipped (scrape-heavy, low signal).
 The canonical index; several other directories crawl it, so this one
 multiplies.
 
+**Automated:** every release publishes the listing from the tag-driven
+workflow via GitHub OIDC — the workflow's identity in this repo grants
+`io.github.frontsail-ai/*`, no tokens involved. It stamps `server.json`
+with the release version before submitting (the in-repo pre-tag bump
+stays a [releasing.md](releasing.md) step because the deployed Worker
+reads `server.json` for its `serverInfo`).
+
+Manual runs (out-of-band metadata changes only):
+
 ```bash
 brew install mcp-publisher          # or download from the registry repo
-mcp-publisher login github          # proves ownership of frontsail-ai
+MCP_GITHUB_TOKEN=$(gh auth token) mcp-publisher login github
 mcp-publisher publish               # reads ./server.json
 ```
 
-Notes: the `io.github.frontsail-ai/*` namespace is granted by the GitHub
-login. Re-run `publish` after each release — the `server.json` version
-bump is a step in [releasing.md](releasing.md). Before the first real
+Notes: org namespaces are granted only to org **Owners**, checked via
+`GET /user/memberships/orgs` — the interactive device-flow login cannot
+see org membership (its private GitHub App is uninstallable), so pass a
+personal token with `read:org` as above; the error message's hint about
+public membership is a red herring. The npm package must embed
+`mcpName` matching the server name (drift-guarded in the mcp tests). Before the first real
 submission, run `mcp-publisher publish --dry-run`: the tool validates
 against the current schema and is the ground truth if it has moved past
 2025-12-11 (that revision renamed the package fields to camelCase and
