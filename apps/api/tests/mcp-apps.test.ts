@@ -7,6 +7,7 @@ import {
 import type { LoadResult, ViewerMeta } from "@aspicio/widget/meta";
 import { expect, test } from "vite-plus/test";
 import { handleRequest } from "../src/handler.ts";
+import { renderLink } from "../src/mcp.ts";
 
 // The MCP Apps contract (AGT-14): the view_dxf tool links the ui:// viewer
 // resource, the drawing travels widget-only in the result's _meta, and the
@@ -118,6 +119,15 @@ test("an over-cap inline drawing degrades to facts plus a too-large marker", asy
   expect(meta.byteLength).toBeGreaterThan(INLINE_EMBED_BYTES);
   expect((r.structuredContent as { entityCount: number }).entityCount).toBe(1);
   await client.close();
+});
+
+test("render_dxf offers a direct image link for URL sources only (AGT-9)", () => {
+  // Chat UIs that drop MCP image blocks can still show a plain URL.
+  expect(renderLink("http://api.test", "https://x.test/a b.dxf", 800)).toBe(
+    "http://api.test/render?src=https%3A%2F%2Fx.test%2Fa%20b.dxf&width=800",
+  );
+  // Inline DXF text has nothing to link statelessly.
+  expect(renderLink("http://api.test", "0\nSECTION\n...", 800)).toBeUndefined();
 });
 
 test("the widget's load tool is app-only and serves whole files and byte ranges", async () => {

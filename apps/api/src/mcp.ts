@@ -39,10 +39,19 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+/** A stateless HTTP link to the same render, for URL sources — chat UIs
+ * that drop MCP image blocks from user display can still show a plain
+ * image URL (AGT-9). Returns undefined for inline sources (nothing to link). */
+export function renderLink(origin: string, source: string, width: number): string | undefined {
+  const s = source.trim();
+  if (!/^https?:\/\//i.test(s)) return undefined;
+  return `${origin}/render?src=${encodeURIComponent(s)}&width=${width}`;
+}
+
 /** Build the same describe/render tools as the local server, Worker-flavored,
  * plus the MCP Apps viewer (AGT-14). `widgetHtml` is the built widget bundle;
  * tests inject a stub so they never depend on the widget build. */
-function createServer(renderPng: RenderPng, widgetHtml?: string): McpServer {
+function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): McpServer {
   const server = new McpServer({ name: "aspicio", version: "1.0.0" });
 
   server.registerTool(
@@ -65,7 +74,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string): McpServer {
     {
       title: "Render a DXF to an image",
       description:
-        "Render a DXF drawing to a PNG image you can look at. Use this to answer visual questions (what does it look like, where is a feature) — it returns an image, not text. For structural facts and measurements, prefer describe_dxf; never measure pixels.",
+        "Render a DXF drawing to a PNG image you can look at. Use this to answer visual questions (what does it look like, where is a feature) — it returns an image, not text. For structural facts and measurements, prefer describe_dxf; never measure pixels. Some chat UIs do not display the returned image to the user: for URL sources the result also includes a direct image link — show it to the user (e.g. as a markdown image) when they need to see the render.",
       inputSchema: {
         source: z.string().describe(SOURCE_DESC),
         width: z
@@ -81,7 +90,15 @@ function createServer(renderPng: RenderPng, widgetHtml?: string): McpServer {
       const doc = parseDxfBytes(await loadDxf(source));
       const svg = tessellationToSvg(tessellate(doc, {}), undefined, { background: DEFAULT_BG });
       const png = await renderPng(svg, width ?? 1200);
-      return { content: [{ type: "image", data: toBase64(png), mimeType: "image/png" }] };
+      const link = renderLink(origin, source, width ?? 1200);
+      return {
+        content: [
+          { type: "image", data: toBase64(png), mimeType: "image/png" },
+          ...(link
+            ? [{ type: "text" as const, text: `Direct image link (for the user): ${link}` }]
+            : []),
+        ],
+      };
     },
   );
 
@@ -212,7 +229,7 @@ export async function handleMcp(
   renderPng: RenderPng,
   widgetHtml?: string,
 ): Promise<Response> {
-  const server = createServer(renderPng, widgetHtml);
+  const server = createServer(renderPng, widgetHtml, new URL(req.url).origin);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

@@ -71,7 +71,10 @@ result over the wire — never a crashed server.
 ### AGT-9: Render results are real images
 
 `render_dxf` returns spec-correct MCP image content (base64 PNG with mime
-type); `describe_dxf` returns JSON text content.
+type); `describe_dxf` returns JSON text content. On the remote server, a
+render of a URL source additionally names a direct HTTP link to the same
+render, so chat hosts that hide MCP image blocks from the user can still
+show the picture.
 
 ### AGT-13: Remote MCP endpoint
 
