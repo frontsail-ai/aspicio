@@ -13,6 +13,7 @@
 import { DxfViewer } from "@aspicio/core";
 import { App } from "@modelcontextprotocol/ext-apps";
 import type { McpUiDisplayMode } from "@modelcontextprotocol/ext-apps";
+import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { INLINE_EMBED_BYTES, LOAD_CHUNK_BYTES, LOAD_TOOL_NAME, type LoadResult } from "./meta.ts";
 import {
   actionForToolResult,
@@ -204,7 +205,11 @@ document.head.appendChild(document.createElement("style")).textContent = TOKEN_S
 // cannot pierce the shadow boundary; the theme variables above still
 // inherit through — the one host influence we want.
 const shadowHost = document.body.appendChild(document.createElement("div"));
-shadowHost.style.height = "100%";
+// The host element is the one light-DOM piece a host stylesheet can still
+// reach. Inline !important outranks any author stylesheet in the cascade,
+// so reset everything and pin the two properties the layout needs.
+shadowHost.style.cssText =
+  "all: initial !important; display: block !important; height: 100% !important;";
 const shadow = shadowHost.attachShadow({ mode: "open" });
 shadow.innerHTML = `<style>${STYLE}</style>
   <div id="root" data-mode="inline" data-state="preparing">
@@ -490,8 +495,12 @@ async function pullDrawing(source: string, byteLength: number): Promise<ArrayBuf
     const bytes = base64ToBytes(full.dxfBase64);
     if (bytes.byteLength === full.byteLength) return bytes;
     // Truncated single-shot — fall through to chunked retrieval.
-  } catch {
-    // Single-shot failed (host cap or transient) — try chunks before giving up.
+  } catch (err) {
+    // A timeout means the host is silent — chunk calls would only re-wait
+    // the same 30s each. Fail now instead of compounding.
+    if ((err as { code?: number }).code === ErrorCode.RequestTimeout)
+      throw new Error("the host did not respond to the drawing request");
+    // Any other failure (host cap, transient) — try chunks before giving up.
   }
   const chunks: Uint8Array[] = [];
   for (let offset = 0; offset < byteLength; offset += LOAD_CHUNK_BYTES) {
