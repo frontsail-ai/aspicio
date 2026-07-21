@@ -72,6 +72,10 @@ jobs:
         run: bun run e2e
         working-directory: apps/react-example
 
+      - name: E2E the web components example
+        run: bun run e2e
+        working-directory: apps/elements-example
+
       - name: Build all packages
         run: bunx vp run -r build
 

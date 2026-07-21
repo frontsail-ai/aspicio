@@ -3,7 +3,10 @@
  *
  * <DxfPreview> embeds the interactive canvas; <DxfLayerPanel> is an
  * optional ready-made layer list. Compose them, or build your own chrome
- * on the DxfViewer instance exposed via ref/onViewer.
+ * on the DxfViewer instance exposed via ref/onViewer. The components are
+ * thin veneers over the framework-neutral @aspicio/elements web
+ * components, so React, Vue, Svelte, and plain-HTML embeds all share one
+ * implementation — and one look.
  */
 
 export { DxfEmbed } from "./DxfEmbed.tsx";

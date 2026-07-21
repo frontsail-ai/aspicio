@@ -9,9 +9,6 @@ export default defineConfig({
       "@aspicio/elements": fileURLToPath(
         new URL("../../packages/elements/src/index.ts", import.meta.url),
       ),
-      "@aspicio/react": fileURLToPath(
-        new URL("../../packages/react/src/index.ts", import.meta.url),
-      ),
     },
   },
 });

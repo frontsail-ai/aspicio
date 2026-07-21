@@ -27,5 +27,6 @@ process — not necessarily testable in isolation.
 | [parsing.md](parsing.md)             | `PARSE` | DXF input → normalized document: entity coverage, binary decoding, units, colors, blocks, layouts |
 | [viewer.md](viewer.md)               | `VIEW`  | Camera, layers, picking, snap/measure, shortcuts, view snapshots, exports, spaces                 |
 | [demo.md](demo.md)                   | `DEMO`  | Demo app: load paths, deep links, panels, error recovery, mobile                                  |
+| [elements.md](elements.md)           | `ELEM`  | Web components: one-tag embed, events, shadow-DOM theming, lifecycle                              |
 | [react.md](react.md)                 | `REACT` | React components: embed, lifecycle, theming, SSR safety                                           |
 | [agent-surface.md](agent-surface.md) | `AGT`   | HTTP API, MCP tools, plugin/skill packaging                                                       |

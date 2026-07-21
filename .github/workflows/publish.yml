@@ -70,7 +70,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           bun -e '
-            for (const path of ["packages/core/package.json", "packages/react/package.json", "packages/mcp/package.json"]) {
+            for (const path of ["packages/core/package.json", "packages/elements/package.json", "packages/react/package.json", "packages/mcp/package.json"]) {
               const pkg = await Bun.file(path).json();
               pkg.version = process.env.VERSION;
               for (const deps of [pkg.dependencies, pkg.peerDependencies]) {
@@ -85,14 +85,17 @@ jobs:
 
       - name: Verify packed dependency ranges
         run: |
-          for dir in packages/react packages/mcp; do
+          for dir in packages/elements packages/react packages/mcp; do
             rm -rf /tmp/verify && (cd "$dir" && bun pm pack --destination /tmp/verify --quiet)
-            RANGE=$(tar -xzOf /tmp/verify/*.tgz package/package.json | bun -e '
+            RANGES=$(tar -xzOf /tmp/verify/*.tgz package/package.json | bun -e '
               const pkg = await new Response(Bun.stdin.stream()).json();
-              console.log(pkg.dependencies["@aspicio/core"]);
+              for (const [name, range] of Object.entries(pkg.dependencies ?? {}))
+                if (name.startsWith("@aspicio/")) console.log(range);
             ')
-            echo "$dir packed @aspicio/core range: $RANGE"
-            test "$RANGE" = "^${{ steps.version.outputs.version }}" || { echo "workspace protocol leaked into the $dir tarball"; exit 1; }
+            echo "$dir packed @aspicio/* ranges: $RANGES"
+            for RANGE in $RANGES; do
+              test "$RANGE" = "^${{ steps.version.outputs.version }}" || { echo "workspace protocol leaked into the $dir tarball"; exit 1; }
+            done
           done
 
       - name: Build all packages
@@ -103,6 +106,12 @@ jobs:
       - name: Publish @aspicio/core
         run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         working-directory: packages/core
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
+
+      - name: Publish @aspicio/elements
+        run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+        working-directory: packages/elements
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
 

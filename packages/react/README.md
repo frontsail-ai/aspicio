@@ -1,7 +1,10 @@
 # @aspicio/react
 
 React bindings for the
-[Aspicio](https://github.com/frontsail-ai/aspicio#readme) DXF viewer.
+[Aspicio](https://github.com/frontsail-ai/aspicio#readme) DXF viewer —
+thin, API-stable veneers over the framework-neutral
+[`@aspicio/elements`](../elements) web components, so React, Vue,
+Svelte, and plain-HTML embeds share one implementation and one look.
 
 ```bash
 npm install @aspicio/react react three   # @aspicio/core comes along; react 18/19 and three (>=0.184) are peers
@@ -33,7 +36,16 @@ Props: `panel="left" | "right" | "none"`, `panelStyle`, `options`,
 
 `DxfEmbed` and `DxfLayerPanel` ship with the Aspicio demo look by default —
 dark panel, blueprint grid behind a transparent canvas, hover states. Pass
-`theme="none"` to inherit the host page's styles instead.
+`theme="none"` to drop the chrome for a minimal structure.
+
+The internals render in shadow DOM (host CSS can't accidentally restyle
+them), so deliberate theming goes through the elements' hooks: set
+`--aspicio-*` CSS custom properties on the component (or any ancestor)
+to change tokens, target `::part(...)` names for structural styling, and
+use `panelStyle` for inline styles on the panel. `panelClassName` is
+deprecated — a class on a shadow-DOM child is unreachable from page CSS.
+See the [`@aspicio/elements` README](../elements#theming) for the full
+token and part list.
 
 The theme uses IBM Plex font _stacks_ but never loads webfonts itself (no
 surprise network requests from a library). Load IBM Plex Sans/Mono in your
@@ -89,5 +101,5 @@ Notes:
   your router, and `viewer.setView(saved)` after `onLoaded` to restore it.
   Since a fixed `srcUrl` already identifies the drawing, this gives embedders
   "open at this view" links. The demo's `viewurl.ts` is a full reference.
-- StrictMode and SSR safe: the viewer is created in an effect and disposed on
-  unmount.
+- StrictMode and SSR safe: the viewer is created only after mount (the
+  underlying elements are import-safe in Node) and disposed on unmount.

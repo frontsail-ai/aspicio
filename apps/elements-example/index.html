@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+    />
+    <title>Aspicio · web components example</title>
+    <style>
+      body {
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #0f1115;
+        color: #e7e3da;
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+      }
+      header {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        padding: 11px 16px;
+        border-bottom: 1px solid #282c34;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 13px;
+        letter-spacing: 0.12em;
+      }
+      header .stats {
+        color: #9aa0ab;
+      }
+      header .hint {
+        color: #6a707b;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+      }
+      main {
+        flex: 1;
+        min-height: 0;
+        padding: 16px;
+      }
+      aspicio-embed {
+        height: 100%;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span>ASPICIO · WEB COMPONENTS</span>
+      <span class="stats" id="stats"></span>
+      <span class="hint">plain HTML — no framework. click the viewer, then F fit · A show all</span>
+    </header>
+    <main>
+      <!-- The whole integration is one tag; attributes only. -->
+      <aspicio-embed src-url="/sample.dxf" shortcuts></aspicio-embed>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

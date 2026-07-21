@@ -1,6 +1,6 @@
 ---
 name: aspicio-embed
-description: "Use when building or modifying an app that displays DXF/CAD drawings in the browser — embedding a DXF viewer in React or vanilla JS, adding layer panels, deep links, exports, or keyboard shortcuts. Covers @aspicio/react and @aspicio/core install, props, common pitfalls (peer deps, workspace aliasing), and the headless helpers."
+description: "Use when building or modifying an app that displays DXF/CAD drawings in the browser — embedding a DXF viewer in React, Vue, Svelte, plain HTML, or vanilla JS, adding layer panels, deep links, exports, or keyboard shortcuts. Covers @aspicio/elements, @aspicio/react, and @aspicio/core install, props/attributes, common pitfalls (peer deps, workspace aliasing), and the headless helpers."
 ---
 
 # Embedding the Aspicio DXF viewer
@@ -9,7 +9,8 @@ description: "Use when building or modifying an app that displays DXF/CAD drawin
 
 ```bash
 npm install @aspicio/react react three   # React apps; three (>=0.184) is a peer dep
-npm install @aspicio/core three          # vanilla JS / other frameworks
+npm install @aspicio/elements three      # plain HTML / Vue / Svelte (web components)
+npm install @aspicio/core three          # vanilla JS, hand-rolled UI
 ```
 
 `react` 18/19 and `three` are **peer dependencies** — forgetting `three` is the most common install failure.
@@ -29,9 +30,22 @@ Key props (all optional):
 - `shortcuts` — opt-in keyboard control (F fit, +/- zoom, R rotation reset, A show-all); scoped to the **focused** embed, click to focus
 - `showDownload={false}` — hide the built-in SVG/PNG export control
 - `onLoaded({ layers, stats })`, `onError`, `onViewer(viewer)` — `onViewer`/`ref` expose the full `DxfViewer` API (`fitView`, `zoomBy`, `setLayerVisible`, `pickLayer`, `view`, `setView`, `toSVG`, `toPNG`)
-- `theme="none"` — inherit host styles instead of the built-in dark theme
+- `theme="none"` — drop the built-in dark theme for a minimal structure
 
 For custom layouts compose `DxfPreview` (canvas only) + `DxfLayerPanel` yourself.
+
+The components are veneers over the `@aspicio/elements` web components: internals live in shadow DOM, and theming goes through `--aspicio-*` CSS custom properties and `::part(...)` hooks (not page CSS cascade).
+
+## Web components: any framework or none
+
+```html
+<script type="module">
+  import "@aspicio/elements";
+</script>
+<aspicio-embed src-url="/drawing.dxf" style="height: 480px"></aspicio-embed>
+```
+
+Same behavior as `<DxfEmbed>`, attribute/property/event flavored: attributes `src-url`, `panel`, `theme`, `no-download`, `shortcuts`; properties `src`, `options`, `viewer` (the full `DxfViewer`); events `loaded`, `load-error`, `viewer-change`, `hover-layer` (CustomEvents, payload in `detail`). In Vue set `compilerOptions.isCustomElement` for `aspicio-` tags; Svelte consumes them natively.
 
 ## Vanilla JS
 

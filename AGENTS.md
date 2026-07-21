@@ -13,7 +13,7 @@ MCP server, and installable skills/plugins. Live demo:
 | Toolchain          | Vite+ (`vp`) — dev, build, test (vitest), lint/format (oxlint/oxfmt), pack (tsdown) |
 | Rendering          | Three.js WebGL (viewer); resvg WASM/native for headless PNG                         |
 | Parsing            | dxf-parser + custom entity handlers                                                 |
-| E2E                | Playwright (`apps/demo/e2e`, `apps/react-example/e2e`)                              |
+| E2E                | Playwright (`apps/demo/e2e`, `apps/react-example/e2e`, `apps/elements-example/e2e`) |
 | Hosting / deploy   | Cloudflare Workers via `wrangler`, deployed from GitHub Actions                     |
 | Agent protocol     | MCP (official SDK; stdio + Streamable HTTP) + MCP Apps in-chat viewer               |
 
@@ -21,20 +21,23 @@ MCP server, and installable skills/plugins. Live demo:
 
 `parse → DxfDocument → tessellate → { WebGL render | SVG | describe }`.
 Everything up to WebGL is headless (browser/Node/Workers). Core is
-framework-free; UI opinion lives in the demo and React packages; the API
-Worker and MCP server expose the same pipeline to agents. Details:
-[docs/architecture.md](docs/architecture.md).
+framework-free; embed UI lives once in the Lit web components
+(`packages/elements`), with `packages/react` as a thin veneer over them;
+the API Worker and MCP server expose the same pipeline to agents.
+Details: [docs/architecture.md](docs/architecture.md).
 
 ## Layout
 
 ```
 packages/core     the library: parse → tessellate → render, camera, input
-packages/react    <DxfEmbed> / <DxfPreview> / <DxfLayerPanel>
+packages/elements <aspicio-embed> / <aspicio-preview> / <aspicio-layer-panel> (Lit)
+packages/react    <DxfEmbed> / <DxfPreview> / <DxfLayerPanel> — veneer over elements
 packages/mcp      stdio MCP server (describe_dxf, render_dxf)
 apps/demo         standalone demo + main Playwright e2e suite
 apps/api          Cloudflare Worker: /describe, /render, /mcp
 apps/widget       MCP Apps in-chat viewer widget, served by the api Worker
-apps/react-example  real embed integration + its e2e suite
+apps/react-example  real React embed integration + its e2e suite
+apps/elements-example  plain-HTML embed integration + its e2e suite
 skills/           Agent Skills shared by the Claude and Codex plugins
 .claude-plugin/ .codex-plugin/ .mcp.json   plugin + marketplace manifests
 docs/             architecture, guidelines, product specs, releasing
@@ -58,7 +61,8 @@ docs/             architecture, guidelines, product specs, releasing
 | [docs/product-specs/parsing.md](docs/product-specs/parsing.md)             | `PARSE-*` — DXF input → document                           | touching parse/ or entity support                                  |
 | [docs/product-specs/viewer.md](docs/product-specs/viewer.md)               | `VIEW-*` — camera, layers, picking, measure, export        | touching core viewer behavior                                      |
 | [docs/product-specs/demo.md](docs/product-specs/demo.md)                   | `DEMO-*` — demo app UX incl. deep links                    | touching apps/demo                                                 |
-| [docs/product-specs/react.md](docs/product-specs/react.md)                 | `REACT-*` — component behaviors                            | touching packages/react                                            |
+| [docs/product-specs/elements.md](docs/product-specs/elements.md)           | `ELEM-*` — web component behaviors                         | touching packages/elements                                         |
+| [docs/product-specs/react.md](docs/product-specs/react.md)                 | `REACT-*` — component behaviors                            | touching packages/react or packages/elements                       |
 | [docs/product-specs/agent-surface.md](docs/product-specs/agent-surface.md) | `AGT-*` — API, MCP, plugins                                | touching apps/api, packages/mcp, skills, manifests                 |
 | [docs/releasing.md](docs/releasing.md)                                     | Tag-driven release runbook                                 | cutting or debugging a release                                     |
 | [docs/registry-listings.md](docs/registry-listings.md)                     | MCP registry submission runbook                            | listing or updating the server in directories                      |

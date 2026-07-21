@@ -6,6 +6,7 @@
   <p>
     <a href="https://github.com/frontsail-ai/aspicio/actions/workflows/ci.yml"><img src="https://github.com/frontsail-ai/aspicio/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/core"><img src="https://img.shields.io/npm/v/%40aspicio%2Fcore?label=%40aspicio%2Fcore" alt="npm: @aspicio/core" /></a>
+    <a href="https://www.npmjs.com/package/@aspicio/elements"><img src="https://img.shields.io/npm/v/%40aspicio%2Felements?label=%40aspicio%2Felements" alt="npm: @aspicio/elements" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/react"><img src="https://img.shields.io/npm/v/%40aspicio%2Freact?label=%40aspicio%2Freact" alt="npm: @aspicio/react" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/mcp"><img src="https://img.shields.io/npm/v/%40aspicio%2Fmcp?label=%40aspicio%2Fmcp" alt="npm: @aspicio/mcp" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
@@ -17,10 +18,10 @@ Aspicio is an open-source (MIT), TypeScript-first DXF engine: one
 framework-free `parse → tessellate` pipeline that runs in the browser, in
 Node, and in Cloudflare Workers. A person gets an interactive WebGL viewer
 of a CAD drawing; an AI agent gets structured JSON facts and a rendered
-PNG of the same file. Every surface — the browser viewer, the React
-components, the headless renderer, the HTTP API, and the MCP server — is
-a thin adapter over the same engine, so a drawing is equally readable
-everywhere.
+PNG of the same file. Every surface — the browser viewer, the web
+components and their React bindings, the headless renderer, the HTTP
+API, and the MCP server — is a thin adapter over the same engine, so a
+drawing is equally readable everywhere.
 
 ```
 DXF bytes ──parse──▶ DxfDocument ──tessellate──▶ Tessellation ──┬─▶ WebGL renderer (viewer)
@@ -35,8 +36,20 @@ specs: [docs/product-specs/](docs/product-specs/README.md)
 
 ## Embed it
 
-React — one component gives you the layer panel plus an interactive
-preview:
+Any framework (or none) — one tag gives you the layer panel plus an
+interactive preview. The web components work in plain HTML, Vue, and
+Svelte alike:
+
+```html
+<script type="module">
+  import "@aspicio/elements";
+</script>
+
+<aspicio-embed src-url="/drawing.dxf" style="height: 480px"></aspicio-embed>
+```
+
+React — the same embed with idiomatic props (a thin veneer over the web
+components, pixel-identical output):
 
 ```tsx
 import { DxfEmbed } from "@aspicio/react";
@@ -128,8 +141,8 @@ model provider. Full details:
 
 ## Available today · direction
 
-Everything above is shipped and live: viewer + demo, React and core
-packages, headless describe/render, stdio and hosted MCP, the in-chat
+Everything above is shipped and live: viewer + demo, core, web
+components and React packages, headless describe/render, stdio and hosted MCP, the in-chat
 MCP Apps viewer, the HTTP API with OpenAPI, and plugin packaging for
 Claude Code and Codex.
 
@@ -140,14 +153,15 @@ upload flow so remote surfaces can handle local files.
 
 ## Packages
 
-| Package                            | Description                                                         |
-| ---------------------------------- | ------------------------------------------------------------------- |
-| [`@aspicio/core`](packages/core)   | The viewer library: parsing, tessellation, rendering, camera, input |
-| [`@aspicio/react`](packages/react) | React bindings: `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`     |
-| [`@aspicio/mcp`](packages/mcp)     | MCP server for AI agents: `describe_dxf` + `render_dxf`             |
-| [`@aspicio/api`](apps/api)         | DXF HTTP API Worker (private): `/describe`, `/render`, `/mcp`       |
-| [`@aspicio/widget`](apps/widget)   | MCP Apps in-chat viewer widget (private), served by the api Worker  |
-| [`@aspicio/demo`](apps/demo)       | Standalone demo app (private) — also the reference integration      |
+| Package                                  | Description                                                                                               |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [`@aspicio/core`](packages/core)         | The viewer library: parsing, tessellation, rendering, camera, input                                       |
+| [`@aspicio/elements`](packages/elements) | Web components: `<aspicio-embed>`, `<aspicio-preview>`, `<aspicio-layer-panel>` — plain HTML, Vue, Svelte |
+| [`@aspicio/react`](packages/react)       | React bindings: `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`                                           |
+| [`@aspicio/mcp`](packages/mcp)           | MCP server for AI agents: `describe_dxf` + `render_dxf`                                                   |
+| [`@aspicio/api`](apps/api)               | DXF HTTP API Worker (private): `/describe`, `/render`, `/mcp`                                             |
+| [`@aspicio/widget`](apps/widget)         | MCP Apps in-chat viewer widget (private), served by the api Worker                                        |
+| [`@aspicio/demo`](apps/demo)             | Standalone demo app (private) — also the reference integration                                            |
 
 ## Development
 
