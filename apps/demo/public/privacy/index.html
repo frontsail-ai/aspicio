@@ -64,60 +64,59 @@
       <p>
         Aspicio is an open-source DXF viewer with a hosted API and MCP server, developed and
         maintained by <a href="https://frontsail.ai/">FrontSail AI</a>. This policy covers the
-        hosted services (the demo site, the HTTP API, and the remote MCP endpoint) and the
-        locally-installed tools. The short version: we don't want your data, we don't have accounts,
-        and we don't keep your drawings.
+        hosted services (the demo site, the HTTP API, and the remote MCP endpoint) and the locally
+        installed tools. The short version: we don't want your data. There are no accounts, and we
+        keep no drawings.
       </p>
 
       <h2>What we collect</h2>
       <ul>
         <li>
-          <strong>No personal data.</strong> There are no accounts, sign-ups, names, or email
+          No personal data. There are no accounts or sign-ups, so we never see names or email
           addresses. We run no analytics and set no cookies.
         </li>
         <li>
-          <strong>Drawings you submit.</strong> When you (or your AI assistant) send a DXF to the
-          hosted API or remote MCP server — as a URL to fetch or as request content — it is
-          processed in memory to produce the response (facts, an image, or viewer data) and is not
-          stored.
+          Drawings you submit are processed in memory. When you (or your AI assistant) send a DXF to
+          the hosted API or remote MCP server, whether as a URL to fetch or as request content, the
+          service produces the response (facts, an image, or viewer data) and does not store the
+          file.
         </li>
         <li>
-          <strong>Operational logs.</strong> Our infrastructure provider (Cloudflare) records
-          standard request metadata — IP address, URL, timestamps — which we use for rate limiting
-          and abuse prevention. These logs are short-lived and are not used for anything else.
+          Operational logs. Cloudflare, our infrastructure provider, records standard request
+          metadata (IP address, URL, timestamps). We use those logs for rate limiting and abuse
+          prevention, nothing else, and they expire quickly.
         </li>
       </ul>
 
       <h2>Purposes</h2>
       <p>
-        Exactly one: providing the service — parsing, describing, and rendering the drawings you
-        send, and keeping the service available (rate limits, abuse prevention).
+        Exactly one: providing the service. That means turning the drawings you send into facts,
+        images, or viewer data, and keeping the service available through rate limits and abuse
+        prevention.
       </p>
 
       <h2>Recipients</h2>
       <ul>
-        <li><strong>Cloudflare</strong> operates the infrastructure the hosted services run on.</li>
+        <li>Cloudflare operates the infrastructure the hosted services run on.</li>
         <li>
-          <strong>Your AI assistant's provider.</strong> When you use Aspicio through an AI
-          assistant (ChatGPT, Claude, or any MCP client), the results we return — drawing facts,
-          rendered images, viewer data — are relayed by <em>your assistant</em> to its model
-          provider under that provider's terms. We do not send anything to model providers
-          ourselves.
+          When you use Aspicio through an AI assistant (ChatGPT, Claude, or any MCP client),
+          <em>your assistant</em> relays the results we return to its model provider under that
+          provider's terms. We send nothing to model providers ourselves.
         </li>
         <li>We do not sell or share data with anyone else.</li>
       </ul>
 
       <h2>Retention</h2>
       <p>
-        Drawings: not retained — processed per-request, in memory. Operational logs: retained
-        briefly per Cloudflare's standard log windows, then gone.
+        We keep no drawings; each request is processed in memory and forgotten. Cloudflare retains
+        its operational logs briefly, per its standard log windows, and then they are gone.
       </p>
 
       <h2>Your controls</h2>
       <ul>
         <li>
           Don't send sensitive drawings to the hosted services. For local files, use the local
-          server (<code>npx -y @aspicio/mcp</code>) — it reads files in-process and never uploads
+          server (<code>npx -y @aspicio/mcp</code>), which reads files in-process and never uploads
           them to any Aspicio service.
         </li>
         <li>
