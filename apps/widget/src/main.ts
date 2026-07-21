@@ -144,7 +144,12 @@ const STYLE = `
   .layers-head .links { display: flex; gap: 8px; }
   .layers-head .links button { background: none; border: none; padding: 0; color: var(--w-link); cursor: pointer; font: 500 11px var(--w-sans); }
   .layer-rows { overflow-y: auto; padding: 4px 0; }
-  .layer-rows label { display: flex; align-items: center; gap: 8px; padding: 5px 10px; cursor: pointer; }
+  /* position: relative is load-bearing: it makes each row the containing
+   * block for its visually-hidden absolute checkbox. Without it the
+   * checkboxes resolve against #panel, pile up as phantom scrollable
+   * overflow, and label-click focus makes the browser scroll the
+   * overflow-hidden panel itself — clipping the whole list out of view. */
+  .layer-rows label { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 10px; cursor: pointer; }
   .layer-rows label:hover { background: var(--w-hover-bg); }
   .layer-rows label.off { opacity: 0.55; }
   .layer-rows input { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -413,7 +418,12 @@ function healLayerHome(home: HTMLElement, withHint: boolean): void {
 // ---------------------------------------------------------------------------
 
 function setPanelOpen(open: boolean): void {
-  if (open) healLayerHome(el("panel"), false);
+  if (open) {
+    healLayerHome(el("panel"), false);
+    // Overflow-hidden boxes are still programmatically scrollable; if
+    // anything ever displaces the panel again, reopening must cure it.
+    el("panel").scrollTop = 0;
+  }
   el("panel").classList.toggle("open", open);
   el("layers-btn").setAttribute("aria-expanded", String(open));
 }
