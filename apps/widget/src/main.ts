@@ -396,6 +396,13 @@ function renderLayers(): void {
 // ---------------------------------------------------------------------------
 
 function setPanelOpen(open: boolean): void {
+  // Self-heal: hosts have been observed mangling widget DOM (ChatGPT's
+  // style/DOM machinery emptied this panel in the wild). If rows no longer
+  // match the drawing, rebuild them — reopening must always work.
+  if (open && root.dataset.state === "loaded") {
+    const expected = viewer.getLayers().length;
+    if (el("panel").querySelectorAll("label").length !== expected) wireLayerHome(el("panel"));
+  }
   el("panel").classList.toggle("open", open);
   el("layers-btn").setAttribute("aria-expanded", String(open));
 }
