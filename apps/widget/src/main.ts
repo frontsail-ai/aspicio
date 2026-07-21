@@ -124,7 +124,10 @@ const STYLE = `
   .oc-btn.icon { width: 30px; padding: 0; }
   .oc-btn[aria-expanded="true"] { background: rgba(45,108,223,0.22); border-color: #2D6CDF; color: #9DBCF3; }
 
-  #cluster { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+  /* The container is a hit-target hole: with buttons hidden at rest it must
+   * not eat canvas clicks/drags. Buttons re-enable their own events. */
+  #cluster { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; pointer-events: none; }
+  #cluster > button { pointer-events: auto; }
   #root[data-mode="fullscreen"] #cluster, #root:not([data-state="loaded"]) #cluster { display: none; }
   #expand-btn { margin-left: 4px; }
   @media (hover: hover) {
