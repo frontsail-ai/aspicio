@@ -3,8 +3,8 @@
 Framework-neutral web components for the
 [Aspicio](https://github.com/frontsail-ai/aspicio#readme) DXF viewer.
 One implementation of the embed UI, consumable from plain HTML, Vue,
-Svelte — with React and Vue veneers ([`@aspicio/react`](../react),
-[`@aspicio/vue`](../vue)) layered on top.
+Svelte — with React, Vue, and Svelte veneers ([`@aspicio/react`](../react),
+[`@aspicio/vue`](../vue), [`@aspicio/svelte`](../svelte)) layered on top.
 
 ```bash
 npm install @aspicio/elements three   # @aspicio/core and lit come along; three (>=0.184) is a peer
@@ -85,7 +85,9 @@ just work.
 
 ## Svelte
 
-Svelte consumes custom elements natively:
+For typed callback props, use [`@aspicio/svelte`](../svelte) — the same
+three components as raw Svelte 5 source. Consuming the elements natively
+works too:
 
 ```svelte
 <script>

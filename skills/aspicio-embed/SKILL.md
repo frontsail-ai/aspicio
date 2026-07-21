@@ -10,7 +10,8 @@ description: "Use when building or modifying an app that displays DXF/CAD drawin
 ```bash
 npm install @aspicio/react react three   # React apps; three (>=0.184) is a peer dep
 npm install @aspicio/vue vue three       # Vue 3 apps; vue 3.4+ and three are peer deps
-npm install @aspicio/elements three      # plain HTML / Svelte (web components)
+npm install @aspicio/svelte svelte three # Svelte 5 apps; ships raw .svelte your bundler compiles
+npm install @aspicio/elements three      # plain HTML (web components, no bindings)
 npm install @aspicio/core three          # vanilla JS, hand-rolled UI
 ```
 
@@ -53,6 +54,17 @@ import { DxfEmbed } from "@aspicio/vue";
 ```
 
 Same props/behavior as the React `<DxfEmbed>`; emits `loaded`, `load-error`, `viewer-change`, `hover-layer` with unwrapped payloads; the template ref exposes `viewer` (the full `DxfViewer`). Binding `@hover-layer` enables canvas hover-picking.
+
+## Svelte: the same component, Svelte-flavored
+
+```svelte
+<script>
+  import { DxfEmbed } from "@aspicio/svelte";
+</script>
+<DxfEmbed srcUrl="/drawing.dxf" style="height: 480px" onloaded={({ stats }) => console.log(stats)} />
+```
+
+Same props/behavior; callback props `onloaded`, `onloaderror`, `onviewerchange`, `onhoverlayer` (providing `onhoverlayer` enables hover-picking); `bind:this` exposes `viewer()` (the full `DxfViewer`). Ships raw `.svelte` source via the `svelte` export condition — the consumer's bundler compiles it.
 
 ## Web components: any framework or none
 
