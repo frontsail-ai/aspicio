@@ -13,7 +13,7 @@
     <a href="https://www.npmjs.com/package/@aspicio/mcp"><img src="https://img.shields.io/npm/v/%40aspicio%2Fmcp?label=%40aspicio%2Fmcp" alt="npm: @aspicio/mcp" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
   </p>
-  <p><a href="https://aspicio.dmitri-66a.workers.dev"><strong>▶ Live demo</strong></a></p>
+  <p><a href="https://aspicio.frontsail.ai"><strong>▶ Live demo</strong></a></p>
 </div>
 
 Aspicio is an open-source (MIT), TypeScript-first DXF engine: one
@@ -148,11 +148,11 @@ instead of guessing at it:
 
 <img src="docs/demo-widget.gif" alt="The in-chat viewer loading a 1.1 MB floor-plan DXF, toggling dimension and text layers, and expanding to fullscreen" />
 
-| Surface                                               | Local files | URLs | Inline DXF |
-| ----------------------------------------------------- | ----------- | ---- | ---------- |
-| stdio MCP — `npx -y @aspicio/mcp`                     | ✅          | ✅   | ✅         |
-| Hosted MCP — `aspicio-api.dmitri-66a.workers.dev/mcp` | —           | ✅   | ✅         |
-| HTTP API — `/describe`, `/render`                     | POST body   | ✅   | ✅         |
+| Surface                                     | Local files | URLs | Inline DXF |
+| ------------------------------------------- | ----------- | ---- | ---------- |
+| stdio MCP — `npx -y @aspicio/mcp`           | ✅          | ✅   | ✅         |
+| Hosted MCP — `aspicio-api.frontsail.ai/mcp` | —           | ✅   | ✅         |
+| HTTP API — `/describe`, `/render`           | POST body   | ✅   | ✅         |
 
 Connect:
 
@@ -166,19 +166,19 @@ Connect:
 - **Any client that launches stdio MCP servers** — register
   `npx -y @aspicio/mcp`
 - **Any client that supports remote MCP (Streamable HTTP)** — point it
-  at `https://aspicio-api.dmitri-66a.workers.dev/mcp` (no install;
+  at `https://aspicio-api.frontsail.ai/mcp` (no install;
   speaks MCP, not a browser page)
 - **Plain HTTP** — `GET /describe?src=<dxf-url>`,
   `GET /render?src=<dxf-url>&format=png|svg`; the API self-describes at
-  [`/openapi.json`](https://aspicio-api.dmitri-66a.workers.dev/openapi.json)
+  [`/openapi.json`](https://aspicio-api.frontsail.ai/openapi.json)
 
 URL fetches are guarded (private-network blocking, size caps, redirect
 validation, timeouts). The stdio server reads local files in-process and
 never uploads the DXF to any Aspicio service — though, as with any tool
 result, your MCP client passes the returned summary or image to its
 model provider. Full details:
-[privacy policy](https://aspicio.dmitri-66a.workers.dev/privacy/) ·
-[terms](https://aspicio.dmitri-66a.workers.dev/terms/).
+[privacy policy](https://aspicio.frontsail.ai/privacy/) ·
+[terms](https://aspicio.frontsail.ai/terms/).
 
 ## Available today · direction
 

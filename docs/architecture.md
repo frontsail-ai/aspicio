@@ -54,7 +54,7 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
 | Three.js                     | Batched WebGL lines/fills without hand-rolled GL; tree-shakes acceptably for headless use (ear-clipping only)                                                     |
 | dxf-parser + custom handlers | Battle-tested group-code parsing; HATCH/VIEWPORT and other gaps filled via our registry                                                                           |
 | Lit (web components)         | One shadow-DOM implementation of the embed UI serves every framework; static styles ship as constructed stylesheets (CSSOM), so strict host CSPs can't strip them |
-| Cloudflare Workers           | Static demo hosting and the API on the same infra; deploys via `wrangler` from GitHub Actions (status stays in the PR)                                            |
+| Vercel (Node functions)      | Custom domains on frontsail.ai via plain CNAMEs (DNS stays in Route 53); CI deploys prebuilt artifacts; Workers deploys continue during the listing transition    |
 | resvg                        | The one rasterizer with both WASM (Worker) and native (Node) builds producing identical output                                                                    |
 | MCP (stdio, official SDK)    | Vendor-neutral agent protocol — one server serves Claude, Codex, Cursor; contract-tested against the wire protocol                                                |
 | MCP Apps (`ext-apps` SDK)    | The real viewer shipped as one self-contained in-chat widget from the api Worker — a single implementation for ChatGPT, Claude, and any spec host                 |

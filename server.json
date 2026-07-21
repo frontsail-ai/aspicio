@@ -3,10 +3,10 @@
   "name": "io.github.frontsail-ai/aspicio",
   "title": "Aspicio",
   "description": "DXF drawings for AI agents: structured facts, PNG renders, and an interactive in-chat viewer.",
-  "websiteUrl": "https://aspicio.dmitri-66a.workers.dev",
+  "websiteUrl": "https://aspicio.frontsail.ai",
   "icons": [
     {
-      "src": "https://aspicio.dmitri-66a.workers.dev/favicon.svg",
+      "src": "https://aspicio.frontsail.ai/favicon.svg",
       "mimeType": "image/svg+xml"
     }
   ],
@@ -29,7 +29,7 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://aspicio-api.dmitri-66a.workers.dev/mcp"
+      "url": "https://aspicio-api.frontsail.ai/mcp"
     }
   ]
 }

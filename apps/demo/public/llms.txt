@@ -39,14 +39,14 @@ released under the MIT license.
 
 ## Use it
 
-- [Live demo](https://aspicio.dmitri-66a.workers.dev/): drop in a DXF
+- [Live demo](https://aspicio.frontsail.ai/): drop in a DXF
   and explore it — layer panel, measuring, picking, export.
-- [Hosted MCP server](https://aspicio-api.dmitri-66a.workers.dev/mcp):
+- [Hosted MCP server](https://aspicio-api.frontsail.ai/mcp):
   remote MCP over Streamable HTTP — `describe_dxf`, `render_dxf`, and
   the `view_dxf` in-chat viewer. No install.
 - Local MCP server: `npx -y @aspicio/mcp` — adds local-file support,
   reads drawings in-process, never uploads them.
-- [HTTP API](https://aspicio-api.dmitri-66a.workers.dev/openapi.json):
+- [HTTP API](https://aspicio-api.frontsail.ai/openapi.json):
   `GET /describe?src=<dxf-url>` and
   `GET /render?src=<dxf-url>&format=png|svg`, self-described via
   OpenAPI 3.1.
@@ -63,8 +63,8 @@ released under the MIT license.
   issues, and contribution guide.
 - [Architecture](https://github.com/frontsail-ai/aspicio/blob/master/docs/architecture.md):
   the pipeline and its layers.
-- [Privacy policy](https://aspicio.dmitri-66a.workers.dev/privacy/) ·
-  [Terms of use](https://aspicio.dmitri-66a.workers.dev/terms/)
+- [Privacy policy](https://aspicio.frontsail.ai/privacy/) ·
+  [Terms of use](https://aspicio.frontsail.ai/terms/)
 
 ## About
 
