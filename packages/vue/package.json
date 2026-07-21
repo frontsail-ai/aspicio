@@ -1,0 +1,48 @@
+{
+  "name": "@aspicio/vue",
+  "version": "0.0.0",
+  "description": "Vue 3 bindings for the Aspicio DXF viewer.",
+  "homepage": "https://github.com/frontsail-ai/aspicio/tree/master/packages/vue#readme",
+  "license": "MIT",
+  "author": "Dmitri Kochelorov <kochelorov.dmitri@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frontsail-ai/aspicio.git",
+    "directory": "packages/vue"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "bunx vp run build"
+  },
+  "dependencies": {
+    "@aspicio/core": "workspace:^",
+    "@aspicio/elements": "workspace:^"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "@vue/test-utils": "^2.4.11",
+    "happy-dom": "^20.0.0",
+    "typescript": "^7.0.2",
+    "vite-plus": "catalog:",
+    "vue": "^3.5.0"
+  },
+  "peerDependencies": {
+    "three": ">=0.184.0 <1.0.0",
+    "vue": "^3.4.0"
+  }
+}

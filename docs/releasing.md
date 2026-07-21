@@ -8,8 +8,8 @@ git tag v0.1.0 && git push origin v0.1.0
 
 The [publish workflow](../.github/workflows/publish.yml) then re-runs the
 lint/test gate, stamps `0.1.0` into the package manifests, builds, and
-publishes `@aspicio/core`, `@aspicio/elements`, `@aspicio/react`, and
-`@aspicio/mcp`.
+publishes `@aspicio/core`, `@aspicio/elements`, `@aspicio/react`,
+`@aspicio/vue`, and `@aspicio/mcp`.
 
 ## Always release the tip of master
 
@@ -43,9 +43,10 @@ older commit. Before tagging:
 ## Versioning policy
 
 - **One version for all public packages.** `@aspicio/core`,
-  `@aspicio/elements`, `@aspicio/react`, and `@aspicio/mcp` always
-  release together with the same number (INV-9). Revisit (e.g. with
-  changesets) only if their release cadences genuinely diverge.
+  `@aspicio/elements`, `@aspicio/react`, `@aspicio/vue`, and
+  `@aspicio/mcp` always release together with the same number (INV-9).
+  Revisit (e.g. with changesets) only if their release cadences genuinely
+  diverge.
 - **The tag is the source of truth.** Manifests in the repo stay at
   `0.0.0`; the workflow stamps the tag's version at publish time. There
   are no release commits to merge or rebase around.
@@ -53,9 +54,10 @@ older commit. Before tagging:
   the practice every release so far has followed — and fix-only releases
   bump the patch. Breaking changes also bump the minor, called out in the
   release notes.
-- `@aspicio/elements` depends on core — and `@aspicio/react` on both —
-  as `workspace:^`, which the publish workflow rewrites to `^<version>`;
-  consumers can patch-update the lower layers independently.
+- `@aspicio/elements` depends on core — and `@aspicio/react` and
+  `@aspicio/vue` on both — as `workspace:^`, which the publish workflow
+  rewrites to `^<version>`; consumers can patch-update the lower layers
+  independently.
 
 ## Dry runs
 
@@ -72,6 +74,7 @@ vp run -r build
 cd packages/core && bun publish --access public --dry-run
 cd ../elements && bun publish --access public --dry-run
 cd ../react && bun publish --access public --dry-run
+cd ../vue && bun publish --access public --dry-run
 cd ../mcp && bun publish --access public --dry-run
 ```
 
@@ -81,6 +84,7 @@ cd ../mcp && bun publish --access public --dry-run
 npm view @aspicio/core version           # the new version is live
 npm view @aspicio/elements dependencies  # core range is ^<version>
 npm view @aspicio/react dependencies     # elements + core ranges are ^<version>
+npm view @aspicio/vue dependencies       # same for the Vue bindings
 npm view @aspicio/mcp dependencies       # same for the MCP server
 npx -y @aspicio/mcp </dev/null           # the agent entry point resolves
 ```
@@ -111,5 +115,6 @@ origin v0.1.0`, then re-tag). Deleting tags is safe _only_ while the
 Each package publishes only `dist/` (built by `vp pack`: `index.mjs` +
 `index.d.mts`), `README.md`, and `package.json` — enforced by the `files`
 field. `three` and `dxf-parser` are regular dependencies, as is `lit` in
-`@aspicio/elements`; `react` is a peer. Check the exact contents any
-time with `bun pm pack` in the package directory.
+`@aspicio/elements`; `react` and `vue` are peers of their bindings.
+Check the exact contents any time with `bun pm pack` in the package
+directory.

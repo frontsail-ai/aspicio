@@ -3,8 +3,8 @@
 Framework-neutral web components for the
 [Aspicio](https://github.com/frontsail-ai/aspicio#readme) DXF viewer.
 One implementation of the embed UI, consumable from plain HTML, Vue,
-Svelte — and React via [`@aspicio/react`](../react), which is a thin
-veneer over these elements.
+Svelte — with React and Vue veneers ([`@aspicio/react`](../react),
+[`@aspicio/vue`](../vue)) layered on top.
 
 ```bash
 npm install @aspicio/elements three   # @aspicio/core and lit come along; three (>=0.184) is a peer
@@ -49,9 +49,11 @@ Events (all `CustomEvent`s dispatched on the element):
 
 ## Vue
 
-Custom elements are first-class in Vue — tell the compiler about the
+For idiomatic props and typed emits, use
+[`@aspicio/vue`](../vue) — thin Vue 3 components over these elements.
+Consuming the elements natively works too: tell the compiler about the
 `aspicio-` tags ([Vue docs](https://vuejs.org/guide/extras/web-components))
-and use the elements directly:
+and use them directly:
 
 ```js
 // vite.config.js
