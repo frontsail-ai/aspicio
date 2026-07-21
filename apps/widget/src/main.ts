@@ -331,12 +331,19 @@ function showTooLarge(byteLength: number): void {
       <button id="copy-btn" class="oc-btn" type="button" aria-label="Copy suggested request">${ICONS.copy} Copy suggested request</button>
     </div>`;
   el("copy-btn").addEventListener("click", () => {
-    navigator.clipboard?.writeText(SUGGESTED_REQUEST).then(
+    // Hosts often sandbox the widget iframe without clipboard permission —
+    // and some strip the API entirely, so an absent `clipboard` must take
+    // the same fallback path, not silently no-op.
+    const copied = navigator.clipboard
+      ? navigator.clipboard.writeText(SUGGESTED_REQUEST)
+      : Promise.reject(new Error("clipboard unavailable"));
+    copied.then(
       () => {
         el("copy-btn").textContent = "Copied";
       },
       () => {
-        // Clipboard may be blocked in the sandbox — show the text to select.
+        // Say what happened on the button and surface the text to select.
+        el("copy-btn").textContent = "Copy blocked — select the text above";
         const msg = el("state").querySelector(".msg") as HTMLElement;
         msg.textContent = SUGGESTED_REQUEST;
       },
