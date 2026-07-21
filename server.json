@@ -6,12 +6,12 @@
     "url": "https://github.com/frontsail-ai/aspicio",
     "source": "github"
   },
-  "version": "0.5.0",
+  "version": "0.6.0",
   "packages": [
     {
       "registry_type": "npm",
       "identifier": "@aspicio/mcp",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "runtime_hint": "npx",
       "transport": {
         "type": "stdio"

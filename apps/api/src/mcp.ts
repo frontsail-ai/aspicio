@@ -14,6 +14,7 @@ import {
 } from "@aspicio/widget/meta";
 import type { ViewerMeta } from "@aspicio/widget/meta";
 import { z } from "zod";
+import registry from "../../../server.json";
 import { fetchDxf } from "./fetch.ts";
 import type { RenderPng } from "./handler.ts";
 
@@ -53,7 +54,10 @@ export function renderLink(origin: string, source: string, width: number): strin
  * tests inject a stub so they never depend on the widget build. */
 function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): McpServer {
   const server = new McpServer(
-    { name: "aspicio", version: "1.0.0" },
+    // The Worker deploys from master, not from release tags; the honest
+    // version is the registry-pinned one in server.json (bumped pre-tag),
+    // which the drift guards already keep coherent.
+    { name: "aspicio", version: registry.version },
     {
       instructions:
         "When the user asks to see, show, or explore a drawing, prefer the interactive viewer " +

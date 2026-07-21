@@ -4,7 +4,11 @@
  * Public API surface. Everything importable by consumers goes through here.
  */
 
-export const VERSION = "0.0.0";
+// Baked from package.json at build time — the release workflow stamps the
+// manifest before building, so published dists report the real version
+// (the repo manifest stays 0.0.0; see docs/releasing.md).
+import pkg from "../package.json";
+export const VERSION: string = pkg.version;
 
 export { DxfViewer } from "./viewer.ts";
 export type {

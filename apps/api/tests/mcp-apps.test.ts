@@ -65,6 +65,19 @@ test("server instructions steer hosts toward the interactive viewer", async () =
   await client.close();
 });
 
+test("the remote server reports the registry-pinned version (#63)", async () => {
+  // Registries display serverInfo.version; server.json is the source of
+  // truth the pre-tag bump keeps current, and drift guards keep coherent.
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const registry = JSON.parse(
+    readFileSync(join(import.meta.dirname, "../../../server.json"), "utf8"),
+  ) as { version: string };
+  const client = await connect();
+  expect(client.getServerVersion()?.version).toBe(registry.version);
+  await client.close();
+});
+
 test("view_dxf declares its UI resource in tool metadata (current + legacy key)", async () => {
   const client = await connect();
   const { tools } = await client.listTools();

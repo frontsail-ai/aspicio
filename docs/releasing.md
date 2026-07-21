@@ -48,8 +48,10 @@ older commit. Before tagging:
 - **The tag is the source of truth.** Manifests in the repo stay at
   `0.0.0`; the workflow stamps the tag's version at publish time. There
   are no release commits to merge or rebase around.
-- **Pre-1.0 semver:** breaking changes bump the minor (`0.1.0` → `0.2.0`),
-  everything else bumps the patch.
+- **Pre-1.0 semver:** feature batches bump the minor (`0.1.0` → `0.2.0`) —
+  the practice every release so far has followed — and fix-only releases
+  bump the patch. Breaking changes also bump the minor, called out in the
+  release notes.
 - `@aspicio/react` depends on core as `workspace:^`, which `bun publish`
   rewrites to `^<version>` — consumers can patch-update core
   independently.
