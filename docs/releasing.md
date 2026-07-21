@@ -16,10 +16,12 @@ publishes `@aspicio/core`, `@aspicio/elements`, `@aspicio/react`,
 Tags are cut from the current tip of `master` — never from a branch or an
 older commit. Before tagging:
 
-1. **Bump `server.json`.** Its top-level and package `version` fields are
-   pinned (the registry has no workspace stamping); set them to the new
-   version in the release PR or a pre-tag commit (INV-9), then re-run
-   `mcp-publisher publish` after the release so the listing follows.
+1. **Bump `server.json` — through a release PR.** Its top-level and
+   package `version` fields are pinned (the registry has no workspace
+   stamping); open a small `chore(release)` PR setting them to the new
+   version (INV-9), merge it, and tag the merge commit. Never push the
+   bump straight to master — v0.8.0 did, and the question "where is the
+   PR?" is why this sentence is no longer ambiguous.
 2. **Wait for pending PRs.** If any open PR belongs in the release —
    features, fixes, or (easy to miss) changes to the publish workflow
    itself — it merges first. A release cut around an unmerged PR silently
@@ -80,6 +82,21 @@ cd ../svelte && bun publish --access public --dry-run
 cd ../mcp && bun publish --access public --dry-run
 ```
 
+## After the tag: the GitHub Release
+
+The workflow creates the GitHub Release automatically (generated notes,
+non-dry-run tag pushes only). Two follow-ups are on whoever cuts the
+release:
+
+1. **Verify it exists**: `gh release view vX.Y.Z`. A tag without a
+   Release is invisible on GitHub — v0.7.0 and v0.8.0 both shipped
+   without one until backfilled.
+2. **Curate the notes**: replace the generated list with a short
+   narrative in the house style (`gh release edit vX.Y.Z --notes-file …`)
+   — headline sentence, grouped sections with PR references, and the
+   Install footer listing every package at the new version. Past
+   releases are the template.
+
 ## Verifying a release
 
 ```bash
@@ -90,6 +107,7 @@ npm view @aspicio/vue dependencies       # same for the Vue bindings
 npm view @aspicio/svelte dependencies    # same for the Svelte bindings
 npm view @aspicio/mcp dependencies       # same for the MCP server
 npx -y @aspicio/mcp </dev/null           # the agent entry point resolves
+gh release view vX.Y.Z                   # the GitHub Release exists
 ```
 
 Then the real proof: `npm install @aspicio/react` in a scratch app and
