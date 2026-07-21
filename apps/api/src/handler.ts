@@ -102,6 +102,12 @@ export async function handleRequest(
     switch (url.pathname) {
       case "/health":
         return json({ status: "ok" });
+      case "/.well-known/openai-apps-challenge":
+        // OpenAI app-directory domain verification: the console-issued token
+        // must be served verbatim at this exact path (public by design).
+        return new Response("1gAK8NA4X6b4VCSuHhmSOywdGJD0VQ0oz4NAILnJHX4", {
+          headers: { "content-type": "text/plain" },
+        });
       case "/openapi.json":
         // Advertise whichever host served the doc — the API answers on more
         // than one domain, and a hardcoded URL lies on all but one of them.

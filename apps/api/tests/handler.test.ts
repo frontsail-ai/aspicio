@@ -47,6 +47,13 @@ test("/health returns ok", async () => {
   expect(await res.json()).toEqual({ status: "ok" });
 });
 
+test("the OpenAI domain-verification token is served verbatim", async () => {
+  const res = await handleRequest(get("/.well-known/openai-apps-challenge"), noPng);
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-type")).toContain("text/plain");
+  expect(await res.text()).toBe("1gAK8NA4X6b4VCSuHhmSOywdGJD0VQ0oz4NAILnJHX4");
+});
+
 test("POST /describe returns a structured summary", async () => {
   const res = await handleRequest(post("/describe", SAMPLE), noPng);
   expect(res.status).toBe(200);
