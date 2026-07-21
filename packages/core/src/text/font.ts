@@ -53,14 +53,14 @@ function decodeGlyph(line: string): Glyph {
   let current: Point2[] = [];
   for (let i = 1; i < nvert; i++) {
     if (data[2 * i] === " ") {
-      if (current.length) strokes.push(current);
+      strokes.push(current); // pen up — empty strokes are filtered below
       current = [];
-      continue;
+    } else {
+      current.push({ x: data.charCodeAt(2 * i) - 82, y: data.charCodeAt(2 * i + 1) - 82 });
     }
-    current.push({ x: data.charCodeAt(2 * i) - 82, y: data.charCodeAt(2 * i + 1) - 82 });
   }
-  if (current.length) strokes.push(current);
-  return { strokes, advance: right - left, left };
+  strokes.push(current);
+  return { strokes: strokes.filter((s) => s.length > 0), advance: right - left, left };
 }
 
 /** Sample a full circle as a closed polyline (font units, y down). */

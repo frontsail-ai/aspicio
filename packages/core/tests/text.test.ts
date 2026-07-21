@@ -1,4 +1,4 @@
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
 import { FONT_CAP_HEIGHT, glyph } from "../src/text/font.ts";
 import { decodeTextSpecials, layoutText, stripMText } from "../src/text/layout.ts";
 import type { DxfDocument, Entity } from "../src/model/types.ts";
@@ -118,6 +118,26 @@ test("decodeTextSpecials unescapes \\U+XXXX and whitespace caret codes only", ()
 test("the %%-code symbols render real strokes, not the space fallback", () => {
   for (const ch of ["°", "±", "Ø"]) {
     expect(layoutText(ch, { height: 10 }).length).toBeGreaterThan(0);
+  }
+});
+
+test("every printable ASCII glyph decodes with a sane advance", () => {
+  for (let code = 32; code <= 126; code++) {
+    const g = glyph(code);
+    expect(g.advance).toBeGreaterThan(0);
+    for (const stroke of g.strokes) expect(stroke.length).toBeGreaterThanOrEqual(2);
+  }
+});
+
+test("the font decodes via the Buffer fallback when atob is unavailable", async () => {
+  vi.stubGlobal("atob", undefined);
+  vi.resetModules();
+  try {
+    const fresh = await import("../src/text/font.ts");
+    expect(fresh.glyph(65).strokes.length).toBeGreaterThan(0); // "A"
+  } finally {
+    vi.unstubAllGlobals();
+    vi.resetModules();
   }
 });
 
