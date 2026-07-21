@@ -46,10 +46,15 @@ curl -X POST --data-binary @plan.dxf "https://<worker>/render?format=png&width=1
 
 ```bash
 cd apps/api
-bunx wrangler dev      # run locally (workerd)
-bunx vp test           # unit tests (rasterizer injected, no WASM needed)
-bunx wrangler deploy   # manual deploy (CI does this on master)
+bunx vp run dev          # local server on :8788 (native resvg; build the
+                         # widget first for the view_dxf viewer resource)
+bunx vp test             # unit tests (rasterizer injected — the full
+                         # contract suite runs the real handler in-memory)
+bunx vp run build:vercel # package the deployable bundle into vercel-dist/
 ```
 
 The request logic lives in `src/handler.ts`, pure except for an injected
-`RenderPng` — `src/index.ts` wires the resvg-wasm rasterizer.
+`RenderPng` — `src/vercel.ts` wires the native resvg rasterizer and the
+built widget. CI deploys the prebuilt bundle to Vercel on every master
+push (`.github/workflows/deploy.yml`); production answers at
+https://aspicio-api.frontsail.app.

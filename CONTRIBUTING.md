@@ -45,8 +45,8 @@ CI runs the same gates on every PR, plus a smoke suite against the
 production build ([ci.yml](.github/workflows/ci.yml)). Pushes to `master`
 deploy the demo and the DXF API to Vercel (the canonical
 aspicio.frontsail.app / aspicio-api.frontsail.app hosts, smoke-tested
-post-deploy) and, during the transition, to Cloudflare Workers; every
-PR gets Workers preview URLs posted back as comments
+post-deploy); every PR gets a preview deploy with its URL posted back
+as a comment (behind Vercel SSO)
 ([deploy.yml](.github/workflows/deploy.yml)).
 
 ## Adding entity support

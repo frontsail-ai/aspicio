@@ -38,13 +38,13 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
   adopt the insert's layer.
 - **Snap index is lazy** and typed-array-backed; built per loaded space on
   first use.
-- **PNG without a GPU** is SVG rasterized by resvg — WASM on Workers,
-  native in Node (MCP). Text renders as stroke paths, so rasterization
+- **PNG without a GPU** is SVG rasterized by native resvg (hosted API
+  and stdio MCP alike). Text renders as stroke paths, so rasterization
   needs no fonts.
 - **Workspace resolution:** checks/tests resolve `@aspicio/core` from
   source (tsconfig `paths` + vite alias — both halves required, or CI
-  breaks when `dist` is absent); wrangler and packs resolve the built
-  dist, so deploys build core first.
+  breaks when `dist` is absent); deploy bundles and packs resolve the
+  built dist, so deploys build core first.
 
 ## Tech choices
 
@@ -54,8 +54,8 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
 | Three.js                     | Batched WebGL lines/fills without hand-rolled GL; tree-shakes acceptably for headless use (ear-clipping only)                                                     |
 | dxf-parser + custom handlers | Battle-tested group-code parsing; HATCH/VIEWPORT and other gaps filled via our registry                                                                           |
 | Lit (web components)         | One shadow-DOM implementation of the embed UI serves every framework; static styles ship as constructed stylesheets (CSSOM), so strict host CSPs can't strip them |
-| Vercel (Node functions)      | Custom domains on frontsail.app via plain CNAMEs (DNS stays in Route 53); CI deploys prebuilt artifacts; Workers deploys continue during the listing transition   |
-| resvg                        | The one rasterizer with both WASM (Worker) and native (Node) builds producing identical output                                                                    |
+| Vercel (Node functions)      | Custom domains on frontsail.app via plain CNAMEs (DNS stays in Route 53); CI deploys prebuilt artifacts and smoke-tests the production aliases                    |
+| resvg                        | Fast native (Node) rasterizer; a WASM build exists for edge runtimes if one returns to the stack                                                                  |
 | MCP (stdio, official SDK)    | Vendor-neutral agent protocol — one server serves Claude, Codex, Cursor; contract-tested against the wire protocol                                                |
 | MCP Apps (`ext-apps` SDK)    | The real viewer shipped as one self-contained in-chat widget from the api Worker — a single implementation for ChatGPT, Claude, and any spec host                 |
 
