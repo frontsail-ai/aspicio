@@ -5,8 +5,8 @@ import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
 import "./style.css";
-import { DxfViewer, attachShortcuts, niceLength } from "@aspicio/core";
-import type { EntityInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
+import { DxfViewer, attachShortcuts, niceLength, partitionLayers } from "@aspicio/core";
+import type { EntityInfo, LayerInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
 import { decodeView, encodeView, packLayers } from "./viewurl.ts";
 import type { ViewLink } from "./viewurl.ts";
 
@@ -36,6 +36,7 @@ const icons = {
   download: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>`,
   drop: `<svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="var(--crease)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"></path><path d="m7 11 5 5 5-5"></path><path d="M5 21h14"></path></svg>`,
   check: `<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" fill="var(--crease)"></rect><path d="M4.4 8.2 L6.9 10.6 L11.6 5.3" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg>`,
+  chevron: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>`,
   uncheck: `<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" fill="none" stroke="var(--hairline2)" stroke-width="1.4"></rect></svg>`,
 };
 
@@ -579,80 +580,120 @@ function renderMeasure(): void {
 
 /* ---------- panel ---------- */
 
+/** Build one layer row and register it in `layerRows` (used by both the main
+ *  list and the collapsible empty-layers group — identical behavior). */
+function buildLayerRow(layer: LayerInfo): HTMLLIElement {
+  const row = document.createElement("li");
+  row.className = "layer-row";
+  row.title = `${layer.name} · ${layer.entityCount} entities`;
+
+  const check = document.createElement("span");
+  check.className = "layer-check";
+  check.setAttribute("role", "checkbox");
+  check.setAttribute("aria-label", layer.name);
+  check.tabIndex = 0;
+  // The checkbox toggles instantly (it's an explicit affordance, and stays
+  // snappy for keyboard/AT users); the rest of the row defers so a double
+  // click can solo without a stray toggle.
+  check.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleLayer(layer.name);
+  });
+  check.addEventListener("keydown", (e) => {
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      toggleLayer(layer.name);
+    }
+  });
+
+  const swatch = document.createElement("span");
+  swatch.className = "layer-swatch";
+
+  const name = document.createElement("span");
+  name.className = "layer-name";
+  name.textContent = layer.name;
+
+  const soloChip = document.createElement("span");
+  soloChip.className = "solo-chip";
+  soloChip.textContent = "SOLO";
+  soloChip.hidden = true;
+
+  const count = document.createElement("span");
+  count.className = "layer-count";
+  count.textContent = String(layer.entityCount);
+
+  const soloBar = document.createElement("span");
+  soloBar.className = "solo-bar";
+  soloBar.hidden = true;
+
+  row.append(soloBar, check, swatch, name, soloChip, count);
+  row.addEventListener("mouseenter", () => setHover(layer.name, "row"));
+  row.addEventListener("mouseleave", () => setHover(null, null));
+  // Single click toggles the layer; double click solos it. Defer the single
+  // click so a double click can cancel it — otherwise a solo would also fire
+  // a stray toggle.
+  let clickTimer: number | null = null;
+  row.addEventListener("click", () => {
+    if (clickTimer !== null) return;
+    clickTimer = window.setTimeout(() => {
+      clickTimer = null;
+      toggleLayer(layer.name);
+    }, 250);
+  });
+  row.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    if (clickTimer !== null) {
+      clearTimeout(clickTimer);
+      clickTimer = null;
+    }
+    toggleSolo(layer.name);
+  });
+
+  layerRows.set(layer.name, row);
+  return row;
+}
+
+/** The collapsible "empty layers" group (DEMO-4): layers with no rendered
+ *  geometry, collapsed by default. Rendered only when there are empties. */
+function buildEmptyGroup(empty: LayerInfo[]): HTMLLIElement {
+  const group = document.createElement("li");
+  group.className = "layer-group";
+
+  const head = document.createElement("button");
+  head.type = "button";
+  head.className = "layer-group-head";
+  head.setAttribute("aria-expanded", "false");
+  head.innerHTML =
+    `<span class="layer-group-chevron">${icons.chevron}</span>` +
+    `<span class="layer-group-label">EMPTY</span>` +
+    `<span class="layer-count">${empty.length}</span>`;
+
+  const rows = document.createElement("ul");
+  rows.className = "layer-group-rows";
+  rows.hidden = true; // collapsed by default
+  for (const layer of empty) rows.appendChild(buildLayerRow(layer));
+
+  head.addEventListener("click", () => {
+    const open = head.getAttribute("aria-expanded") === "true";
+    head.setAttribute("aria-expanded", String(!open));
+    rows.hidden = open;
+    group.classList.toggle("open", !open);
+  });
+
+  group.append(head, rows);
+  return group;
+}
+
 function buildLayerPanel(): void {
   const list = $<HTMLUListElement>("#layer-list");
   list.textContent = "";
   layerRows.clear();
-  for (const layer of viewer.getLayers()) {
-    const row = document.createElement("li");
-    row.className = "layer-row";
-    row.title = `${layer.name} · ${layer.entityCount} entities`;
-
-    const check = document.createElement("span");
-    check.className = "layer-check";
-    check.setAttribute("role", "checkbox");
-    check.setAttribute("aria-label", layer.name);
-    check.tabIndex = 0;
-    // The checkbox toggles instantly (it's an explicit affordance, and stays
-    // snappy for keyboard/AT users); the rest of the row defers so a double
-    // click can solo without a stray toggle.
-    check.addEventListener("click", (e) => {
-      e.stopPropagation();
-      toggleLayer(layer.name);
-    });
-    check.addEventListener("keydown", (e) => {
-      if (e.key === " " || e.key === "Enter") {
-        e.preventDefault();
-        toggleLayer(layer.name);
-      }
-    });
-
-    const swatch = document.createElement("span");
-    swatch.className = "layer-swatch";
-
-    const name = document.createElement("span");
-    name.className = "layer-name";
-    name.textContent = layer.name;
-
-    const soloChip = document.createElement("span");
-    soloChip.className = "solo-chip";
-    soloChip.textContent = "SOLO";
-    soloChip.hidden = true;
-
-    const count = document.createElement("span");
-    count.className = "layer-count";
-    count.textContent = String(layer.entityCount);
-
-    const soloBar = document.createElement("span");
-    soloBar.className = "solo-bar";
-    soloBar.hidden = true;
-
-    row.append(soloBar, check, swatch, name, soloChip, count);
-    row.addEventListener("mouseenter", () => setHover(layer.name, "row"));
-    row.addEventListener("mouseleave", () => setHover(null, null));
-    // Single click toggles the layer; double click solos it. Defer the single
-    // click so a double click can cancel it — otherwise a solo would also fire
-    // a stray toggle.
-    let clickTimer: number | null = null;
-    row.addEventListener("click", () => {
-      if (clickTimer !== null) return;
-      clickTimer = window.setTimeout(() => {
-        clickTimer = null;
-        toggleLayer(layer.name);
-      }, 250);
-    });
-    row.addEventListener("dblclick", (e) => {
-      e.preventDefault();
-      if (clickTimer !== null) {
-        clearTimeout(clickTimer);
-        clickTimer = null;
-      }
-      toggleSolo(layer.name);
-    });
-
-    list.appendChild(row);
-    layerRows.set(layer.name, row);
-  }
+  // Layers with no rendered geometry (the default "0", "Defpoints") go into a
+  // collapsed group so they don't clutter the list; omit the group entirely
+  // when every layer has geometry.
+  const { rendered, empty } = partitionLayers(viewer.getLayers());
+  for (const layer of rendered) list.appendChild(buildLayerRow(layer));
+  if (empty.length > 0) list.appendChild(buildEmptyGroup(empty));
   $("#layer-count").textContent = String(viewer.getLayers().length);
   syncPanel();
 }

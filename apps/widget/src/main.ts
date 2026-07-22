@@ -10,7 +10,8 @@
  * way to open another file unless the server sets `allowFilePicker` (the flag
  * is the reserved gate; no picker UI exists yet).
  */
-import { DxfViewer } from "@aspicio/core";
+import { DxfViewer, isEmptyLayer } from "@aspicio/core";
+import type { LayerInfo } from "@aspicio/core";
 import { App } from "@modelcontextprotocol/ext-apps";
 import type { McpUiDisplayMode } from "@modelcontextprotocol/ext-apps";
 import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
@@ -164,6 +165,15 @@ const STYLE = `
   .layer-rows .swatch { width: 18px; flex: none; border-top: 3px solid transparent; box-shadow: 0 0 0 1px var(--w-border); }
   .layer-rows .name { font: 400 13px var(--w-sans); color: var(--w-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+  /* Collapsible empty-layers group (AGT-14): 0-entity layers, collapsed. */
+  .empty-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; background: none; border: none; border-top: 1px solid var(--w-hairline); cursor: pointer; color: var(--w-text-2); font: 500 11px var(--w-mono); letter-spacing: 0.06em; text-transform: uppercase; }
+  .empty-head:hover { background: var(--w-hover-bg); }
+  .empty-head .chevron { display: inline-flex; transition: transform 140ms; }
+  .empty-head[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+  .empty-head .empty-label { flex: 1; text-align: left; }
+  .empty-head .empty-count { color: var(--w-text-2); }
+  @media (prefers-reduced-motion: reduce) { .empty-head .chevron { transition: none; } }
+
   #panel { position: absolute; top: 46px; right: 10px; width: 216px; max-height: calc(100% - 56px); background: var(--w-panel-bg); border: 1px solid var(--w-border); border-radius: var(--w-r-md); box-shadow: var(--w-shadow); overflow: hidden; display: none; flex-direction: column; }
   #root[data-mode="inline"][data-state="loaded"] #panel.open { display: flex; }
 
@@ -186,6 +196,7 @@ const ICONS = {
   layers: svg(
     '<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 12l10 5 10-5"/><path d="M2 17l10 5 10-5"/>',
   ),
+  chevron: svg('<path d="m9 18 6-6-6-6"/>'),
   fit: svg(
     '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/>',
   ),
@@ -357,27 +368,40 @@ function showTooLarge(byteLength: number): void {
 // Layer list — one row set, rendered into panel (inline) and sidebar (fullscreen)
 // ---------------------------------------------------------------------------
 
-function layersMarkup(): string {
-  const rows = viewer
-    .getLayers()
-    .map((layer, i) => {
-      return `<label class="${layer.visible ? "" : "off"}" data-i="${i}">
+// data-i is the layer's index in getLayers() — kept stable across the split so
+// wireLayerHome/syncLayerRows can look it up regardless of which group holds it.
+function rowMarkup(layer: LayerInfo, i: number): string {
+  return `<label class="${layer.visible ? "" : "off"}" data-i="${i}">
         <input type="checkbox" ${layer.visible ? "checked" : ""}>
         <span class="box">${ICONS.check}</span>
         <span class="swatch"></span>
         <span class="name"></span>
       </label>`;
-    })
-    .join("");
+}
+
+function layersMarkup(): string {
+  const layers = viewer.getLayers();
+  const shown: string[] = [];
+  const empty: string[] = [];
+  // Empty (0-entity) layers go into a collapsed group, omitted when there are
+  // none — shared classification with the demo via core's isEmptyLayer.
+  layers.forEach((layer, i) => (isEmptyLayer(layer) ? empty : shown).push(rowMarkup(layer, i)));
+  const emptyGroup = empty.length
+    ? `<button type="button" class="empty-head" aria-expanded="false">
+        <span class="chevron">${ICONS.chevron}</span><span class="empty-label">Empty</span><span class="empty-count">${empty.length}</span>
+      </button>
+      <div class="layer-rows empty-rows" hidden>${empty.join("")}</div>`
+    : "";
   return `
     <div class="layers-head">
-      <span class="h">Layers · ${viewer.getLayers().length}</span>
+      <span class="h">Layers · ${layers.length}</span>
       <span class="links">
         <button type="button" data-all="1" aria-label="Show all layers">All</button>
         <button type="button" data-all="0" aria-label="Hide all layers">None</button>
       </span>
     </div>
-    <div class="layer-rows">${rows}</div>`;
+    <div class="layer-rows">${shown.join("")}</div>
+    ${emptyGroup}`;
 }
 
 function wireLayerHome(home: HTMLElement): void {
@@ -407,6 +431,17 @@ function wireLayerHome(home: HTMLElement): void {
       const visible = btn.dataset.all === "1";
       for (const layer of layers) viewer.setLayerVisible(layer.name, visible);
       syncLayerRows();
+    });
+  }
+  // The empty-layers group toggles its own rows (collapsed by default).
+  const emptyHead = home.querySelector<HTMLButtonElement>(".empty-head");
+  const emptyRows = home.querySelector<HTMLElement>(".empty-rows");
+  if (emptyHead && emptyRows) {
+    emptyHead.addEventListener("click", () => {
+      const open = emptyHead.getAttribute("aria-expanded") === "true";
+      emptyHead.setAttribute("aria-expanded", String(!open));
+      emptyRows.hidden = open;
+      emptyHead.classList.toggle("open", !open);
     });
   }
 }

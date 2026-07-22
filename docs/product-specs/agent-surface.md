@@ -115,7 +115,9 @@ the structured summary plus an explicit too-large notice. A drawing that
 parses to no drawable entities shows an explicit empty-drawing notice,
 never a blank viewer. In the layer list, a long machine prefix shared by
 many rows (xref-qualified names) collapses in the display; the full name
-stays available on the row. The widget
+stays available on the row, and layers with no rendered geometry are
+tucked into a collapsed "empty" group (omitted when there are none),
+sharing the same classification as the demo. The widget
 reports its terminal state — loaded, empty, or failed, with the reason —
 back to
 the conversation context, so the model narrates what actually happened.
