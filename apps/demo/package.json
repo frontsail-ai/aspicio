@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@aspicio/core": "workspace:*",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
     "three": "^0.185.1"
   },
   "devDependencies": {
