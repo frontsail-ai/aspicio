@@ -230,8 +230,9 @@ test("parseDxfBytes decodes binary DXF through the sentinel path", () => {
   str(0, "EOF");
   const doc = parseDxfBytes(new Uint8Array(parts));
   expect(doc.entities.map((e) => e.type)).toEqual(["LINE"]);
-  // A short buffer that can't hold the sentinel is treated as text, not binary.
-  expect(() => parseDxfBytes(new Uint8Array([48, 10]))).toThrow(/end of input|EOF/i);
+  // A short buffer that can't hold the sentinel is treated as text, not binary
+  // — and surfaces a clean, person-facing error, not dxf-parser internals.
+  expect(() => parseDxfBytes(new Uint8Array([48, 10]))).toThrow(/not a valid dxf/i);
 });
 
 test("texts collects TEXT strings, including inside reachable blocks, deduped", () => {

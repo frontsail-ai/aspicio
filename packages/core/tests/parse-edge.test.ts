@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { parseDxf } from "../src/parse/parse.ts";
+import { DxfParseError, parseDxf, parseDxfBytes } from "../src/parse/parse.ts";
 
 /** Build a DXF from (code, value) pairs. */
 function dxf(...pairs: (string | number)[]): string {
@@ -359,6 +359,41 @@ test("unsupported entities inside blocks are counted too", () => {
 
 test("garbage input throws", () => {
   expect(() => parseDxf("not a dxf at all")).toThrow();
+});
+
+// PARSE-12: invalid input yields a clean, person-facing error — never
+// dxf-parser's internals ("Empty file" / "Unexpected end of input …").
+test("invalid input yields a clean, honest error (never a raw parser message)", () => {
+  const enc = (s: string) => new TextEncoder().encode(s);
+  const invalid = [
+    "<!doctype html><title>x</title>", // single-line non-empty → parser says "Empty file"
+    "this is not a valid dxf\n", // multi-line garbage → parser says "Unexpected end of input"
+    "\x00\x01\x02PK\x03\x04", // binary junk
+    "0\n", // one group code, no value
+  ];
+  for (const src of invalid) {
+    let thrown: unknown;
+    try {
+      parseDxfBytes(enc(src));
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown, `should throw for ${JSON.stringify(src)}`).toBeInstanceOf(DxfParseError);
+    expect((thrown as Error).message).toBe("Not a valid DXF file");
+  }
+});
+
+test("empty and whitespace-only input reads as empty, not invalid", () => {
+  for (const src of ["", "   \n \n"]) {
+    let thrown: unknown;
+    try {
+      parseDxf(src);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(DxfParseError);
+    expect((thrown as Error).message).toBe("The file is empty");
+  }
 });
 
 test("entity without a layer code lands on layer 0", () => {

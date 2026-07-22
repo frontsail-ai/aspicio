@@ -611,10 +611,14 @@ app.ontoolresult = (result) => {
   const gen = ++generation;
   void apply(action, gen).catch((err: Error) => {
     if (gen !== generation) return; // a newer result owns the UI now
+    // The core parse error is already person-facing ("Not a valid DXF file",
+    // "The file is empty") — show it as-is rather than prefixing our own.
     const detail =
       action.kind === "pull"
         ? `Could not load the drawing — ${err.message}.`
-        : `The file isn't valid DXF${err.message ? ` — ${err.message}.` : "."}`;
+        : err.message
+          ? `${err.message}.`
+          : "The file isn't valid DXF.";
     showError(detail);
     reportStatus(`failed: ${detail}`);
   });
