@@ -56,7 +56,9 @@ stale view hash so the URL never implies it points at the new drawing.
 Clicking an entity opens a panel with its type, layer, color swatch, and
 measurements, plus actions to isolate the layer, hide the layer, and copy
 a text summary to the clipboard (with visual feedback). Clicking empty
-space or Escape closes it.
+space or Escape closes it. The panel docks in the top corner opposite the
+selection — top-left when the click is in the right half of the canvas,
+top-right otherwise — so it never covers the clicked point.
 
 ### DEMO-9: Measure tool UX
 

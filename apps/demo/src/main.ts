@@ -407,6 +407,9 @@ function selectAt(clientX: number, clientY: number): void {
   selectedIndex = picked.index;
   selected = picked;
   viewer.setSelection(picked.index);
+  // Dock the panel in the corner opposite the click so it never covers the
+  // selection (DEMO-8). Set before showInfo unhides it — no flash.
+  $("#info-panel").dataset.side = clientX - rect.left > rect.width / 2 ? "left" : "right";
   showInfo(picked);
 }
 

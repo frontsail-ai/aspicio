@@ -1078,6 +1078,14 @@ button {
   overflow: hidden;
 }
 
+/* Dock opposite the selection so the panel never covers what you clicked
+   (DEMO-8): default is the top-right; a click in the right half flips it
+   left. selectAt sets data-side before the panel is shown. */
+.info-panel[data-side="left"] {
+  right: auto;
+  left: 14px;
+}
+
 .info-head {
   display: flex;
   align-items: center;
