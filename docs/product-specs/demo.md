@@ -87,9 +87,28 @@ zoom.
 ### DEMO-13: Mobile layout
 
 Below tablet width the layer panel becomes a slide-in drawer with a
-backdrop; the same layer interactions apply.
+backdrop; the same layer interactions apply. The top toolbar always fits
+the viewport — on narrow screens it wraps rather than pushing actions
+(including the primary open button) off-screen.
 
 ### DEMO-14: Paper-space tabs
 
 When the drawing has layouts, tabs above the canvas switch between Model
 and each layout; the switcher is absent for model-only drawings.
+
+### DEMO-15: Crawlable page shell
+
+The demo page carries static, crawler-visible substance without
+executing JavaScript: a descriptive title and meta description, share
+metadata with a preview image, structured data describing the app, and a
+static rendition of the empty screen — heading, a short description of
+what Aspicio is (in-browser viewing, no upload; library, API, and MCP
+surfaces), and the supported-entity list. Once the app boots it replaces
+the static shell with the live empty screen; the two never disagree in
+substance.
+
+### DEMO-16: Empty-screen project links
+
+The empty screen links to the project's home surfaces — repository,
+published packages, privacy policy, and terms of use. The links are
+absent while a drawing is displayed (the canvas owns the screen).

@@ -122,13 +122,19 @@ app.innerHTML = `
         <div class="empty-inner">
           ${reticle(52, "var(--text2)", "var(--text3)")}
           <div class="empty-kicker">NO DRAWING LOADED</div>
-          <div class="empty-title">Open a DXF to view it</div>
+          <h1 class="empty-title">Open a DXF to view it</h1>
           <div class="empty-body">Drop a file anywhere in the window, pick one from your machine, or load the bundled sample.</div>
           <div class="empty-actions">
             <button id="empty-open" class="btn-primary" type="button">Open DXF</button>
             <button id="empty-sample" class="btn-ghost" type="button">Load sample</button>
           </div>
           <div class="empty-supports">SUPPORTS · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · INSERT</div>
+          <nav class="empty-links" aria-label="Project links">
+            <a href="https://github.com/frontsail-ai/aspicio" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://www.npmjs.com/package/@aspicio/core" target="_blank" rel="noopener">npm</a>
+            <a href="/privacy/">Privacy</a>
+            <a href="/terms/">Terms</a>
+          </nav>
         </div>
       </div>
       <div id="error-toast" class="error-toast" hidden>

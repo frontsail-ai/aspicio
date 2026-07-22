@@ -68,7 +68,35 @@
     </script>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- Static shell: crawlable content that main.ts replaces with the app
+           at boot. Non-JS crawlers (and the first paint) see this instead of
+           an empty div; keep its substance in sync with the live empty state. -->
+      <div class="empty-state seo-shell">
+        <div class="empty-inner">
+          <div class="empty-kicker">NO DRAWING LOADED</div>
+          <h1 class="empty-title">Open a DXF to view it</h1>
+          <p class="empty-body">
+            Aspicio is a free, open-source DXF viewer that runs entirely in your browser — drawings
+            are parsed and rendered locally and never uploaded. Inspect layers, measure distances,
+            and export to SVG or PNG.
+          </p>
+          <p class="empty-body">
+            The same engine ships as a TypeScript library with React, Vue, Svelte, and web-component
+            bindings, plus an HTTP API and an MCP server for AI agents.
+          </p>
+          <div class="empty-supports">
+            SUPPORTS · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · INSERT
+          </div>
+          <nav class="empty-links" aria-label="Project links">
+            <a href="https://github.com/frontsail-ai/aspicio">GitHub</a>
+            <a href="https://www.npmjs.com/package/@aspicio/core">npm</a>
+            <a href="/privacy/">Privacy</a>
+            <a href="/terms/">Terms</a>
+          </nav>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

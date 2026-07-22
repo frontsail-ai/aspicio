@@ -814,6 +814,38 @@ test("canvas resizes with the window without breaking rendering", async ({ page 
   expect(colors.green).toBeGreaterThan(50);
 });
 
+// DEMO-15 / DEMO-16
+test("empty state exposes an h1 title, project links, and crawl files", async ({ page }) => {
+  await expect(page.locator("#empty-state h1.empty-title")).toHaveText("Open a DXF to view it");
+
+  const links = page.locator("#empty-state .empty-links a");
+  await expect(links.filter({ hasText: "GitHub" })).toBeVisible();
+  await expect(links.filter({ hasText: "npm" })).toBeVisible();
+  await expect(links.filter({ hasText: "Privacy" })).toBeVisible();
+  await expect(links.filter({ hasText: "Terms" })).toBeVisible();
+
+  const robots = await page.request.get("/robots.txt");
+  expect(robots.ok()).toBeTruthy();
+  expect(await robots.text()).toContain("Sitemap:");
+  const sitemap = await page.request.get("/sitemap.xml");
+  expect(sitemap.ok()).toBeTruthy();
+  expect(await sitemap.text()).toContain("<urlset");
+});
+
+// DEMO-13: the toolbar must never push the primary CTA off-screen.
+test("mobile viewport: header fits without horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await loadSample(page);
+
+  const fits = await page.locator(".topbar").evaluate((el) => el.scrollWidth <= el.clientWidth);
+  expect(fits).toBeTruthy();
+
+  const openBox = await page.locator("#open").boundingBox();
+  expect(openBox).not.toBeNull();
+  expect(openBox!.x).toBeGreaterThanOrEqual(0);
+  expect(openBox!.x + openBox!.width).toBeLessThanOrEqual(375);
+});
+
 test("shares the view via the URL hash and restores it on reload", async ({ page }) => {
   await loadSample(page);
 
