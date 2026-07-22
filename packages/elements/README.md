@@ -5,6 +5,7 @@ Framework-neutral web components for the
 One implementation of the embed UI, consumable from plain HTML, Vue,
 Svelte — with React, Vue, and Svelte veneers ([`@aspicio/react`](../react),
 [`@aspicio/vue`](../vue), [`@aspicio/svelte`](../svelte)) layered on top.
+Try the viewer live at [aspicio.frontsail.app](https://aspicio.frontsail.app/).
 
 ```bash
 npm install @aspicio/elements three   # @aspicio/core and lit come along; three (>=0.184) is a peer

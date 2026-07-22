@@ -5,6 +5,7 @@ React bindings for the
 thin, API-stable veneers over the framework-neutral
 [`@aspicio/elements`](../elements) web components, so React, Vue,
 Svelte, and plain-HTML embeds share one implementation and one look.
+Try the viewer live at [aspicio.frontsail.app](https://aspicio.frontsail.app/).
 
 ```bash
 npm install @aspicio/react react three   # @aspicio/core comes along; react 18/19 and three (>=0.184) are peers

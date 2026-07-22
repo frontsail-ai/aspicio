@@ -3,7 +3,9 @@
 An [MCP](https://modelcontextprotocol.io) server that lets AI agents open,
 inspect, and render DXF/CAD drawings — built on the
 [Aspicio](https://github.com/frontsail-ai/aspicio#readme) viewer's headless
-pipeline. Local stdio server, no hosted dependency.
+pipeline. Local stdio server, no hosted dependency. A hosted endpoint and
+docs live at [aspicio.frontsail.app/mcp](https://aspicio.frontsail.app/mcp/);
+the interactive viewer at [aspicio.frontsail.app](https://aspicio.frontsail.app/).
 
 ## Tools
 

@@ -4,6 +4,7 @@ A TypeScript-first 2D DXF viewer for the web: WebGL rendering, layers,
 and mobile-grade gestures behind one small facade. Framework-agnostic —
 React bindings live in
 [`@aspicio/react`](https://github.com/frontsail-ai/aspicio/tree/master/packages/react#readme).
+Try the viewer live at [aspicio.frontsail.app](https://aspicio.frontsail.app/).
 
 ```bash
 npm install @aspicio/core three   # three is a peer dependency (>=0.184)
