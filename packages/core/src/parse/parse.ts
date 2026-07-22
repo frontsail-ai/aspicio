@@ -26,6 +26,25 @@ import type { RawViewport } from "./viewport.ts";
 const DEG2RAD = Math.PI / 180;
 const DEFAULT_COLOR = 0xffffff;
 
+/**
+ * A parse failure phrased for a person. dxf-parser's own messages are library
+ * internals that mislead — "Empty file" fires for any single-line non-empty
+ * input, and "Unexpected end of input: EOF group not read…" is jargon — so we
+ * never surface them (PARSE-12). Callers on every surface (viewer, API, MCP)
+ * show `message` directly.
+ */
+export class DxfParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DxfParseError";
+  }
+}
+
+/** Empty (or whitespace-only) input reads as empty; anything else is invalid. */
+function parseError(text: string): DxfParseError {
+  return new DxfParseError(text.trim().length === 0 ? "The file is empty" : "Not a valid DXF file");
+}
+
 function point2(p: { x?: number; y?: number } | undefined): Point2 {
   return { x: p?.x ?? 0, y: p?.y ?? 0 };
 }
@@ -366,11 +385,17 @@ export function parseDxf(text: string): DxfDocument {
   try {
     dxf = runParser(text);
   } catch (err) {
-    // Retry once with lenient boolean groups; rethrow anything else.
-    if (!(err instanceof TypeError && /cast to Boolean/.test(err.message))) throw err;
-    dxf = runParser(coerceBooleanGroups(text));
+    // Retry once with lenient boolean groups (PARSE-11); every other failure
+    // — and a failed retry — becomes a clean, person-facing error (PARSE-12),
+    // never dxf-parser's internal message.
+    if (!(err instanceof TypeError && /cast to Boolean/.test(err.message))) throw parseError(text);
+    try {
+      dxf = runParser(coerceBooleanGroups(text));
+    } catch {
+      throw parseError(text);
+    }
   }
-  if (!dxf) throw new Error("Failed to parse DXF: parser returned no document");
+  if (!dxf) throw parseError(text);
 
   const unsupported: Record<string, number> = {};
   const lineTypes = parseLineTypes(dxf);

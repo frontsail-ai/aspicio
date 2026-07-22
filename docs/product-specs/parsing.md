@@ -74,3 +74,11 @@ entity → block override → layer → hairline. Text is never dashed.
 Real-world files carry non-0/1 values at boolean group codes 290–299
 (e.g. `$XCLIPFRAME 2`, a 0/1/2 enum since DXF 2010). Such values are
 coerced to 0/1 instead of failing the whole parse.
+
+### PARSE-12: Invalid input yields a clean, honest error
+
+A source that isn't parseable DXF fails with a `DxfParseError` phrased for
+a person — "The file is empty" for empty or whitespace-only input, "Not a
+valid DXF file" otherwise. The underlying parser's internal messages
+("Empty file", which fires for any single-line non-empty file; "Unexpected
+end of input …") never reach a user surface.
