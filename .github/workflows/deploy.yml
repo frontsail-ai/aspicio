@@ -119,6 +119,8 @@ jobs:
           ASSET=$(curl -sf "$URL/" | grep -o 'assets/[^"]*\.js' | head -1)
           curl -sfI "$URL/$ASSET" | grep -qi "immutable"
           curl -sI "$URL/privacy" | grep -qi "^location: .*/privacy/"
+          curl -sf "$URL/mcp/" | grep -q "describe_dxf"
+          curl -sf "$URL/docs/" | grep -q "@aspicio/core"
           echo "Demo smoke passed."
 
       # Post (and keep updating) one sticky PR comment per target.

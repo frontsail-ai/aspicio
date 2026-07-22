@@ -130,6 +130,8 @@ app.innerHTML = `
           </div>
           <div class="empty-supports">SUPPORTS · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · INSERT</div>
           <nav class="empty-links" aria-label="Project links">
+            <a href="/docs/">Docs</a>
+            <a href="/mcp/">MCP</a>
             <a href="https://github.com/frontsail-ai/aspicio" target="_blank" rel="noopener">GitHub</a>
             <a href="https://www.npmjs.com/package/@aspicio/core" target="_blank" rel="noopener">npm</a>
             <a href="/privacy/">Privacy</a>

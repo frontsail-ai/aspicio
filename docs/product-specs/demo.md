@@ -109,6 +109,7 @@ substance.
 
 ### DEMO-16: Empty-screen project links
 
-The empty screen links to the project's home surfaces — repository,
-published packages, privacy policy, and terms of use. The links are
-absent while a drawing is displayed (the canvas owns the screen).
+The empty screen links to the project's home surfaces — documentation,
+the MCP server page, repository, published packages, privacy policy,
+and terms of use. The links are absent while a drawing is displayed
+(the canvas owns the screen).
