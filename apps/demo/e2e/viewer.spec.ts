@@ -158,10 +158,27 @@ test("clicking an entity selects it and shows a measured info panel", async ({ p
   await expect(page.locator("#info-rows")).toContainText("FURNITURE");
   expect(await page.evaluate(() => window.__demo?.selectedIndex)).not.toBeNull();
 
+  // DEMO-8: measurements carry the document unit (mm) and area gets ²;
+  // a circle's path length is labeled CIRCUMFERENCE, not LENGTH (#29, #36).
+  const rows = await page.locator("#info-rows").innerText();
+  expect(rows).toContain("8 mm"); // radius
+  expect(rows).toContain("201.1 mm²"); // area
+  expect(rows).toContain("50.27 mm"); // circumference value
+  expect(rows).toContain("CIRCUMFERENCE");
+  expect(rows).not.toContain("LENGTH");
+
   // Clicking empty space clears the selection.
   await page.mouse.click(box.x + 6, box.y + 6);
   await expect(page.locator("#info-panel")).toBeHidden();
   expect(await page.evaluate(() => window.__demo?.selectedIndex)).toBeNull();
+
+  // An open shape keeps the "LENGTH" label (the door LINE at world 65,30).
+  const door = await page.evaluate(() => window.__aspicio!.worldToScreen({ x: 65, y: 30 }));
+  await page.mouse.click(box.x + door.x, box.y + door.y);
+  await expect(page.locator("#info-type")).toHaveText("LINE");
+  const lineRows = await page.locator("#info-rows").innerText();
+  expect(lineRows).toContain("LENGTH");
+  expect(lineRows).not.toContain("CIRCUMFERENCE");
 });
 
 // DEMO-8: the info panel docks in the corner opposite the selection, so it

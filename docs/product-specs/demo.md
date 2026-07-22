@@ -58,7 +58,11 @@ measurements, plus actions to isolate the layer, hide the layer, and copy
 a text summary to the clipboard (with visual feedback). Clicking empty
 space or Escape closes it. The panel docks in the top corner opposite the
 selection — top-left when the click is in the right half of the canvas,
-top-right otherwise — so it never covers the clicked point.
+top-right otherwise — so it never covers the clicked point. Measurements
+carry the document's unit suffix (and `²` for area) when the drawing has
+one, matching the measure readout and the copied summary. The path-length
+row is labeled by shape: "CIRCUMFERENCE" for a circle or ellipse,
+"PERIMETER" for a closed polyline, "LENGTH" otherwise.
 
 ### DEMO-9: Measure tool UX
 
