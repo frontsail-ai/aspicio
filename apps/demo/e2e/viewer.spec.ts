@@ -164,6 +164,56 @@ test("clicking an entity selects it and shows a measured info panel", async ({ p
   expect(await page.evaluate(() => window.__demo?.selectedIndex)).toBeNull();
 });
 
+// DEMO-8: the info panel docks in the corner opposite the selection, so it
+// never covers the entity you just clicked.
+test("info panel docks opposite the selection and never covers the click", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await loadSample(page);
+  const box = await canvas(page).boundingBox();
+  if (!box) throw new Error("no canvas box");
+
+  // First pickable point within a horizontal band [lo, hi] of the canvas.
+  const findHit = (lo: number, hi: number) =>
+    page.evaluate(
+      ({ lo, hi }) => {
+        const r = document.querySelector("#viewer canvas")!.getBoundingClientRect();
+        for (let gx = lo; gx <= hi; gx += 0.02)
+          for (let gy = 0.06; gy < 0.5; gy += 0.03) {
+            const x = r.width * gx;
+            const y = r.height * gy;
+            if (window.__demo?.pickAt(x, y)) return { x, y };
+          }
+        return null;
+      },
+      { lo, hi },
+    );
+
+  for (const [lo, hi, expectedSide] of [
+    [0.55, 0.95, "left"],
+    [0.05, 0.45, "right"],
+  ] as const) {
+    const hit = await findHit(lo, hi);
+    if (!hit) throw new Error(`no pickable entity in band [${lo}, ${hi}]`);
+    await page.mouse.click(box.x + hit.x, box.y + hit.y);
+    await expect(page.locator("#info-panel")).toBeVisible();
+    await expect(page.locator("#info-panel")).toHaveAttribute("data-side", expectedSide);
+
+    const panel = await page.locator("#info-panel").boundingBox();
+    if (!panel) throw new Error("no info-panel box");
+    const px = box.x + hit.x;
+    const py = box.y + hit.y;
+    const covers =
+      px >= panel.x && px <= panel.x + panel.width && py >= panel.y && py <= panel.y + panel.height;
+    expect(
+      covers,
+      `panel must not cover the ${expectedSide === "left" ? "right" : "left"}-half click`,
+    ).toBe(false);
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#info-panel")).toBeHidden();
+  }
+});
+
 /** Screen point of the round table's edge (a CIRCLE at world 30,45, r=8). */
 async function clickTable(page: Page): Promise<void> {
   const box = await canvas(page).boundingBox();
