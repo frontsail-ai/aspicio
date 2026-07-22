@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Docs — DXF Viewer Library for the Web · Aspicio</title>
+    <meta
+      name="description"
+      content="Embed Aspicio's open-source TypeScript DXF viewer in your app: web components, React, Vue, and Svelte bindings, a headless pipeline, an HTTP API, and an MCP server. MIT licensed."
+    />
+    <link rel="canonical" href="https://aspicio.frontsail.app/docs/" />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: #16181d;
+        color: #cfd3dc;
+        font:
+          16px/1.65 system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 48px 24px 80px;
+      }
+      h1 {
+        font-size: 28px;
+        color: #edeef2;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 19px;
+        color: #edeef2;
+        margin: 36px 0 8px;
+      }
+      p,
+      li {
+        color: #b7bcc7;
+      }
+      a {
+        color: #8fb0ec;
+      }
+      .meta {
+        color: #6b7280;
+        font-size: 14px;
+        margin-bottom: 32px;
+      }
+      code {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 14px;
+        background: #22252d;
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      pre {
+        background: #22252d;
+        border-radius: 8px;
+        padding: 14px 16px;
+        overflow-x: auto;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 15px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid #2a2e37;
+        color: #b7bcc7;
+        vertical-align: top;
+      }
+      th {
+        color: #edeef2;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Aspicio Documentation</h1>
+      <p class="meta">
+        Aspicio · <a href="/">demo</a> · <a href="/mcp/">MCP server</a> ·
+        <a href="https://github.com/frontsail-ai/aspicio">GitHub</a>
+      </p>
+
+      <p>
+        Aspicio is an open-source, TypeScript-first DXF engine: one framework-free
+        parse&nbsp;→&nbsp;tessellate pipeline that serves people (the
+        <a href="/">interactive WebGL viewer</a>), applications (embeddable components and a
+        headless renderer), and AI agents (an <a href="/mcp/">MCP server</a> and HTTP API). MIT
+        licensed.
+      </p>
+
+      <h2>Packages</h2>
+      <table>
+        <tr>
+          <th>Package</th>
+          <th>What it is</th>
+        </tr>
+        <tr>
+          <td>
+            <a href="https://www.npmjs.com/package/@aspicio/core"><code>@aspicio/core</code></a>
+          </td>
+          <td>
+            The library: parse → tessellate → render, camera and input handling. Headless up to
+            WebGL — runs in the browser, Node, and Cloudflare Workers.
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <a href="https://www.npmjs.com/package/@aspicio/elements"
+              ><code>@aspicio/elements</code></a
+            >
+          </td>
+          <td>
+            Framework-neutral web components: <code>&lt;aspicio-embed&gt;</code>,
+            <code>&lt;aspicio-preview&gt;</code>, <code>&lt;aspicio-layer-panel&gt;</code>.
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <a href="https://www.npmjs.com/package/@aspicio/react"><code>@aspicio/react</code></a> ·
+            <a href="https://www.npmjs.com/package/@aspicio/vue"><code>@aspicio/vue</code></a> ·
+            <a href="https://www.npmjs.com/package/@aspicio/svelte"><code>@aspicio/svelte</code></a>
+          </td>
+          <td>
+            The same three components — <code>&lt;DxfEmbed&gt;</code>,
+            <code>&lt;DxfPreview&gt;</code>, <code>&lt;DxfLayerPanel&gt;</code> — as thin React,
+            Vue&nbsp;3, and Svelte&nbsp;5 bindings over the elements.
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <a href="https://www.npmjs.com/package/@aspicio/mcp"><code>@aspicio/mcp</code></a>
+          </td>
+          <td>Local stdio MCP server for AI agents — see the <a href="/mcp/">MCP page</a>.</td>
+        </tr>
+      </table>
+
+      <h2>Install</h2>
+      <pre><code>npm install @aspicio/react   # or @aspicio/vue, @aspicio/svelte,
+                             # @aspicio/elements, @aspicio/core</code></pre>
+      <p>
+        Each package's README on npm carries its full usage guide; the
+        <a href="https://github.com/frontsail-ai/aspicio#readme">repository README</a> has the
+        overview and example apps for every binding.
+      </p>
+
+      <h2>HTTP API</h2>
+      <p>
+        The hosted API exposes the same pipeline over plain HTTP:
+        <code>GET /describe?src=&lt;dxf-url&gt;</code> returns structured facts,
+        <code>GET /render?src=&lt;dxf-url&gt;&amp;format=png|svg</code> returns an image —
+        self-described via <a href="https://aspicio-api.frontsail.app/openapi.json">OpenAPI 3.1</a>.
+      </p>
+
+      <h2>Go deeper</h2>
+      <ul>
+        <li>
+          <a href="https://github.com/frontsail-ai/aspicio/blob/master/docs/architecture.md"
+            >Architecture</a
+          >
+          — the pipeline and its layers.
+        </li>
+        <li>
+          <a href="https://github.com/frontsail-ai/aspicio">Repository</a> — source, issues, and
+          contribution guide.
+        </li>
+        <li><a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a></li>
+      </ul>
+    </main>
+  </body>
+</html>

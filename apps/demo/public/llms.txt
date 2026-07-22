@@ -59,6 +59,10 @@ released under the MIT license.
 
 ## Docs
 
+- [Library docs](https://aspicio.frontsail.app/docs/): packages,
+  bindings, install, and the HTTP API at a glance.
+- [MCP server](https://aspicio.frontsail.app/mcp/): tools, hosted
+  endpoint, and local install.
 - [Repository](https://github.com/frontsail-ai/aspicio): source,
   issues, and contribution guide.
 - [Architecture](https://github.com/frontsail-ai/aspicio/blob/master/docs/architecture.md):

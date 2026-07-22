@@ -819,10 +819,22 @@ test("empty state exposes an h1 title, project links, and crawl files", async ({
   await expect(page.locator("#empty-state h1.empty-title")).toHaveText("Open a DXF to view it");
 
   const links = page.locator("#empty-state .empty-links a");
+  await expect(links.filter({ hasText: "Docs" })).toBeVisible();
+  await expect(links.filter({ hasText: "MCP" })).toBeVisible();
   await expect(links.filter({ hasText: "GitHub" })).toBeVisible();
   await expect(links.filter({ hasText: "npm" })).toBeVisible();
   await expect(links.filter({ hasText: "Privacy" })).toBeVisible();
   await expect(links.filter({ hasText: "Terms" })).toBeVisible();
+
+  // AGT-15: the agent-surface pages are served and substantive. The explicit
+  // file path works in dev too, where the SPA fallback owns directory URLs;
+  // the deploy smoke covers the pretty /mcp/ and /docs/ URLs in production.
+  const mcp = await page.request.get("/mcp/index.html");
+  expect(mcp.ok()).toBeTruthy();
+  expect(await mcp.text()).toContain("describe_dxf");
+  const docs = await page.request.get("/docs/index.html");
+  expect(docs.ok()).toBeTruthy();
+  expect(await docs.text()).toContain("@aspicio/core");
 
   const robots = await page.request.get("/robots.txt");
   expect(robots.ok()).toBeTruthy();

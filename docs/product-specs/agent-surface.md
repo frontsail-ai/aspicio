@@ -133,3 +133,12 @@ automatically; Codex wires tools with a single documented command.
 The bundled skills (inspect-dxf, embed) describe real APIs and semantics;
 drift guards fail CI if a taught name stops existing in the source (see
 INV-10).
+
+### AGT-15: Discovery pages on the demo host
+
+The demo site serves static, crawler-readable pages that describe the
+agent and library surfaces: an MCP page (tools, the hosted endpoint,
+local install commands, guardrails) and a docs page (packages, bindings,
+install, HTTP API at a glance). Both state only shipped behavior
+(INV-10), are listed in the sitemap, and are linked from the empty
+screen and llms.txt.

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DXF MCP Server · Aspicio</title>
+    <meta
+      name="description"
+      content="Aspicio's MCP server gives AI agents DXF tools: describe_dxf for structured facts, render_dxf for PNG renders, and an in-chat viewer. Hosted endpoint or one-command local install."
+    />
+    <link rel="canonical" href="https://aspicio.frontsail.app/mcp/" />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: #16181d;
+        color: #cfd3dc;
+        font:
+          16px/1.65 system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 48px 24px 80px;
+      }
+      h1 {
+        font-size: 28px;
+        color: #edeef2;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 19px;
+        color: #edeef2;
+        margin: 36px 0 8px;
+      }
+      p,
+      li {
+        color: #b7bcc7;
+      }
+      a {
+        color: #8fb0ec;
+      }
+      .meta {
+        color: #6b7280;
+        font-size: 14px;
+        margin-bottom: 32px;
+      }
+      code {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 14px;
+        background: #22252d;
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      pre {
+        background: #22252d;
+        border-radius: 8px;
+        padding: 14px 16px;
+        overflow-x: auto;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 15px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid #2a2e37;
+        color: #b7bcc7;
+        vertical-align: top;
+      }
+      th {
+        color: #edeef2;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>DXF MCP Server</h1>
+      <p class="meta">
+        Aspicio · <a href="/">demo</a> · <a href="/docs/">docs</a> ·
+        <a href="https://github.com/frontsail-ai/aspicio">GitHub</a>
+      </p>
+
+      <p>
+        Aspicio ships an <a href="https://modelcontextprotocol.io">MCP</a> server that lets AI
+        agents open, inspect, and render DXF/CAD drawings — built on the same open-source
+        parse&nbsp;→&nbsp;tessellate pipeline as the <a href="/">interactive viewer</a>. Use the
+        hosted endpoint with zero install, or run it locally for private files.
+      </p>
+
+      <h2>Tools</h2>
+      <table>
+        <tr>
+          <th>Tool</th>
+          <th>Returns</th>
+          <th>Use for</th>
+        </tr>
+        <tr>
+          <td><code>describe_dxf</code></td>
+          <td>
+            Structured JSON: units, bounds and size, entity and segment counts, layers with the
+            color actually drawn, per-type entity counts, skipped types
+          </td>
+          <td>Structural questions — layers, counts, dimensions, units</td>
+        </tr>
+        <tr>
+          <td><code>render_dxf</code></td>
+          <td>A PNG image of the drawing</td>
+          <td>Visual questions — what the drawing looks like</td>
+        </tr>
+        <tr>
+          <td><code>view_dxf</code></td>
+          <td>
+            An interactive, pannable, layer-toggling viewer inside the conversation (hosted server,
+            on MCP Apps hosts such as ChatGPT and Claude)
+          </td>
+          <td>Letting the user explore the drawing themselves</td>
+        </tr>
+      </table>
+
+      <h2>Hosted endpoint — no install</h2>
+      <p>
+        Remote MCP over Streamable HTTP, stateless, no accounts, rate-limited per IP. Sources:
+        http(s) URLs or inline DXF text.
+      </p>
+      <pre><code>https://aspicio-api.frontsail.app/mcp</code></pre>
+
+      <h2>Local server — private files</h2>
+      <p>
+        The <a href="https://www.npmjs.com/package/@aspicio/mcp"><code>@aspicio/mcp</code></a> stdio
+        server adds local file paths as a source form and reads drawings in-process — nothing is
+        uploaded.
+      </p>
+      <pre><code># Claude Code / Claude Desktop
+claude mcp add aspicio -- npx -y @aspicio/mcp
+
+# Codex
+codex mcp add aspicio -- npx -y @aspicio/mcp</code></pre>
+      <p>
+        Any other MCP client: register the stdio command <code>npx -y @aspicio/mcp</code>. For a
+        one-step install with bundled usage skills, use the
+        <a href="https://github.com/frontsail-ai/aspicio#for-agents">aspicio plugin</a> for Claude
+        Code and Codex.
+      </p>
+
+      <h2>Guardrails</h2>
+      <ul>
+        <li>
+          URL fetches are guarded: private-network blocking, size caps, redirect validation, and
+          timeouts.
+        </li>
+        <li>
+          No accounts and no stored drawings — see the <a href="/privacy/">privacy policy</a>.
+        </li>
+        <li>
+          Unsupported entity types are counted and reported, never fatal; failures come back as
+          proper protocol errors an agent can read.
+        </li>
+      </ul>
+
+      <h2>More</h2>
+      <ul>
+        <li>
+          Prefer plain HTTP? <code>GET /describe?src=&lt;dxf-url&gt;</code> and
+          <code>GET /render?src=&lt;dxf-url&gt;&amp;format=png|svg</code>, self-described via
+          <a href="https://aspicio-api.frontsail.app/openapi.json">OpenAPI 3.1</a>.
+        </li>
+        <li>
+          <a href="https://github.com/frontsail-ai/aspicio">Source on GitHub</a> — MIT licensed.
+        </li>
+        <li>
+          <a href="/docs/">Library and embedding docs</a> for using the viewer in your own app.
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>
