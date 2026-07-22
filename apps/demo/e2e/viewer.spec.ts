@@ -893,6 +893,13 @@ test("empty state exposes an h1 title, project links, and crawl files", async ({
   await expect(links.filter({ hasText: "Privacy" })).toBeVisible();
   await expect(links.filter({ hasText: "Terms" })).toBeVisible();
 
+  // The SUPPORTS list must name the rich entity types too, not just the
+  // primitives — otherwise it implies they're unsupported (#30).
+  const supports = page.locator("#empty-state .empty-supports");
+  for (const t of ["TEXT", "MTEXT", "DIMENSION", "HATCH", "SOLID", "SPLINE"]) {
+    await expect(supports).toContainText(t);
+  }
+
   // AGT-15: the agent-surface pages are served and substantive. The explicit
   // file path works in dev too, where the SPA fallback owns directory URLs;
   // the deploy smoke covers the pretty /mcp/ and /docs/ URLs in production.

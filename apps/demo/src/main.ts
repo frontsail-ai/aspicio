@@ -134,7 +134,7 @@ app.innerHTML = `
             <button id="empty-open" class="btn-primary" type="button">Open DXF</button>
             <button id="empty-sample" class="btn-ghost" type="button">Load sample</button>
           </div>
-          <div class="empty-supports">SUPPORTS · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · INSERT</div>
+          <div class="empty-supports">SUPPORTS · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · SPLINE · TEXT · MTEXT · INSERT · DIMENSION · HATCH · SOLID · POINT</div>
           <nav class="empty-links" aria-label="Project links">
             <a href="/docs/">Docs</a>
             <a href="/mcp/">MCP</a>
