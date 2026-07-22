@@ -21,7 +21,9 @@ released under the MIT license.
   structured JSON facts (units, bounds, layers with the colors actually
   drawn, entity counts, and the drawing's text content), so an agent
   reads a title block or a dimension value directly — no OCR, no
-  vision round-trip.
+  vision round-trip. The structured tools declare MCP output schemas,
+  so clients validate and parse results mechanically instead of
+  guessing at shapes.
 - An interactive in-chat viewer via the open MCP Apps extension:
   `view_dxf` puts a pannable, zoomable, layer-toggling WebGL viewer
   directly in ChatGPT or Claude conversations. The widget is locked to
