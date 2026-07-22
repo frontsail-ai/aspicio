@@ -352,11 +352,12 @@ function fmt(n: number): string {
 
 /* ---------- entity selection + info panel ---------- */
 
-const INFO_FIELDS: [keyof EntityInfo, string, (v: number) => string][] = [
-  ["length", "LENGTH", fmt],
-  ["radius", "RADIUS", fmt],
-  ["area", "AREA", fmt],
-  ["points", "POINTS", (v) => String(v)],
+// The 4th element is the measurement's unit kind (null = a bare count).
+const INFO_FIELDS: [keyof EntityInfo, string, (v: number) => string, "linear" | "area" | null][] = [
+  ["length", "LENGTH", fmt, "linear"],
+  ["radius", "RADIUS", fmt, "linear"],
+  ["area", "AREA", fmt, "area"],
+  ["points", "POINTS", (v) => String(v), null],
 ];
 
 function showInfo(picked: PickedEntity): void {
@@ -371,10 +372,14 @@ function showInfo(picked: PickedEntity): void {
       `<span class="info-k">COLOR</span><span class="info-v"><span class="info-swatch" style="background:${hex}"></span>${hex}</span>`,
     );
   }
-  for (const [key, label, format] of INFO_FIELDS) {
+  for (const [key, label, format, unit] of INFO_FIELDS) {
     const value = info[key];
     if (typeof value === "number") {
-      rows.push(`<span class="info-k">${label}</span><span class="info-v">${format(value)}</span>`);
+      const rowLabel = key === "length" ? lengthLabel(info) : label;
+      const suffix = unit ? measureSuffix(unit) : "";
+      rows.push(
+        `<span class="info-k">${rowLabel}</span><span class="info-v">${format(value)}${suffix}</span>`,
+      );
     }
   }
   if (info.position) {
@@ -440,13 +445,13 @@ function showAllLayers(): void {
 function copySelection(): void {
   if (!selected) return;
   const { info } = selected;
-  const u = viewer.document?.units;
-  const unit = u ? ` ${u}` : "";
   const lines = [info.type, `layer: ${info.layer}`];
   if (info.color !== null) lines.push(`color: #${info.color.toString(16).padStart(6, "0")}`);
-  if (info.length !== undefined) lines.push(`length: ${fmt(info.length)}${unit}`);
-  if (info.radius !== undefined) lines.push(`radius: ${fmt(info.radius)}${unit}`);
-  if (info.area !== undefined) lines.push(`area: ${fmt(info.area)}${unit ? `${unit}²` : ""}`);
+  if (info.length !== undefined)
+    lines.push(`${lengthLabel(info).toLowerCase()}: ${fmt(info.length)}${measureSuffix("linear")}`);
+  if (info.radius !== undefined)
+    lines.push(`radius: ${fmt(info.radius)}${measureSuffix("linear")}`);
+  if (info.area !== undefined) lines.push(`area: ${fmt(info.area)}${measureSuffix("area")}`);
   if (info.points !== undefined) lines.push(`points: ${info.points}`);
   if (info.position) lines.push(`at: ${fmt(info.position.x)}, ${fmt(info.position.y)}`);
   if (info.text) lines.push(`text: ${info.text}`);
@@ -745,6 +750,22 @@ viewer.on("loaded", () => {
 function unitSuffix(): string {
   const u = viewer.document?.units;
   return u ? ` ${u}` : "";
+}
+
+/** Measurement suffix for the drawing unit: " mm" (linear), " mm²" (area),
+ *  or "" when the file is unitless. One source of truth for panel + copy. */
+function measureSuffix(kind: "linear" | "area"): string {
+  const us = unitSuffix();
+  return us ? (kind === "area" ? `${us}²` : us) : "";
+}
+
+/** Label for an entity's path length: a closed curve reads "CIRCUMFERENCE",
+ *  a closed polygon "PERIMETER", everything else "LENGTH" (#36). A closed
+ *  polyline is the one that carries an `area` (describeEntity). */
+function lengthLabel(info: EntityInfo): string {
+  if (info.type === "CIRCLE" || info.type === "ELLIPSE") return "CIRCUMFERENCE";
+  if (info.type === "POLYLINE" && info.area !== undefined) return "PERIMETER";
+  return "LENGTH";
 }
 
 /** Redraw the scale bar to a round number of drawing units (~90px target). */
