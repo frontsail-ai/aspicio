@@ -5,13 +5,67 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="google-site-verification" content="vysmTNxh1ZM7hQ1mrz26cb2dqRlSujMxOqMGrQtBSag" />
+    <meta
+      name="description"
+      content="Free, open-source DXF viewer that runs entirely in your browser — no upload required. Inspect layers, measure, and export CAD drawings to SVG or PNG."
+    />
+    <link rel="canonical" href="https://aspicio.frontsail.app/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://aspicio.frontsail.app/" />
+    <meta property="og:title" content="Aspicio — Free Online DXF Viewer" />
+    <meta
+      property="og:description"
+      content="Free, open-source DXF viewer that runs entirely in your browser — no upload required. Inspect layers, measure, and export CAD drawings to SVG or PNG."
+    />
+    <meta property="og:image" content="https://aspicio.frontsail.app/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
     />
-    <title>Aspicio</title>
+    <title>Aspicio — Free Online DXF Viewer</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://aspicio.frontsail.app/#website",
+            "name": "Aspicio",
+            "url": "https://aspicio.frontsail.app/",
+            "description": "Open-source, TypeScript-first DXF viewer for the web — parse, render, and export CAD drawings in the browser.",
+            "publisher": { "@id": "https://frontsail.ai/#organization" },
+            "inLanguage": "en"
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://frontsail.ai/#organization",
+            "name": "FrontSail AI",
+            "url": "https://frontsail.ai/",
+            "sameAs": [
+              "https://github.com/frontsail-ai/aspicio",
+              "https://www.npmjs.com/package/@aspicio/core"
+            ]
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://aspicio.frontsail.app/#webapp",
+            "name": "Aspicio",
+            "url": "https://aspicio.frontsail.app/",
+            "description": "Open-source DXF viewer: open a DXF file to explore CAD drawings in WebGL with layer controls, measurement tools, and SVG/PNG export — no install required.",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Any (runs in a web browser)",
+            "browserRequirements": "Requires JavaScript and WebGL",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "creator": { "@id": "https://frontsail.ai/#organization" },
+            "sameAs": ["https://github.com/frontsail-ai/aspicio"]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

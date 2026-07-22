@@ -111,6 +111,14 @@ jobs:
           URL="https://${{ matrix.alias }}"
           curl -sf "$URL/" | grep -qi "aspicio"
           curl -sf "$URL/llms.txt" | grep -q "Aspicio"
+          # Crawlability + hosting config (vercel.json is read from the static
+          # deploy root — these fail loudly if Vercel ever stops honoring it).
+          curl -sf "$URL/robots.txt" | grep -q "Sitemap:"
+          curl -sf "$URL/sitemap.xml" | grep -q "<urlset"
+          curl -sf "$URL/" | grep -q 'name="description"'
+          ASSET=$(curl -sf "$URL/" | grep -o 'assets/[^"]*\.js' | head -1)
+          curl -sfI "$URL/$ASSET" | grep -qi "immutable"
+          curl -sI "$URL/privacy" | grep -qi "^location: .*/privacy/"
           echo "Demo smoke passed."
 
       # Post (and keep updating) one sticky PR comment per target.
