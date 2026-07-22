@@ -1175,7 +1175,7 @@ button {
   font-weight: 600;
   color: var(--text);
   letter-spacing: -0.01em;
-  margin-bottom: 8px;
+  margin: 0 0 8px;
 }
 
 .empty-body {
@@ -1207,6 +1207,35 @@ button {
   line-height: 1.8;
   border-top: 1px solid var(--hairline);
   padding-top: 14px;
+}
+
+.empty-links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.empty-links a {
+  color: var(--text2);
+  text-decoration: none;
+}
+
+.empty-links a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* Static pre-boot shell (index.html): same look, roomier prose. */
+.seo-shell .empty-inner {
+  max-width: 480px;
+}
+
+.seo-shell .empty-body {
+  margin: 0 0 14px;
 }
 
 /* ===================== ERROR TOAST ===================== */
@@ -1349,9 +1378,28 @@ button {
 /* ===================== MOBILE ===================== */
 
 @media (width <= 720px) {
+  /* Let the toolbar wrap instead of pushing the primary CTA off-screen on
+     narrow phones; the app column below simply yields the extra row. */
   .topbar {
-    height: 50px;
-    padding: 0 12px;
+    height: auto;
+    min-height: 50px;
+    flex-wrap: wrap;
+    row-gap: 4px;
+    padding: 6px 12px;
+  }
+
+  /* Comfortable touch targets (44px baseline). */
+  .topbar-actions .btn-primary,
+  .topbar-actions .btn-ghost,
+  .empty-actions .btn-primary,
+  .empty-actions .btn-ghost {
+    min-height: 44px;
+  }
+
+  .ctrl,
+  .ctrl-stack button {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .statusbar,
