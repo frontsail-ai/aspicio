@@ -5,7 +5,8 @@ Vue 3 bindings for the
 thin veneers over the framework-neutral
 [`@aspicio/elements`](../elements) web components, so Vue, React,
 Svelte, and plain-HTML embeds share one implementation and one look
-(pixel-identical, verified).
+(pixel-identical, verified). Try the viewer live at
+[aspicio.frontsail.app](https://aspicio.frontsail.app/).
 
 ```bash
 npm install @aspicio/vue vue three   # @aspicio/core and @aspicio/elements come along; vue 3.4+ and three (>=0.184) are peers

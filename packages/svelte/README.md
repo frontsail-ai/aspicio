@@ -7,7 +7,8 @@ thin veneers over the framework-neutral
 Vue, and plain-HTML embeds share one implementation and one look
 (pixel-identical, verified). Ships as **raw `.svelte` source** via the
 `svelte` export condition; your bundler compiles it against your own
-Svelte version (5+).
+Svelte version (5+). Try the viewer live at
+[aspicio.frontsail.app](https://aspicio.frontsail.app/).
 
 ```bash
 npm install @aspicio/svelte svelte three   # @aspicio/core and @aspicio/elements come along; svelte 5 and three (>=0.184) are peers
