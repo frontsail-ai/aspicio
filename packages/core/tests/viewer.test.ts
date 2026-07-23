@@ -228,6 +228,35 @@ test("setView animate path eases to the target pose", async () => {
   expect(viewer.view.rotation).toBeCloseTo(0.2, 5);
 });
 
+test("rapid animated zoom clicks compound the full factor (#39)", async () => {
+  const { viewer } = makeViewer();
+  await viewer.load(SAMPLE);
+  viewer.fitView();
+  const u0 = viewer.view.unitsPerPixel;
+  // Two zoom-in clicks with the second firing mid-animation. The target must
+  // compound from the first click's destination, not the mid-flight camera.
+  viewer.zoomBy(1.25, { animate: true, durationMs: 60 });
+  await new Promise((r) => setTimeout(r, 18));
+  viewer.zoomBy(1.25, { animate: true, durationMs: 60 });
+  await new Promise((r) => setTimeout(r, 220));
+  // 1.25 * 1.25 = 1.5625; before the fix this landed near 1.28.
+  expect(u0 / viewer.view.unitsPerPixel).toBeCloseTo(1.5625, 2);
+});
+
+test("resetRotation mid-zoom keeps the pending zoom (#39 sibling)", async () => {
+  const { viewer } = makeViewer();
+  await viewer.load(SAMPLE);
+  viewer.fitView();
+  const u0 = viewer.view.unitsPerPixel;
+  viewer.zoomBy(1.25, { animate: true, durationMs: 60 });
+  await new Promise((r) => setTimeout(r, 18));
+  // Interrupting the zoom to reset rotation must not abandon the zoom target.
+  viewer.resetRotation({ animate: true, durationMs: 60 });
+  await new Promise((r) => setTimeout(r, 220));
+  expect(u0 / viewer.view.unitsPerPixel).toBeCloseTo(1.25, 2);
+  expect(viewer.view.rotation).toBeCloseTo(0, 5);
+});
+
 test("off removes a listener", async () => {
   const { viewer } = makeViewer();
   const listener = vi.fn();
