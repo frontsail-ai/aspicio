@@ -23,7 +23,7 @@ multiplies.
 workflow via GitHub OIDC — the workflow's identity in this repo grants
 `io.github.frontsail-ai/*`, no tokens involved. It stamps `server.json`
 with the release version before submitting (the in-repo pre-tag bump
-stays a [releasing.md](releasing.md) step because the deployed Worker
+stays a [releasing.md](releasing.md) step because the deployed server
 reads `server.json` for its `serverInfo`).
 
 Manual runs (out-of-band metadata changes only):

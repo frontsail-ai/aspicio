@@ -28,21 +28,23 @@ just check     # the repo gate (vp run ready)
 
 ## Testing
 
-- **Unit tests** (`packages/core/tests/`, `packages/react/tests/`,
-  Vitest): parsing, geometry math, tessellation, camera invariants,
-  gestures (happy-dom), the viewer facade (mocked renderer), and the
-  React component lifecycle (mocked core).
+- **Unit tests** (`packages/core/tests/`, plus the binding packages
+  `packages/{elements,react,vue,svelte}/tests/`, Vitest): parsing,
+  geometry math, tessellation, camera invariants, gestures (happy-dom),
+  the viewer facade (mocked renderer), and each binding's component
+  lifecycle (mocked core).
 - **Agent-surface tests** (`apps/api/tests/`, `packages/mcp/tests/`,
   `apps/widget/tests/`, Vitest): the hosted API's routing, fetch guards,
   rate limiting, and remote MCP contract (in-memory Streamable HTTP
   round-trips — including the MCP Apps viewer resource and `view_dxf`
   payload); the stdio MCP tools; the widget's state logic; and the
   manifest/README drift guards.
-- **E2E tests** (`apps/demo/e2e/` and `apps/react-example/e2e/`,
-  Playwright): real-browser coverage of the WebGL renderer, the demo
-  app — pixel-level render checks, layer toggling, zoom/pan/rotate/fit,
+- **E2E tests** (seven Playwright suites — `apps/demo/e2e/` plus
+  `apps/{elements,react,vue,svelte,vanilla,widget}-example/e2e/`):
+  real-browser coverage of the WebGL renderer, the demo app —
+  pixel-level render checks, layer toggling, zoom/pan/rotate/fit,
   synthetic multi-touch pinch and twist, file loading, error handling,
-  the mobile layout — and the React embed integration.
+  the mobile layout — and each framework's embed integration.
 
 The renderer is intentionally untested at the unit level (it needs a real
 WebGL context); the e2e suite exercises it end to end instead. All other
@@ -72,7 +74,8 @@ per-entity colors (INV-8).
 git tag v0.5.0 && git push origin v0.5.0
 ```
 
-CI gates, versions, builds, and publishes the three public packages
-(`@aspicio/core`, `@aspicio/react`, `@aspicio/mcp`). Full runbook —
+CI gates, versions, builds, and publishes the six public packages
+(`@aspicio/core`, `@aspicio/elements`, `@aspicio/react`, `@aspicio/vue`,
+`@aspicio/svelte`, `@aspicio/mcp`). Full runbook —
 one-time npm setup, versioning policy, dry runs, recovery — in
 [docs/releasing.md](docs/releasing.md).

@@ -1,19 +1,19 @@
 # @aspicio/api
 
-A Cloudflare Worker exposing Aspicio's headless DXF pipeline over HTTP —
-structured facts and rendered images for agents, scripts, and integrations.
-No browser, no WebGL: parsing and SVG generation are pure JS, and PNG
-rasterizes the SVG with resvg (WASM) inside the Worker.
+A serverless HTTP API (deployed on Vercel) exposing Aspicio's headless DXF
+pipeline — structured facts and rendered images for agents, scripts, and
+integrations. No browser, no WebGL: parsing and SVG generation are pure JS,
+and PNG rasterizes the SVG with resvg (WASM) inside the function.
 
 ## Endpoints
 
-| Endpoint                | Returns                                                                                                                                       |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET \| POST /describe` | JSON summary: units, bounds/size, entity + segment counts, layers with the color actually drawn, per-type entity counts, skipped types        |
-| `GET \| POST /render`   | The drawing as an image — `?format=png` (default) or `svg`                                                                                    |
-| `GET /openapi.json`     | OpenAPI 3.1 description of this API — import it into ChatGPT Actions, Gemini/Grok function calling, or any OpenAPI-speaking tool              |
-| `POST /mcp`             | Remote MCP (Streamable HTTP, stateless): the same `describe_dxf`/`render_dxf` tools for web clients with connector support — no local install |
-| `GET /health`           | `{ "status": "ok" }`                                                                                                                          |
+| Endpoint                | Returns                                                                                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET \| POST /describe` | JSON summary: units, bounds/size, entity + segment counts, layers with the color actually drawn, per-type entity counts, skipped types                                         |
+| `GET \| POST /render`   | The drawing as an image — `?format=png` (default) or `svg`                                                                                                                     |
+| `GET /openapi.json`     | OpenAPI 3.1 description of this API — import it into ChatGPT Actions, Gemini/Grok function calling, or any OpenAPI-speaking tool                                               |
+| `POST /mcp`             | Remote MCP (Streamable HTTP, stateless): the `describe_dxf`, `render_dxf`, and `view_dxf` (interactive viewer) tools for web clients with connector support — no local install |
+| `GET /health`           | `{ "status": "ok" }`                                                                                                                                                           |
 
 Input is either a fetched URL (`?src=<dxf-url>`) or the DXF file itself as
 the POST body — ASCII and binary DXF alike (auto-detected).
@@ -23,8 +23,8 @@ the POST body — ASCII and binary DXF alike (auto-detected).
 demo's dark slate).
 
 ```bash
-curl "https://<worker>/describe?src=https://example.com/plan.dxf"
-curl -X POST --data-binary @plan.dxf "https://<worker>/render?format=png&width=1600" -o plan.png
+curl "https://aspicio-api.frontsail.app/describe?src=https://example.com/plan.dxf"
+curl -X POST --data-binary @plan.dxf "https://aspicio-api.frontsail.app/render?format=png&width=1600" -o plan.png
 ```
 
 ## Guards
