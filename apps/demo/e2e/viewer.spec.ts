@@ -617,6 +617,30 @@ test("canvas control buttons zoom and reset rotation", async ({ page }) => {
     .toBeCloseTo(initial.unitsPerPixel, 5);
 });
 
+test("keyboard focus rings the clustered zoom buttons inside the clip (#120)", async ({ page }) => {
+  await loadSample(page);
+  // Establish keyboard modality so programmatic focus matches :focus-visible.
+  await page.keyboard.press("Tab");
+
+  // The clustered +/fit/- buttons inset the ring so .ctrl-stack's overflow:hidden
+  // can't crop it to a sliver at the dividers.
+  for (const id of ["#zoom-in", "#fit-btn", "#zoom-out"]) {
+    const [focusVisible, offset] = await page.locator(id).evaluate((el: HTMLElement) => {
+      el.focus();
+      return [el.matches(":focus-visible"), getComputedStyle(el).outlineOffset] as const;
+    });
+    expect(focusVisible, `${id} should show a keyboard focus ring`).toBe(true);
+    expect(offset, `${id} ring must be inset`).toBe("-2px");
+  }
+
+  // Standalone controls keep the outer ring (they aren't clipped).
+  const standaloneOffset = await page.locator("#reset-rot").evaluate((el: HTMLElement) => {
+    el.focus();
+    return getComputedStyle(el).outlineOffset;
+  });
+  expect(standaloneOffset).toBe("2px");
+});
+
 test("synthetic two-finger pinch zooms in", async ({ page }) => {
   await loadSample(page);
   const before = (await probeViewer(page)).view;

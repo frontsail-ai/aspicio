@@ -833,6 +833,14 @@ button {
   border-bottom: 1px solid var(--hairline);
 }
 
+/* The stack clips its flush buttons (overflow: hidden), so the global focus
+   ring's outer offset gets cropped to a sliver at the dividers (#120). Inset it
+   so it renders inside the clip — outline (not box-shadow) so it survives
+   forced-colors mode. */
+.ctrl-stack button:focus-visible {
+  outline-offset: -2px;
+}
+
 .ctrl.active {
   color: var(--crease);
   border-color: var(--crease);
