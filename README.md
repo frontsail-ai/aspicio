@@ -18,7 +18,7 @@
 
 Aspicio is an open-source (MIT), TypeScript-first DXF engine: one
 framework-free `parse → tessellate` pipeline that runs in the browser, in
-Node, and in Cloudflare Workers. A person gets an interactive WebGL viewer
+Node, and in serverless runtimes. A person gets an interactive WebGL viewer
 of a CAD drawing; an AI agent gets structured JSON facts and a rendered
 PNG of the same file. Every surface — the browser viewer, the web
 components and their React, Vue, and Svelte bindings, the headless
@@ -105,7 +105,7 @@ const viewer = new DxfViewer(document.querySelector("#preview")!);
 await viewer.load(file); // File | Blob | ArrayBuffer | DXF text (ASCII or binary)
 ```
 
-### Headless — Node and Workers
+### Headless — Node and serverless
 
 Parse, describe, and render with no browser at all (server-side
 previews, thumbnails, pipelines):

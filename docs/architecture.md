@@ -11,7 +11,7 @@ DXF bytes ──parse──▶ DxfDocument ──tessellate──▶ Tessellatio
 Every consumer — browser viewer, demo, React embed, HTTP API, MCP server —
 sits on the same parse → tessellate core. The pipeline through SVG and
 describe is **headless** (no DOM/WebGL): it runs in browsers, Node, and
-Cloudflare Workers alike. Only the WebGL renderer needs a browser.
+serverless runtimes alike. Only the WebGL renderer needs a browser.
 
 ## Layers
 
@@ -57,7 +57,7 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
 | Vercel (Node functions)      | Custom domains on frontsail.app via plain CNAMEs (DNS stays in Route 53); CI deploys prebuilt artifacts and smoke-tests the production aliases                    |
 | resvg                        | Fast native (Node) rasterizer; a WASM build exists for edge runtimes if one returns to the stack                                                                  |
 | MCP (stdio, official SDK)    | Vendor-neutral agent protocol — one server serves Claude, Codex, Cursor; contract-tested against the wire protocol                                                |
-| MCP Apps (`ext-apps` SDK)    | The real viewer shipped as one self-contained in-chat widget from the api Worker — a single implementation for ChatGPT, Claude, and any spec host                 |
+| MCP Apps (`ext-apps` SDK)    | The real viewer shipped as one self-contained in-chat widget from the api server — a single implementation for ChatGPT, Claude, and any spec host                 |
 
 ## Intentionally simple (for now)
 
@@ -76,5 +76,5 @@ Cloudflare Workers alike. Only the WebGL renderer needs a browser.
 - The widget hand-rolls a shadow-root wrapper around the core viewer;
   consuming `<aspicio-embed>` from `@aspicio/elements` instead is the
   named consolidation follow-up (AGT-14 stays the spec).
-- A third Worker (or surface) slots into the deploy matrix and the plugin
+- A third surface slots into the deploy matrix and the plugin
   manifests without structural change.
