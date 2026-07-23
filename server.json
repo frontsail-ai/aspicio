@@ -10,7 +10,7 @@
       "mimeType": "image/svg+xml"
     }
   ],
-  "version": "0.10.0",
+  "version": "0.11.0",
   "repository": {
     "url": "https://github.com/frontsail-ai/aspicio",
     "source": "github"
@@ -19,7 +19,7 @@
     {
       "registryType": "npm",
       "identifier": "@aspicio/mcp",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
