@@ -11,26 +11,69 @@ lint/test gate, stamps `0.1.0` into the package manifests, builds, and
 publishes `@aspicio/core`, `@aspicio/elements`, `@aspicio/react`,
 `@aspicio/vue`, `@aspicio/svelte`, and `@aspicio/mcp`.
 
-## Always release the tip of master
+## Release workflow
 
 Tags are cut from the current tip of `master` — never from a branch or an
-older commit. Before tagging:
+older commit. Follow these steps in order; each gates the next.
 
-1. **Bump `server.json` — through a release PR.** Its top-level and
-   package `version` fields are pinned (the registry has no workspace
-   stamping); open a small `chore(release)` PR setting them to the new
-   version (INV-9), merge it, and tag the merge commit. Never push the
-   bump straight to master — v0.8.0 did, and the question "where is the
-   PR?" is why this sentence is no longer ambiguous.
-2. **Wait for pending PRs.** If any open PR belongs in the release —
+0. **Wait for pending PRs.** If any open PR belongs in the release —
    features, fixes, or (easy to miss) changes to the publish workflow
    itself — it merges first. A release cut around an unmerged PR silently
    ships without it: v0.4.0 nearly shipped without `@aspicio/mcp` because
    the PR wiring it into publishing was still open.
-3. **Sync and verify.** `git fetch && git checkout master && git pull`;
-   confirm the working tree is clean and local `master` matches
-   `origin/master`.
-4. **Tag that commit** and push the tag.
+
+1. **Analyze the changes.** Diff the published packages since the last
+   tag and read what actually changed:
+
+   ```bash
+   LAST=$(git tag --list 'v*' --sort=-v:refname | head -1)
+   git log --oneline "$LAST"..HEAD
+   git diff --name-only "$LAST"..HEAD -- packages/   # which published pkgs moved
+   ```
+
+   Only `packages/*` feed the npm semver — `apps/*` (demo, api, widget)
+   ship on the website, not to npm, so a demo-only change doesn't move the
+   library version (but still belongs in the release notes).
+
+2. **Decide the release type** per the [versioning policy](#versioning-policy):
+   patch for fix-only changes to published packages, minor for a public-API
+   addition or feature batch (or a breaking change, pre-1.0). **If the
+   change set is ambiguous — a fix that also widened a type, a refactor
+   with a subtle behavior change, unsure whether something is "public API"
+   — stop and ask the user which bump to cut, and state your recommendation
+   with the one-line reason.** Don't silently pick when it's a judgment
+   call; do pick (and just say so) when it's clear-cut.
+
+3. **Open the release PR.** Bump `server.json`'s top-level and package
+   `version` fields (they're pinned — the registry has no workspace
+   stamping, INV-9) in a small `chore(release): X.Y.Z` PR. Never push the
+   bump straight to `master` — v0.8.0 did, and "where is the PR?" is why
+   this sentence exists.
+
+4. **Wait for CI to go green.** All required checks must pass on the PR
+   before merging (`gh pr checks <n> --watch`). Don't merge a yellow PR —
+   the same gate runs again in the publish workflow, so a red check here
+   is a guaranteed failed release.
+
+5. **Merge the PR** (`gh pr merge <n> --merge`).
+
+6. **Pull the latest master.** `git fetch && git checkout master &&
+git pull`; confirm the working tree is clean and local `master` matches
+   `origin/master`. The merge commit is the tip you'll tag.
+
+7. **Tag that merge commit and push the tag.**
+
+   ```bash
+   git tag vX.Y.Z <merge-commit> && git push origin vX.Y.Z
+   ```
+
+8. **Wait for the publish workflow to succeed.** Pushing the tag triggers
+   [publish.yml](../.github/workflows/publish.yml); watch it to completion
+   (`gh run watch <id> --exit-status`) — it re-runs the gate, stamps the
+   version, publishes all six packages, republishes the MCP registry
+   listing (OIDC), and creates the GitHub Release. If it fails, see
+   [When things go wrong](#when-things-go-wrong) before re-tagging. Then
+   verify and curate the Release (next two sections).
 
 ## One-time setup (repo owner)
 
