@@ -108,6 +108,13 @@ export async function handleRequest(
         return new Response("1gAK8NA4X6b4VCSuHhmSOywdGJD0VQ0oz4NAILnJHX4", {
           headers: { "content-type": "text/plain" },
         });
+      case "/.well-known/glama.json":
+        // Glama connector ownership verification: the maintainer contact,
+        // served on the MCP server's domain (public by design).
+        return json({
+          $schema: "https://glama.ai/mcp/schemas/connector.json",
+          maintainers: [{ email: "dmitri@frontsail.ai" }],
+        });
       case "/openapi.json":
         // Advertise whichever host served the doc — the API answers on more
         // than one domain, and a hardcoded URL lies on all but one of them.

@@ -54,6 +54,16 @@ test("the OpenAI domain-verification token is served verbatim", async () => {
   expect(await res.text()).toBe("1gAK8NA4X6b4VCSuHhmSOywdGJD0VQ0oz4NAILnJHX4");
 });
 
+test("the Glama connector-ownership manifest is served for verification", async () => {
+  const res = await handleRequest(get("/.well-known/glama.json"), noPng);
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-type")).toContain("application/json");
+  expect(await res.json()).toEqual({
+    $schema: "https://glama.ai/mcp/schemas/connector.json",
+    maintainers: [{ email: "dmitri@frontsail.ai" }],
+  });
+});
+
 test("POST /describe returns a structured summary", async () => {
   const res = await handleRequest(post("/describe", SAMPLE), noPng);
   expect(res.status).toBe(200);
