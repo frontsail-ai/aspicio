@@ -33,6 +33,10 @@ one; an explicit Exit control restores all. Layers with no rendered
 entities (the default `0`, `Defpoints`) are collected into a collapsible
 "empty" group, collapsed by default; the group is omitted entirely when
 every layer has geometry, and its rows behave like any other layer row.
+When not soloing, a "Show all" control appears in the panel header as soon
+as any rendered (non-empty) layer is hidden, and restores every layer;
+it is absent while all rendered layers are visible and while soloing (solo
+has its own Exit control).
 
 ### DEMO-5: Deep-link view state
 

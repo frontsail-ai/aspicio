@@ -82,6 +82,34 @@ test("empty layers are tucked into a collapsed group", async ({ page }) => {
   await expect(page.locator(".layer-group")).toHaveCount(0);
 });
 
+// DEMO-4: a "Show all" control appears when a rendered layer is hidden outside
+// solo, and restores every layer.
+test("Show all appears when a layer is hidden and restores them", async ({ page }) => {
+  await loadSample(page);
+  const showAll = page.locator("#show-all");
+  await expect(showAll).toBeHidden();
+
+  // Hide DOORS with a single row click (the row toggle is deferred ~250ms).
+  const box = await row(page, "DOORS").boundingBox();
+  if (!box) throw new Error("no row box");
+  const clickDoors = () => page.mouse.click(box.x + box.width * 0.6, box.y + box.height / 2);
+  await clickDoors();
+  await expect(showAll).toBeVisible();
+
+  // Soloing suppresses it (solo has its own Exit affordance).
+  await row(page, "WALLS").dblclick();
+  await expect(showAll).toBeHidden();
+  await row(page, "WALLS").click(); // single click exits solo, showing all
+  await expect(showAll).toBeHidden();
+
+  // Hide again, then the control restores every layer and hides itself.
+  await clickDoors();
+  await expect(showAll).toBeVisible();
+  await showAll.click();
+  await expect(showAll).toBeHidden();
+  expect((await probeViewer(page)).layers.every((l) => l.visible !== false)).toBe(true);
+});
+
 test("skipped-entities popover opens with detail and closes outside", async ({ page }) => {
   await loadSample(page);
   await page.locator("#skipped-btn").click();
