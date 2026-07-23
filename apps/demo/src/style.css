@@ -1544,3 +1544,719 @@ button {
     left: 12px;
   }
 }
+
+/* ===================== OPEN-DXF DIALOG ===================== */
+
+@keyframes asp-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes asp-scrim {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.od-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  /* Anchor to a fixed distance from the top so the header and tabs stay put and
+     only the body grows/shrinks between tabs. */
+  padding: 96px 24px 24px;
+  overflow-y: auto;
+  background: rgb(9 10 13 / 68%);
+  backdrop-filter: blur(3px);
+  animation: asp-scrim 140ms ease;
+}
+
+.od-card {
+  width: min(480px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--hairline2);
+  border-radius: 7px;
+  box-shadow: 0 24px 64px rgb(0 0 0 / 60%);
+  overflow: hidden;
+  animation: asp-pop 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.od-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 14px 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.od-head-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.1em;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.od-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    color 120ms,
+    background 120ms;
+}
+
+.od-close:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.od-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 10px 12px 0;
+}
+
+.od-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  border-radius: 3px 3px 0 0;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text3);
+  transition:
+    color 120ms,
+    border-color 120ms;
+}
+
+.od-tab:hover {
+  color: var(--text2);
+}
+
+.od-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--cut);
+}
+
+.od-body {
+  padding: 16px 18px 18px;
+}
+
+/* File tab */
+.od-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 34px 20px;
+  border: 2px dashed var(--hairline2);
+  border-radius: 6px;
+  background: var(--canvas);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 140ms,
+    background 140ms;
+}
+
+.od-dropzone:hover {
+  border-color: var(--crease);
+  background: var(--creasedim);
+}
+
+.od-dz-title {
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.od-dz-sub {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 3px;
+}
+
+.od-dz-note {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+}
+
+/* URL tab */
+.od-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+  margin-bottom: 7px;
+}
+
+.od-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.od-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.od-input-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--text3);
+  pointer-events: none;
+}
+
+.od-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 11px 0 32px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline2);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  outline: none;
+  transition: border-color 120ms;
+}
+
+.od-input:focus {
+  border-color: var(--crease);
+}
+
+.od-input.invalid {
+  border-color: var(--err);
+}
+
+.od-open {
+  flex-shrink: 0;
+  height: 38px;
+  padding: 0 18px;
+  border: 1px solid var(--cut);
+  background: var(--cut);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 140ms,
+    border-color 140ms;
+}
+
+.od-open:hover:not(:disabled) {
+  background: var(--cut2);
+  border-color: var(--cut2);
+}
+
+.od-open:disabled {
+  border-color: var(--hairline2);
+  background: transparent;
+  color: var(--text3);
+  cursor: not-allowed;
+}
+
+.od-invalid {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--err);
+}
+
+.od-recents {
+  margin-top: 18px;
+}
+
+.od-recents-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.od-recents-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+}
+
+.od-clear {
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 2px;
+  transition: color 120ms;
+}
+
+.od-clear:hover {
+  color: var(--text2);
+}
+
+.od-recents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.od-recent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 9px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 120ms,
+    background 120ms;
+}
+
+.od-recent:hover {
+  border-color: var(--hairline2);
+  background: var(--panel2);
+}
+
+.od-recent-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text3);
+}
+
+.od-recent-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.od-recent-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.od-recent-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+
+/* No origin to show (unparseable URL) — collapse the row back to one line. */
+.od-recent-host:empty {
+  display: none;
+}
+
+.od-recent-size {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+
+/* Loading state */
+.od-loading {
+  padding: 8px 0 4px;
+}
+
+.od-loading-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+}
+
+.od-loading-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--crease);
+  animation: asp-pulse 1s ease-in-out infinite;
+}
+
+.od-loading-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+
+.od-bar-fill {
+  height: 100%;
+  width: 0;
+  background: var(--crease);
+  transition: width 140ms linear;
+}
+
+/* Indeterminate: no Content-Length, so slide a bar instead of filling. */
+.od-bar-fill.indeterminate {
+  width: 30% !important;
+  transition: none;
+  animation: asp-progress 1.1s ease-in-out infinite;
+}
+
+.od-bytes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text3);
+  font-feature-settings: "tnum" 1;
+}
+
+.od-pct {
+  color: var(--text2);
+}
+
+.od-cancel {
+  margin-top: 16px;
+  height: 32px;
+  width: 100%;
+  border: 1px solid var(--hairline2);
+  background: transparent;
+  color: var(--text2);
+  border-radius: 4px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    border-color 120ms,
+    color 120ms;
+}
+
+.od-cancel:hover {
+  border-color: var(--frame);
+  color: var(--text);
+}
+
+/* CORS / fetch-error state */
+.od-cors {
+  padding: 4px 0;
+}
+
+.od-cors-card {
+  display: flex;
+  gap: 11px;
+  padding: 13px 14px;
+  background: #241416;
+  border: 1px solid rgb(224 87 75 / 45%);
+  border-left: 3px solid var(--err);
+  border-radius: 5px;
+}
+
+.od-cors-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--err);
+}
+
+.od-cors-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+
+.od-cors-msg {
+  font-size: 12px;
+  color: #e7a49c;
+  line-height: 1.55;
+}
+
+.od-cors-url {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text2);
+  margin-top: 8px;
+  word-break: break-all;
+  padding: 6px 8px;
+  background: rgb(0 0 0 / 25%);
+  border-radius: 3px;
+}
+
+.od-try {
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+
+.od-try-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+
+.od-try-item {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.od-try-dot {
+  color: var(--crease);
+}
+
+.od-try-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--hairline2);
+  font: inherit;
+}
+
+.od-try-link:hover {
+  text-decoration-color: var(--crease);
+}
+
+.od-lit {
+  color: var(--text);
+}
+
+.od-cors-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.od-retry {
+  flex: 1;
+  height: 34px;
+  border: 1px solid var(--crease);
+  background: var(--crease);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.od-retry:hover {
+  filter: brightness(1.08);
+}
+
+.od-edit {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--hairline2);
+  background: transparent;
+  color: var(--text2);
+  border-radius: 4px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    color 120ms,
+    border-color 120ms;
+}
+
+.od-edit:hover {
+  color: var(--text);
+  border-color: var(--frame);
+}
+
+/* ===================== PASTE-CONFIRM TOAST ===================== */
+
+/* Own entrance keyframe: asp-fade's `to { transform: none }` would clobber the
+   translateX(-50%) centering and make the toast jump sideways as it appears. */
+@keyframes asp-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}
+
+.paste-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  width: min(460px, calc(100% - 32px));
+  animation: asp-toast-in 180ms ease;
+}
+
+.paste-card {
+  display: flex;
+  gap: 12px;
+  padding: 13px 14px;
+  background: #12161d;
+  border: 1px solid var(--hairline2);
+  border-left: 3px solid var(--crease);
+  border-radius: 5px;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 50%);
+}
+
+.paste-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--crease);
+}
+
+.paste-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.paste-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+
+.paste-url {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text2);
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.paste-actions {
+  margin-top: 11px;
+  display: flex;
+  gap: 8px;
+}
+
+.paste-open {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--crease);
+  background: var(--crease);
+  color: #fff;
+  border-radius: 3px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.paste-open:hover {
+  filter: brightness(1.08);
+}
+
+.paste-dismiss {
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  border-radius: 3px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: color 120ms;
+}
+
+.paste-dismiss:hover {
+  color: var(--text);
+}
+
+.paste-close {
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 2px;
+  align-self: flex-start;
+  transition: color 120ms;
+}
+
+.paste-close:hover {
+  color: var(--text);
+}
+
+@media (width <= 720px) {
+  .od-scrim {
+    padding: 64px 14px 14px;
+  }
+
+  .od-input-row {
+    flex-wrap: wrap;
+  }
+
+  .od-open {
+    flex: 1;
+  }
+}

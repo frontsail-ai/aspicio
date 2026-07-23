@@ -8,10 +8,10 @@ Prefix: `DEMO`.
 
 ### DEMO-1: Load paths
 
-A drawing opens via the bundled sample button, a native file picker, or
-drag-and-drop anywhere in the window. While loading, a status line shows
-the file name; on success the top bar shows name, entity count, and
-segment count.
+A drawing opens via the bundled sample button, the Open-DXF dialog (a
+native file picker or a remote URL — see DEMO-17), or drag-and-drop
+anywhere in the window. While loading, a status line shows the file name;
+on success the top bar shows name, entity count, and segment count.
 
 ### DEMO-2: Unsupported-entity report
 
@@ -55,8 +55,10 @@ never disturbs an already-loaded drawing.
 
 ### DEMO-7: Only URL-addressable drawings are linkable
 
-Deep links apply to the bundled sample; opening a local file clears any
-stale view hash so the URL never implies it points at the new drawing.
+Deep links apply to URL-addressable drawings — the bundled sample and any
+remote URL loaded from the dialog (whose source is carried in the hash per
+DEMO-18). Opening a local file clears any stale hash so the URL never
+implies it points at the new drawing.
 
 ### DEMO-8: Selection info panel
 
@@ -126,3 +128,40 @@ The empty screen links to the project's home surfaces — documentation,
 the MCP server page, repository, published packages, privacy policy,
 and terms of use. The links are absent while a drawing is displayed
 (the canvas owns the screen).
+
+### DEMO-17: Open-DXF dialog
+
+The Open-DXF control (top bar and empty screen) opens one dialog with two
+tabs. **From file** is a dashed dropzone that opens the native picker (and
+notes files are parsed locally, never uploaded). **From URL** takes a
+drawing URL: the Open action stays disabled until the field holds a valid
+`http(s)://` URL, and Enter submits. A submitted URL is streamed with a
+live byte/percent progress bar and a Cancel control; when the server omits
+`Content-Length` the bar runs indeterminate and only bytes are shown. The
+tab remembers up to five recently loaded URLs (filename, origin host, and
+size, newest first, with a Clear action) — the host disambiguates same-named
+files from different origins; clicking one refills the field without loading it.
+
+A fetch failure shows a dedicated guidance card — honest about the cause
+(a cross-origin block and an unreachable host are indistinguishable in the
+browser; an HTTP status is named) — with download-and-open advice and
+Try-again / Edit-URL actions; a valid fetch that isn't a valid DXF falls
+back to the standard error toast (DEMO-3). The dialog anchors a fixed
+distance from the top so the header and tabs stay put while the body
+switches; Escape or a backdrop click dismisses it (Cancel, not the
+backdrop, exits an in-flight fetch). Pasting a `.dxf` link anywhere while
+the dialog is closed raises a toast that confirms the URL before loading.
+
+### DEMO-18: Remote URLs are deep-linkable
+
+A drawing loaded from a remote URL is URL-addressable: its source is
+written into the share hash as `src=<url>` alongside the view state, so the
+link restores both the drawing and the exact view on reload. Opening such a
+link auto-loads the URL on cold start (a failure opens the dialog's
+guidance); a `src`-only link (no view) loads the drawing fitted. Changing
+the hash live — pasting a share link into the address bar, or back/forward
+between links — loads the new source without a reload (or just restores the
+view when that source is already open); an empty or malformed hash never
+disturbs the current drawing. The `src` value is validated as `http(s)` on
+decode — a `javascript:`/`data:`/`file:` value is ignored — and only remote
+URLs (never local files) are written.

@@ -80,3 +80,39 @@ test("decodeView is tolerant of junk in h and s", () => {
   expect(decoded!.hiddenLayerIndices).toEqual([0, 3]); // negatives/NaN dropped
   expect(decoded!.spaceIndex).toBe(0); // clamped up from -4
 });
+
+test("round-trips a remote source alongside the view", () => {
+  const url = "https://example.com/plans/site-plan.dxf?v=2";
+  const hash = encodeView(link({ src: url, hiddenLayerIndices: [1] }));
+  expect(hash.startsWith("#src=")).toBe(true);
+  const decoded = decodeView(hash);
+  expect(decoded!.src).toBe(url);
+  expect(decoded!.view.unitsPerPixel).toBeCloseTo(0.42, 5);
+  expect(decoded!.hiddenLayerIndices).toEqual([1]);
+});
+
+test("a src-only link decodes with the zero-view sentinel", () => {
+  const decoded = decodeView("#src=https%3A%2F%2Fx.io%2Fa.dxf");
+  expect(decoded).not.toBeNull();
+  expect(decoded!.src).toBe("https://x.io/a.dxf");
+  expect(decoded!.view.unitsPerPixel).toBe(0); // no pose to restore
+  expect(decoded!.hiddenLayerIndices).toBeUndefined();
+});
+
+test("drops a non-http(s) src to avoid loading dangerous schemes", () => {
+  expect(decodeView("#src=javascript%3Aalert(1)")).toBeNull();
+  expect(decodeView("#src=file%3A%2F%2F%2Fetc%2Fpasswd")).toBeNull();
+  // A bad src with a good view still yields the view, minus the src.
+  const decoded = decodeView("#src=data%3Atext&v=1,2,0.5,0");
+  expect(decoded!.src).toBeUndefined();
+  expect(decoded!.view.unitsPerPixel).toBeCloseTo(0.5, 5);
+});
+
+test("a src-only link encodes without a view part", () => {
+  const hash = encodeView({
+    view: { center: { x: 0, y: 0 }, unitsPerPixel: 0, rotation: 0 },
+    spaceIndex: 0,
+    src: "https://x.io/a.dxf",
+  });
+  expect(hash).toBe("#src=https%3A%2F%2Fx.io%2Fa.dxf");
+});

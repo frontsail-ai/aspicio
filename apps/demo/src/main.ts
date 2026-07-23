@@ -9,6 +9,10 @@ import { DxfViewer, attachShortcuts, niceLength, partitionLayers } from "@aspici
 import type { EntityInfo, LayerInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
 import { decodeView, encodeView, packLayers } from "./viewurl.ts";
 import type { ViewLink } from "./viewurl.ts";
+import { FetchError, fetchWithProgress, isHttpUrl } from "./fetch-progress.ts";
+import type { FetchErrorKind, FetchProgress } from "./fetch-progress.ts";
+import { clearRecents, loadRecents, pushRecent } from "./recents.ts";
+import { formatBytes } from "./format.ts";
 
 /* ---------- SVG fragments ---------- */
 
@@ -38,6 +42,10 @@ const icons = {
   check: `<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" fill="var(--crease)"></rect><path d="M4.4 8.2 L6.9 10.6 L11.6 5.3" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg>`,
   chevron: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>`,
   uncheck: `<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" fill="none" stroke="var(--hairline2)" stroke-width="1.4"></rect></svg>`,
+  link: (size: number): string =>
+    `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>`,
+  clock: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>`,
+  dropArrow: `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--crease)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"></path><path d="m7 11 5 5 5-5"></path><path d="M5 21h14"></path></svg>`,
 };
 
 /* ---------- markup ---------- */
@@ -222,6 +230,96 @@ app.innerHTML = `
       ).join("")}</div>
     </div>
   </div>
+  <div id="open-dialog" class="od-scrim" hidden>
+    <div id="od-card" class="od-card">
+      <div class="od-head">
+        <div class="od-head-title">${icons.filePlus}<span>OPEN DXF</span></div>
+        <button id="od-close" class="od-close" type="button">${icons.close(18)}</button>
+      </div>
+      <div class="od-tabs">
+        <button id="od-tab-file" class="od-tab" type="button">${icons.file} From file</button>
+        <button id="od-tab-url" class="od-tab" type="button">${icons.link(14)} From URL</button>
+      </div>
+      <div class="od-body">
+        <div id="od-file" class="od-file" hidden>
+          <button id="od-dropzone" class="od-dropzone" type="button">
+            ${icons.dropArrow}
+            <div>
+              <div class="od-dz-title">Drop a .dxf file here</div>
+              <div class="od-dz-sub">or click to browse your machine</div>
+            </div>
+            <div class="od-dz-note">.DXF · ASCII OR BINARY · PARSED LOCALLY, NEVER UPLOADED</div>
+          </button>
+        </div>
+        <div id="od-url" class="od-url" hidden>
+          <label class="od-label" for="od-input">DRAWING URL</label>
+          <div class="od-input-row">
+            <div class="od-input-wrap">
+              <span class="od-input-icon">${icons.link(15)}</span>
+              <input id="od-input" class="od-input" type="text" inputmode="url"
+                placeholder="https://example.com/drawing.dxf" spellcheck="false" autocomplete="off">
+            </div>
+            <button id="od-open" class="od-open" type="button" disabled>Open</button>
+          </div>
+          <div id="od-invalid" class="od-invalid" hidden>${icons.warn(13)}<span>Enter a full http(s):// URL</span></div>
+          <div id="od-recents" class="od-recents" hidden>
+            <div class="od-recents-head">
+              <span class="od-recents-title">RECENT</span>
+              <button id="od-clear" class="od-clear" type="button">CLEAR</button>
+            </div>
+            <div id="od-recents-list" class="od-recents-list"></div>
+          </div>
+        </div>
+        <div id="od-loading" class="od-loading" hidden>
+          <div class="od-loading-head">
+            <span class="od-loading-dot"></span>
+            <span id="od-loading-name" class="od-loading-name">FETCHING DRAWING</span>
+          </div>
+          <div class="od-bar"><div id="od-bar-fill" class="od-bar-fill"></div></div>
+          <div class="od-bytes">
+            <span id="od-loaded">0 B</span>
+            <span id="od-pct" class="od-pct">0%</span>
+          </div>
+          <button id="od-cancel" class="od-cancel" type="button">Cancel</button>
+        </div>
+        <div id="od-cors" class="od-cors" hidden>
+          <div class="od-cors-card">
+            <span class="od-cors-icon">${icons.warn(18)}</span>
+            <div class="od-cors-content">
+              <div id="od-cors-title" class="od-cors-title">Couldn't fetch that URL</div>
+              <div id="od-cors-msg" class="od-cors-msg"></div>
+              <div id="od-cors-url" class="od-cors-url"></div>
+            </div>
+          </div>
+          <div class="od-try">
+            <div class="od-try-title">TRY THIS</div>
+            <div id="od-tip-status" class="od-try-item"><span class="od-try-dot">·</span><span id="od-tip-status-text"></span></div>
+            <div id="od-tip-download" class="od-try-item"><span class="od-try-dot">·</span><span>Download the file, then open it from the <button id="od-try-file" class="od-try-link" type="button">From file</button> tab.</span></div>
+            <div id="od-tip-direct" class="od-try-item"><span class="od-try-dot">·</span><span>Check the link points directly at a <span class="od-lit">.dxf</span> (not an HTML page).</span></div>
+            <div id="od-tip-cors" class="od-try-item"><span class="od-try-dot">·</span><span>Host it somewhere CORS-enabled (S3 with public read, a raw GitHub URL, etc.).</span></div>
+          </div>
+          <div class="od-cors-actions">
+            <button id="od-retry" class="od-retry" type="button">Try again</button>
+            <button id="od-edit" class="od-edit" type="button">Edit URL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="paste-toast" class="paste-toast" hidden>
+    <div class="paste-card">
+      <span class="paste-icon">${icons.link(18)}</span>
+      <div class="paste-content">
+        <div class="paste-title">Open this DXF link?</div>
+        <div id="paste-url" class="paste-url"></div>
+        <div class="paste-actions">
+          <button id="paste-open" class="paste-open" type="button">Open</button>
+          <button id="paste-dismiss" class="paste-dismiss" type="button">Dismiss</button>
+        </div>
+      </div>
+      <button id="paste-close" class="paste-close" type="button">${icons.close(16)}</button>
+    </div>
+  </div>
 `;
 
 const $ = <T extends HTMLElement>(selector: string): T => {
@@ -250,10 +348,25 @@ let baselineZoom = 1;
 // Deep-link view state. Only the bundled sample is URL-addressable, so we only
 // share/restore links for it; a drag-dropped file can't be re-fetched from a URL.
 let currentSourceLinkable = false;
+// The remote URL the current drawing was fetched from, or null for the sample /
+// a local file. Written into the share hash as `src=` so remote loads are
+// shareable and auto-restore on reload.
+let currentSourceUrl: string | null = null;
 let pendingLink: ViewLink | null = null;
 let restoringView = false;
 let hashWriteTimer: number | null = null;
 const layerRows = new Map<string, HTMLLIElement>();
+
+// Open-DXF dialog state. `tab` picks file/url; `phase` overlays loading/cors/
+// invalid onto the active tab (see renderDialog).
+let dialogOpen = false;
+let dialogTab: "file" | "url" = "file";
+// The tab the dialog reopens on — remembers the last one the user chose so a
+// run of URL loads doesn't force re-clicking "From URL" each time.
+let lastTab: "file" | "url" = "file";
+let dialogPhase: "idle" | "loading" | "cors" | "invalid" = "idle";
+let dialogAbort: AbortController | null = null;
+let pastedUrl = "";
 
 // Interaction state for entity selection and the measure tool.
 let selectedIndex: number | null = null;
@@ -833,12 +946,17 @@ function applyLink(link: ViewLink): void {
   if (link.spaceIndex > 0 && link.spaceIndex < spaces.length) setSpace(spaces[link.spaceIndex]);
   const layers = viewer.getLayers();
   // Resolve visibility from whichever set the link carried (see `packLayers`).
+  // A `src`-only link carries neither set — leave every layer as loaded.
   const visSet = link.visibleLayerIndices && new Set(link.visibleLayerIndices);
   const hidSet = link.hiddenLayerIndices && new Set(link.hiddenLayerIndices);
-  const isVis = (i: number): boolean => (visSet ? visSet.has(i) : hidSet ? !hidSet.has(i) : true);
-  layers.forEach((layer, i) => viewer.setLayerVisible(layer.name, isVis(i)));
+  if (visSet || hidSet) {
+    const isVis = (i: number): boolean => (visSet ? visSet.has(i) : !hidSet!.has(i));
+    layers.forEach((layer, i) => viewer.setLayerVisible(layer.name, isVis(i)));
+  }
   syncPanel();
-  viewer.setView(link.view); // last, so it overrides the space-switch re-fit
+  // Restore the pose only when the link carried one (unitsPerPixel > 0); a
+  // src-only link uses the fitted view from load.
+  if (link.view.unitsPerPixel > 0) viewer.setView(link.view);
   restoringView = false;
 }
 
@@ -855,6 +973,7 @@ function scheduleHashWrite(): void {
       view: viewer.view,
       spaceIndex: Math.max(0, spaces.indexOf(viewer.activeSpaceName)),
       ...packLayers(hidden, layers.length),
+      ...(currentSourceUrl ? { src: currentSourceUrl } : {}),
     };
     history.replaceState(null, "", encodeView(link) || location.pathname + location.search);
   }, 300);
@@ -874,18 +993,48 @@ viewer.on("render", () => {
 
 /* ---------- loading ---------- */
 
-async function openSource(source: File | string, name: string): Promise<void> {
+const isAbortError = (e: unknown): boolean => e instanceof Error && e.name === "AbortError";
+
+/** Filename shown for a remote URL: the last path segment, or a generic name. */
+function nameFromUrl(url: string): string {
+  try {
+    const last = new URL(url).pathname.split("/").pop() ?? "";
+    return decodeURIComponent(last) || "drawing.dxf";
+  } catch {
+    return "drawing.dxf";
+  }
+}
+
+/** Host (with port) of a URL, for disambiguating recents; "" if unparseable. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "";
+  }
+}
+
+/** Record what the current drawing came from — its name, whether it's
+ *  URL-addressable (so the view hash is shareable), and the remote URL if any.
+ *  A non-linkable source clears any stale hash (DEMO-7). */
+function applySourceMeta(name: string, opts: { linkable: boolean; url?: string | null }): void {
   currentName = name;
-  currentSourceLinkable = source === "/sample.dxf";
-  // A drag-dropped file isn't URL-addressable — drop any stale view hash so we
-  // don't imply the link still points at this drawing.
+  currentSourceLinkable = opts.linkable;
+  currentSourceUrl = opts.url ?? null;
   if (!currentSourceLinkable && location.hash) {
     history.replaceState(null, "", location.pathname + location.search);
   }
+}
+
+/** Load a local File or the bundled sample. Errors surface on the toast. */
+async function openSource(source: File | string, name: string): Promise<void> {
+  applySourceMeta(name, { linkable: source === "/sample.dxf" });
   $("#error-toast").hidden = true;
   $("#loading-text").textContent = `LOADING ${name.toUpperCase()}…`;
   setMode("loading");
   try {
+    // The sample is a same-origin relative path; a remote URL never reaches here
+    // (it goes through loadRemoteUrl, which streams with byte progress).
     if (typeof source === "string") await viewer.loadUrl(source);
     else await viewer.load(source);
   } catch (error) {
@@ -893,10 +1042,315 @@ async function openSource(source: File | string, name: string): Promise<void> {
   }
 }
 
-/* ---------- wiring ---------- */
+/** Fetch a remote DXF with byte/percent progress, then load it. Throws so the
+ *  caller can route the failure to the right surface (dialog card vs. toast):
+ *  a FetchError is a network/CORS/HTTP problem, anything else is a bad DXF. */
+async function loadRemoteUrl(
+  url: string,
+  onProgress: (p: FetchProgress) => void,
+  signal: AbortSignal,
+): Promise<void> {
+  const name = nameFromUrl(url);
+  const buffer = await fetchWithProgress(url, { onProgress, signal });
+  // Snapshot the current source so a parse failure can undo the swap — otherwise
+  // the still-showing previous drawing would inherit the bad URL's share hash.
+  const prev = { name: currentName, url: currentSourceUrl, linkable: currentSourceLinkable };
+  applySourceMeta(name, { linkable: true, url });
+  $("#error-toast").hidden = true;
+  $("#loading-text").textContent = `LOADING ${name.toUpperCase()}…`;
+  setMode("loading");
+  try {
+    await viewer.load(buffer); // emits "loaded" on success; throws on bad DXF
+  } catch (e) {
+    applySourceMeta(prev.name, { linkable: prev.linkable, url: prev.url });
+    throw e;
+  }
+  pushRecent({ url, name, size: buffer.byteLength, ts: Date.now() });
+}
+
+/* ---------- open-DXF dialog ---------- */
 
 const fileInput = $<HTMLInputElement>("#file");
-const openPicker = (): void => fileInput.click();
+const urlInput = $<HTMLInputElement>("#od-input");
+
+/** Coerce raw input into a fetchable http(s) URL, or null when it can't be one.
+ *  A scheme-less but domain-shaped value (`example.com/a.dxf`) is assumed https —
+ *  the common typo — while a bare word (`notaurl`) or non-http scheme stays null
+ *  so the Open button disables and the invalid hint explains why. */
+function normalizeUrl(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return isHttpUrl(s) ? s : null;
+  // No scheme: only assume https:// for a dotted host, not any random word.
+  const host = s.split(/[/?#]/, 1)[0];
+  if (!host.includes(".")) return null;
+  const withScheme = `https://${s}`;
+  return isHttpUrl(withScheme) ? withScheme : null;
+}
+
+/** Reflect dialog state (open, tab, phase) onto the DOM. */
+function renderDialog(): void {
+  $("#open-dialog").hidden = !dialogOpen;
+  const busy = dialogPhase === "loading" || dialogPhase === "cors";
+  $("#od-tab-file").classList.toggle("active", dialogTab === "file");
+  $("#od-tab-url").classList.toggle("active", dialogTab === "url");
+  $("#od-file").hidden = !(dialogTab === "file" && !busy);
+  $("#od-url").hidden = !(dialogTab === "url" && !busy);
+  $("#od-loading").hidden = dialogPhase !== "loading";
+  $("#od-cors").hidden = dialogPhase !== "cors";
+  $("#od-invalid").hidden = dialogPhase !== "invalid";
+  urlInput.classList.toggle("invalid", dialogPhase === "invalid");
+  $<HTMLButtonElement>("#od-open").disabled = normalizeUrl(urlInput.value) === null;
+}
+
+/** Rebuild the recent-URL list from storage; hidden when empty. */
+function renderRecents(): void {
+  const recents = loadRecents();
+  $("#od-recents").hidden = recents.length === 0;
+  const list = $("#od-recents-list");
+  list.textContent = "";
+  for (const r of recents) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "od-recent";
+    const icon = document.createElement("span");
+    icon.className = "od-recent-icon";
+    icon.innerHTML = icons.clock; // static SVG constant, not user data
+    const main = document.createElement("span");
+    main.className = "od-recent-main";
+    const name = document.createElement("span");
+    name.className = "od-recent-name";
+    name.textContent = r.name; // textContent — never interpolate a URL into HTML
+    const host = document.createElement("span");
+    host.className = "od-recent-host";
+    // The host disambiguates same-named files from different origins (#6).
+    host.textContent = hostOf(r.url);
+    main.append(name, host);
+    main.title = r.url;
+    const size = document.createElement("span");
+    size.className = "od-recent-size";
+    size.textContent = formatBytes(r.size);
+    btn.append(icon, main, size);
+    // Clicking a recent refills the input (an explicit Open still confirms it).
+    btn.addEventListener("click", () => {
+      urlInput.value = r.url;
+      dialogPhase = "idle";
+      renderDialog();
+      urlInput.focus();
+    });
+    list.appendChild(btn);
+  }
+}
+
+function openDialog(tab: "file" | "url" = lastTab): void {
+  dialogOpen = true;
+  dialogTab = tab;
+  lastTab = tab;
+  dialogPhase = "idle";
+  renderRecents();
+  renderDialog();
+  if (tab === "url") window.setTimeout(() => urlInput.focus(), 0);
+}
+
+function cancelDialogFetch(): void {
+  if (dialogAbort) {
+    dialogAbort.abort();
+    dialogAbort = null;
+  }
+}
+
+function closeDialog(): void {
+  cancelDialogFetch();
+  dialogOpen = false;
+  dialogPhase = "idle";
+  renderDialog();
+}
+
+function selectTab(tab: "file" | "url"): void {
+  dialogTab = tab;
+  lastTab = tab;
+  // A tab click backs out of an error/invalid state; an in-flight load keeps
+  // showing its progress regardless of the active tab.
+  if (dialogPhase === "cors" || dialogPhase === "invalid") dialogPhase = "idle";
+  renderDialog();
+  if (tab === "url" && dialogPhase === "idle") urlInput.focus();
+}
+
+function renderDialogProgress(p: FetchProgress): void {
+  const fill = $("#od-bar-fill");
+  const pct = p.total ? Math.min(100, Math.round((p.loaded / p.total) * 100)) : null;
+  if (pct === null) {
+    fill.classList.add("indeterminate");
+    fill.style.width = "";
+    $("#od-pct").textContent = "";
+    $("#od-loaded").textContent = formatBytes(p.loaded);
+  } else {
+    fill.classList.remove("indeterminate");
+    fill.style.width = `${pct}%`;
+    $("#od-pct").textContent = `${pct}%`;
+    $("#od-loaded").textContent = `${formatBytes(p.loaded)} / ${formatBytes(p.total)}`;
+  }
+}
+
+/** Guidance for why a fetched HTTP response didn't yield a usable file. */
+function httpTip(status: number | undefined): string {
+  if (status === 404 || status === 410)
+    return "The file may have moved or been removed — double-check the link.";
+  if (status === 401 || status === 403)
+    return "The file may be private — make sure it's publicly downloadable.";
+  if (status !== undefined && status >= 500)
+    return "The server had a problem — try again in a moment.";
+  return "Check the link points straight at a downloadable .dxf.";
+}
+
+/** Show the dialog's error state for a failed URL open, tailoring the title and
+ *  the TRY-THIS tips to the cause: a network/CORS block, an HTTP status, or a
+ *  file that downloaded fine but isn't a valid DXF. Keeps the user in the URL
+ *  flow (Try again / Edit URL) instead of dropping them onto the file toast. */
+function showDialogError(url: string, kind: FetchErrorKind | "parse", status?: number): void {
+  dialogOpen = true;
+  dialogTab = "url";
+  dialogPhase = "cors";
+  urlInput.value = url;
+  const network = kind === "network" || kind === "scheme";
+
+  // The browser can't distinguish a CORS block from an unreachable host, so the
+  // network copy stays honest; an HTTP status and a parse failure are specific.
+  $("#od-cors-title").textContent =
+    kind === "parse"
+      ? "That file isn't a valid DXF"
+      : kind === "http"
+        ? `The server returned ${status ?? "an error"}`
+        : "Couldn't fetch that URL";
+  $("#od-cors-msg").textContent =
+    kind === "parse"
+      ? "The download succeeded, but the file isn't a valid DXF drawing."
+      : kind === "http"
+        ? "The request reached the server, but it didn't return the file."
+        : "The server blocked the request (no CORS header) or the file wasn't reachable. Browsers can only load remote files a server explicitly allows.";
+  $("#od-cors-url").textContent = url;
+
+  // Tailor the tips: a download-and-open fallback always fits; the direct-.dxf
+  // check fits network and parse failures; CORS hosting only fits network ones;
+  // an HTTP status gets its own status-specific line.
+  $("#od-tip-status").hidden = kind !== "http";
+  if (kind === "http") $("#od-tip-status-text").textContent = httpTip(status);
+  $("#od-tip-direct").hidden = !(network || kind === "parse");
+  $("#od-tip-cors").hidden = !network;
+
+  // The failed load left the app in "loading" on the cold/hash path; restore it
+  // to whatever survived underneath so the drawing behind the modal is coherent.
+  setMode(viewer.document ? "loaded" : "empty");
+  renderRecents();
+  renderDialog();
+}
+
+async function submitDialogUrl(): Promise<void> {
+  const url = normalizeUrl(urlInput.value);
+  if (!url) {
+    dialogPhase = "invalid";
+    renderDialog();
+    return;
+  }
+  dialogPhase = "loading";
+  $("#od-loading-name").textContent = `FETCHING ${nameFromUrl(url).toUpperCase()}`;
+  renderDialogProgress({ loaded: 0, total: null });
+  renderDialog();
+  dialogAbort = new AbortController();
+  try {
+    await loadRemoteUrl(url, renderDialogProgress, dialogAbort.signal);
+    dialogAbort = null;
+    closeDialog();
+  } catch (e) {
+    dialogAbort = null;
+    if (isAbortError(e)) return; // user cancelled — cancel handler owns the UI
+    // Keep the user in the URL flow: a network/HTTP failure or a valid download
+    // that isn't a DXF both surface as the dialog's error state (Try again / Edit
+    // URL), not the file-oriented toast.
+    if (e instanceof FetchError) showDialogError(url, e.kind, e.status);
+    else showDialogError(url, "parse");
+  }
+}
+
+function cancelDialogLoad(): void {
+  cancelDialogFetch();
+  dialogPhase = "idle";
+  renderDialog();
+}
+
+/** Pasting a .dxf link anywhere (dialog closed) offers to open it. */
+function maybeShowPasteConfirm(text: string): void {
+  const trimmed = text.trim();
+  if (dialogOpen || !isHttpUrl(trimmed) || !/\.dxf(\?|#|$)/i.test(trimmed)) return;
+  pastedUrl = trimmed;
+  $("#paste-url").textContent = trimmed;
+  $("#paste-toast").hidden = false;
+}
+
+function dismissPaste(): void {
+  $("#paste-toast").hidden = true;
+  pastedUrl = "";
+}
+
+$("#od-close").addEventListener("click", closeDialog);
+$("#od-tab-file").addEventListener("click", () => selectTab("file"));
+$("#od-tab-url").addEventListener("click", () => selectTab("url"));
+$("#od-dropzone").addEventListener("click", () => {
+  closeDialog();
+  fileInput.click();
+});
+$("#od-try-file").addEventListener("click", () => selectTab("file"));
+$("#od-open").addEventListener("click", () => void submitDialogUrl());
+$("#od-cancel").addEventListener("click", cancelDialogLoad);
+$("#od-retry").addEventListener("click", () => void submitDialogUrl());
+$("#od-edit").addEventListener("click", () => selectTab("url"));
+$("#od-clear").addEventListener("click", () => {
+  clearRecents();
+  renderRecents();
+});
+urlInput.addEventListener("input", () => {
+  if (dialogPhase === "invalid") dialogPhase = "idle";
+  renderDialog();
+});
+urlInput.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  // Enter on an unfixable value surfaces the hint (the Open button is disabled,
+  // so this is the only way the "why" reaches the user).
+  if (normalizeUrl(urlInput.value)) void submitDialogUrl();
+  else {
+    dialogPhase = "invalid";
+    renderDialog();
+  }
+});
+// Clicking the scrim (not the card) closes — but never mid-fetch.
+$("#open-dialog").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget && dialogPhase !== "loading") closeDialog();
+});
+
+$("#paste-open").addEventListener("click", () => {
+  const url = pastedUrl;
+  dismissPaste();
+  openDialog("url");
+  urlInput.value = url;
+  void submitDialogUrl();
+});
+$("#paste-dismiss").addEventListener("click", dismissPaste);
+$("#paste-close").addEventListener("click", dismissPaste);
+window.addEventListener("paste", (e) => {
+  const text = e.clipboardData?.getData("text") ?? "";
+  maybeShowPasteConfirm(text);
+});
+// Esc closes the dialog (or cancels an in-flight fetch). The core shortcut
+// handler is disabled while the dialog is open, so this is the only Esc path.
+window.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !dialogOpen) return;
+  e.preventDefault();
+  if (dialogPhase === "loading") cancelDialogLoad();
+  else closeDialog();
+});
+
+/* ---------- wiring ---------- */
+
 const loadSample = (): void => void openSource("/sample.dxf", "sample.dxf");
 
 fileInput.addEventListener("change", () => {
@@ -905,9 +1359,12 @@ fileInput.addEventListener("change", () => {
   if (file) void openSource(file, file.name);
 });
 
-for (const id of ["#open", "#empty-open", "#error-open"]) {
-  $(id).addEventListener("click", openPicker);
+// The main open buttons reopen on the last-used tab; "Choose another file" on
+// the error toast is explicitly a file action.
+for (const id of ["#open", "#empty-open"]) {
+  $(id).addEventListener("click", () => openDialog());
 }
+$("#error-open").addEventListener("click", () => openDialog("file"));
 for (const id of ["#load-sample", "#empty-sample", "#error-sample"]) {
   $(id).addEventListener("click", loadSample);
 }
@@ -1000,7 +1457,7 @@ function onEscape(): void {
 
 /* Keyboard shortcuts (camera keys drive the viewer; the rest are wired here). */
 attachShortcuts(window, viewer, {
-  isEnabled: () => mode === "loaded",
+  isEnabled: () => mode === "loaded" && !dialogOpen,
   onToggleMeasure: () => setMeasureActive(!measureActive),
   onShowAll: () => showAllLayers(),
   onIsolate: () => {
@@ -1102,14 +1559,67 @@ window.addEventListener("drop", (e) => {
   dragDepth = 0;
   dropOverlay.hidden = true;
   const file = e.dataTransfer?.files?.[0];
-  if (file) void openSource(file, file.name);
+  if (file) {
+    if (dialogOpen) closeDialog(); // a drop supersedes the open dialog
+    void openSource(file, file.name);
+  }
 });
 
-// A view hash on first load implies a shared link to the sample — open it, then
-// the "loaded" handler restores the pose. Otherwise start on the empty screen.
-pendingLink = decodeView(location.hash);
-if (pendingLink) loadSample();
-else setMode("empty");
+// Open/restore from a decoded share hash. A hash arrives two ways: at cold start,
+// and while the app is already running (a pasted `#src=…` link, or back/forward
+// between links). Both funnel through here.
+//  • `#src=…` → auto-load that remote URL; the "loaded" handler restores any pose.
+//    On failure, open the dialog with retry/guidance.
+//  • a view-only hash → a shared link to the sample; open it and restore.
+//  • nothing usable → cold start shows the empty screen; a live hashchange leaves
+//    the current drawing untouched (DEMO-6).
+let sourceAbort: AbortController | null = null;
+
+function openFromLink(link: ViewLink | null, cold: boolean): void {
+  if (!link) {
+    if (cold) setMode("empty");
+    return; // a garbage/empty hash never disturbs the current drawing or dialog
+  }
+  // A live navigation that loads/restores a drawing supersedes the open dialog
+  // (like a file drop does). A failed load reopens it with guidance.
+  if (!cold && dialogOpen) closeDialog();
+  if (link.src) {
+    // The same remote is already on screen → just restore the view, no refetch.
+    if (!cold && link.src === currentSourceUrl && viewer.document) {
+      applyLink(link);
+      return;
+    }
+    const url = link.src;
+    pendingLink = link; // the "loaded" handler restores the pose after the fetch
+    sourceAbort?.abort(); // supersede an in-flight hash/cold load (rapid nav)
+    sourceAbort = new AbortController();
+    currentName = nameFromUrl(url);
+    $("#loading-text").textContent = `LOADING ${currentName.toUpperCase()}…`;
+    setMode("loading");
+    loadRemoteUrl(url, () => {}, sourceAbort.signal).catch((e) => {
+      if (pendingLink === link) pendingLink = null;
+      if (isAbortError(e)) return;
+      // showDialogError opens the dialog on the URL tab with retry/guidance and
+      // restores the app mode (the load left it in "loading").
+      if (e instanceof FetchError) showDialogError(url, e.kind, e.status);
+      else showDialogError(url, "parse");
+    });
+    return;
+  }
+  // View-only hash → the bundled sample. If it's already shown, just restore.
+  if (!cold && currentSourceLinkable && !currentSourceUrl && viewer.document) {
+    applyLink(link);
+    return;
+  }
+  pendingLink = link;
+  loadSample();
+}
+
+openFromLink(decodeView(location.hash), true);
+// React to a hash the user introduces after load — pasting a share link into the
+// address bar, or back/forward between shared links. Our own writes go through
+// history.replaceState, which never fires hashchange, so this can't loop.
+window.addEventListener("hashchange", () => openFromLink(decodeView(location.hash), false));
 
 /* Test hook: lets e2e tests observe viewer + demo interaction state. */
 declare global {
@@ -1119,8 +1629,12 @@ declare global {
       readonly selectedIndex: number | null;
       readonly measureActive: boolean;
       readonly measurePoints: Point2[];
+      readonly dialogPhase: string;
       pickAt(x: number, y: number): PickedEntity | null;
       snapAt(x: number, y: number): SnapResult | null;
+      /** Drive the paste-confirm path deterministically (clipboard events are
+       *  awkward to synthesize in Playwright). */
+      simulatePaste(text: string): void;
     };
   }
 }
@@ -1135,6 +1649,10 @@ window.__demo = {
   get measurePoints() {
     return measurePoints;
   },
+  get dialogPhase() {
+    return dialogOpen ? dialogPhase : "closed";
+  },
   pickAt: (x, y) => viewer.pickEntity(x, y),
   snapAt: (x, y) => viewer.snap(x, y),
+  simulatePaste: (text) => maybeShowPasteConfirm(text),
 };

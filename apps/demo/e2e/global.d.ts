@@ -29,8 +29,10 @@ interface DemoTestHook {
   readonly selectedIndex: number | null;
   readonly measureActive: boolean;
   readonly measurePoints: { x: number; y: number }[];
+  readonly dialogPhase: string;
   pickAt(x: number, y: number): { index: number } | null;
   snapAt(x: number, y: number): { point: { x: number; y: number }; kind: string } | null;
+  simulatePaste(text: string): void;
 }
 
 declare interface Window {
