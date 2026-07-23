@@ -88,6 +88,10 @@ export class DxfViewer {
   private highlightedLayer: string | null = null;
   private selectedIndex: number | null = null;
   private animationFrame: number | null = null;
+  /** The settled pose an in-flight animation is easing toward, or null when
+   * the camera is at rest. Relative ops (zoomBy, resetRotation) compound from
+   * this so rapid clicks accumulate instead of reading a mid-flight camera. */
+  private pendingView: ViewState | null = null;
 
   document: DxfDocument | null = null;
 
@@ -389,31 +393,41 @@ export class DxfViewer {
 
   /** Zoom by `factor` (>1 zooms in) at the viewport center. */
   zoomBy(factor: number, options: { animate?: boolean; durationMs?: number } = {}): void {
+    // Compound from where the camera is heading, not its mid-animation pose,
+    // so rapid clicks accumulate the full factor (base === view when at rest).
+    const base = this.pendingView ?? this.view;
     this.cancelViewAnimation();
     const target: ViewState = {
-      center: { ...this.camera.center },
-      unitsPerPixel: this.camera.unitsPerPixel / factor,
-      rotation: this.camera.rotation,
+      center: { ...base.center },
+      unitsPerPixel: base.unitsPerPixel / factor,
+      rotation: base.rotation,
     };
     if (options.animate) {
       this.animateView(target, options.durationMs ?? 250);
     } else {
+      this.camera.center = { ...target.center };
       this.camera.unitsPerPixel = target.unitsPerPixel;
+      this.camera.rotation = target.rotation;
       this.requestRender();
     }
   }
 
   /** Rotate back to 0, keeping center and zoom. */
   resetRotation(options: { animate?: boolean; durationMs?: number } = {}): void {
+    // Keep whatever zoom/center an in-flight animation is easing toward, so
+    // resetting rotation mid-zoom doesn't abandon the pending zoom.
+    const base = this.pendingView ?? this.view;
     this.cancelViewAnimation();
     const target: ViewState = {
-      center: { ...this.camera.center },
-      unitsPerPixel: this.camera.unitsPerPixel,
+      center: { ...base.center },
+      unitsPerPixel: base.unitsPerPixel,
       rotation: 0,
     };
     if (options.animate) {
       this.animateView(target, options.durationMs ?? 300);
     } else {
+      this.camera.center = { ...base.center };
+      this.camera.unitsPerPixel = base.unitsPerPixel;
       this.camera.rotation = 0;
       this.requestRender();
     }
@@ -437,6 +451,9 @@ export class DxfViewer {
   }
 
   private animateView(target: ViewState, durationMs: number): void {
+    // Remember the destination so relative ops can compound from it while the
+    // animation is still running (cleared on completion / cancel).
+    this.pendingView = target;
     // Normalize rotation so the animation takes the short way around.
     this.camera.rotation -= 2 * Math.PI * Math.round(this.camera.rotation / (2 * Math.PI));
     const start = this.view;
@@ -455,7 +472,12 @@ export class DxfViewer {
       // Render inline — we're already in an animation frame, so going through
       // requestRender would schedule a second rAF and render a frame late.
       this.renderNow();
-      this.animationFrame = t < 1 ? requestAnimationFrame(step) : null;
+      if (t < 1) {
+        this.animationFrame = requestAnimationFrame(step);
+      } else {
+        this.animationFrame = null;
+        this.pendingView = null; // arrived — the camera is at rest again
+      }
     };
     this.animationFrame = requestAnimationFrame(step);
   }
@@ -465,6 +487,9 @@ export class DxfViewer {
       cancelAnimationFrame(this.animationFrame);
       this.animationFrame = null;
     }
+    // A cancelled animation has no destination; drop it so a later relative op
+    // compounds from the live camera, not a stale target.
+    this.pendingView = null;
   }
 
   on(event: ViewerEvent, listener: Listener): void {
