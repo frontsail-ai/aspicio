@@ -64,6 +64,12 @@ or app copy change.
 Sign in with GitHub → Add server → point it at this repo. It reads
 `smithery.yaml` (stdio launch via `npx -y @aspicio/mcp`).
 
+Smithery computes a **quality score** from the server metadata: `description`
+and `homepage` in `smithery.yaml` are worth 24 of the 35 "Server Metadata"
+points, so keep them present (the registry test pins them to `server.json`'s
+`description`/`websiteUrl`). `render_dxf` intentionally has no `outputSchema`
+(it returns an image), so "Output schemas" caps at 3/4 — expected, not a gap.
+
 ## 3. Glama (glama.ai)
 
 Crawls npm + GitHub, so listing generally appears on its own once the

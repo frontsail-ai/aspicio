@@ -55,8 +55,13 @@ test("registry metadata agrees on the one load-bearing package name", () => {
   // mcpName against the server name — a mismatch rejects the submission.
   expect(pkg.mcpName).toBe(server.name);
   // Smithery launches the same package via npx.
-  expect(read("smithery.yaml")).toContain(pkg.name);
-  expect(read("smithery.yaml")).toContain("type: stdio");
+  const smithery = read("smithery.yaml");
+  expect(smithery).toContain(pkg.name);
+  expect(smithery).toContain("type: stdio");
+  // Smithery's listing metadata must not drift from the registry manifest —
+  // its quality score reads description and homepage.
+  expect(smithery).toContain(server.description);
+  expect(smithery).toContain(server.websiteUrl);
 });
 
 test("README's agent-surface strings match the registry manifests", () => {
