@@ -162,6 +162,11 @@ body {
   flex-shrink: 0;
 }
 
+/* Drop the separator in the empty state, when no status sits beside it. */
+.statusbar:not(:has(#loading-status:not([hidden]), #file-status:not([hidden]))) .vdiv {
+  display: none;
+}
+
 .loading-status {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -282,6 +287,13 @@ body {
 
 button {
   font-family: var(--font-sans);
+}
+
+/* Themed keyboard focus ring — replaces the browser default against the
+   dark blueprint theme. Scoped to controls so the canvas keeps no outline. */
+:is(a, button, input, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--crease);
+  outline-offset: 2px;
 }
 
 .btn-ghost {
@@ -935,6 +947,7 @@ button {
   font-size: 9.5px;
   letter-spacing: 0.04em;
   color: var(--text3);
+  white-space: nowrap;
 }
 
 /* ===================== SPACE TABS ===================== */
