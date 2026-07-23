@@ -1,4 +1,14 @@
-# Smithery (smithery.ai) launch config for the Aspicio MCP server.
+# Smithery (smithery.ai) launch config + listing metadata for the Aspicio MCP
+# server. description/homepage feed Smithery's quality score and are kept in
+# step with server.json by the registry drift test.
+displayName: Aspicio
+description: "DXF drawings for AI agents: structured facts, PNG renders, and an interactive in-chat viewer."
+homepage: https://aspicio.frontsail.app
+repository: https://github.com/frontsail-ai/aspicio
+license: MIT
+categories:
+  - developer-tools
+  - design
 startCommand:
   type: stdio
   configSchema: {}
