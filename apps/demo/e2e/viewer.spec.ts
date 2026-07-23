@@ -32,6 +32,8 @@ test("starts in the empty state with canvas chrome hidden", async ({ page }) => 
   await expect(page.locator("#controls")).toBeHidden();
   await expect(page.locator("#readout")).toBeHidden();
   await expect(page.locator("#file-status")).toBeHidden();
+  // No status beside the wordmark → the header divider is dropped (#32).
+  await expect(page.locator(".vdiv")).toBeHidden();
   await expect(page.locator("#layer-list li")).toHaveCount(0);
 });
 
@@ -42,6 +44,8 @@ test("loads the sample with stats, layers, and skip report", async ({ page }) =>
   await expect(page.locator("#skipped-btn")).toContainText("1 SKIPPED");
   await expect(page.locator("#empty-state")).toBeHidden();
   await expect(page.locator("#controls")).toBeVisible();
+  // The divider returns once a file status sits beside the wordmark (#32).
+  await expect(page.locator(".vdiv")).toBeVisible();
 
   const probe = await probeViewer(page);
   expect(probe.entityCount).toBe(21);
