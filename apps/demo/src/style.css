@@ -418,6 +418,31 @@ button {
   font-feature-settings: "tnum" 1;
 }
 
+/* Right-aligned in the panel head; pushes past the title and sits left of the
+   mobile close button. Hidden until a rendered layer is manually hidden. */
+.show-all-btn {
+  margin-left: auto;
+  margin-right: 8px;
+  border: 1px solid var(--hairline2);
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 3px;
+  transition:
+    border-color 140ms,
+    color 140ms;
+}
+
+.show-all-btn:hover {
+  border-color: var(--crease);
+  color: var(--text);
+}
+
 .panel-close {
   display: none;
   align-items: center;

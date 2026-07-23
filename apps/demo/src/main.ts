@@ -109,6 +109,7 @@ app.innerHTML = `
     <aside id="panel" class="panel asp-scroll">
       <div class="panel-head">
         <div class="panel-title">LAYERS <span id="layer-count" class="count-badge">0</span></div>
+        <button id="show-all" class="show-all-btn" type="button" hidden>Show all</button>
         <button id="close-panel" class="panel-close" type="button">${icons.close(18)}</button>
       </div>
       <div id="solo-banner" class="solo-banner" hidden>
@@ -703,6 +704,13 @@ function syncPanel(): void {
   banner.hidden = !soloLayer;
   if (soloLayer) $("#solo-name").textContent = soloLayer;
 
+  // Offer a one-click "Show all" when the user has manually hidden a rendered
+  // layer. Solo mode has its own EXIT affordance, so suppress it there; empty
+  // layers don't count (hiding them changes nothing on the canvas).
+  const anyRenderedHidden =
+    !soloLayer && partitionLayers(viewer.getLayers()).rendered.some((l) => l.visible === false);
+  $("#show-all").hidden = !anyRenderedHidden;
+
   for (const layer of viewer.getLayers()) {
     const row = layerRows.get(layer.name);
     if (!row) continue;
@@ -909,6 +917,7 @@ $("#error-dismiss").addEventListener("click", () => {
 });
 
 $("#exit-solo").addEventListener("click", exitSolo);
+$("#show-all").addEventListener("click", showAllLayers);
 
 $("#skipped-btn").addEventListener("click", (e) => {
   e.stopPropagation();
