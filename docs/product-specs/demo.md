@@ -29,7 +29,10 @@ underneath.
 Single click toggles the layer. Double click solos it (banner + SOLO chip,
 other rows dimmed). In solo mode: single click exits solo showing all
 layers; double click exits solo showing every layer except the clicked
-one; an explicit Exit control restores all.
+one; an explicit Exit control restores all. Layers with no rendered
+entities (the default `0`, `Defpoints`) are collected into a collapsible
+"empty" group, collapsed by default; the group is omitted entirely when
+every layer has geometry, and its rows behave like any other layer row.
 
 ### DEMO-5: Deep-link view state
 

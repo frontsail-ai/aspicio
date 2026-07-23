@@ -50,8 +50,32 @@ test("loads the sample with stats, layers, and skip report", async ({ page }) =>
   expect(probe.layers.map((l) => l.name)).toEqual(
     expect.arrayContaining(["WALLS", "DOORS", "FURNITURE", "DECOR", "NOTES"]),
   );
-  await expect(page.locator("#layer-list li")).toHaveCount(6);
+  // All 6 layers have a row (5 shown + 1 in the collapsed empty group); the
+  // badge counts every layer.
+  await expect(page.locator("#layer-list .layer-row")).toHaveCount(6);
   await expect(page.locator("#layer-count")).toHaveText("6");
+});
+
+// DEMO-4: empty (0-entity) layers live in a collapsible group, collapsed by
+// default, and the group is omitted when every layer has geometry.
+test("empty layers are tucked into a collapsed group", async ({ page }) => {
+  await loadSample(page);
+  // The sample's default "0" layer is empty; the other 5 render directly.
+  await expect(page.locator("#layer-list > .layer-row")).toHaveCount(5);
+  const group = page.locator(".layer-group");
+  await expect(group).toHaveCount(1);
+  const head = group.locator(".layer-group-head");
+  await expect(head).toHaveAttribute("aria-expanded", "false");
+  await expect(group.locator(".layer-group-rows")).toBeHidden();
+
+  await head.click();
+  await expect(head).toHaveAttribute("aria-expanded", "true");
+  await expect(group.locator(".layer-group-rows .layer-name")).toHaveText("0");
+
+  // A drawing whose every layer carries geometry shows no group at all.
+  await page.setInputFiles("#file", fixture("box.dxf"));
+  await expect(page.locator("#file-chip")).toHaveText("box.dxf");
+  await expect(page.locator(".layer-group")).toHaveCount(0);
 });
 
 test("skipped-entities popover opens with detail and closes outside", async ({ page }) => {

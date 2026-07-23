@@ -34,6 +34,7 @@ export { DxfParseError, parseDxf, parseDxfBytes } from "./parse/parse.ts";
 export { binaryDxfToText, isBinaryDxf } from "./parse/binary.ts";
 export { describeDrawing } from "./describe.ts";
 export type { DrawingSummary, LayerSummary } from "./describe.ts";
+export { isEmptyLayer, partitionLayers } from "./layers.ts";
 export { tessellate, tessellateLayout, registerEntityHandler } from "./tessellate/tessellate.ts";
 export type {
   Tessellation,
