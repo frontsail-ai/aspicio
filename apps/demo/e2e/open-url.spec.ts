@@ -299,3 +299,24 @@ test("opening a local file clears a stale remote share hash", async ({ page }) =
   await expect(page.locator("#file-chip")).toHaveText("layout.dxf");
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
 });
+
+test("dragging a file over the open dialog shows the drop overlay on top", async ({ page }) => {
+  await page.locator("#open").click();
+  await expect(page.locator("#open-dialog")).toBeVisible();
+
+  // Drag a file in while the dialog is up — a drop supersedes the dialog, so
+  // its hint must render above it, not behind.
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.items.add(new File(["x"], "x.dxf"));
+    window.dispatchEvent(new DragEvent("dragenter", { dataTransfer: dt, bubbles: true }));
+  });
+  await expect(page.locator("#drop")).toBeVisible();
+
+  // The element under the viewport centre belongs to the drop overlay, not the
+  // dialog — i.e. the overlay is stacked on top.
+  const topIsDrop = await page.evaluate(
+    () => !!document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest("#drop"),
+  );
+  expect(topIsDrop).toBe(true);
+});

@@ -1447,7 +1447,10 @@ button {
 .drop-overlay {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  /* Above the Open dialog (100) and the paste toast (90): a file drop
+     supersedes them (it closes the dialog and loads), so its hint must sit
+     on top rather than behind them. */
+  z-index: 110;
   background: rgb(15 17 21 / 90%);
   display: flex;
   align-items: center;
