@@ -1584,8 +1584,9 @@ button {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  /* Anchor to a fixed distance from the top so the header and tabs stay put and
-     only the body grows/shrinks between tabs. */
+  /* Anchor to a fixed distance from the top so the header stays put and only
+     the body grows/shrinks as it switches between the form, progress, and
+     error states. */
   padding: 96px 24px 24px;
   overflow-y: auto;
   background: rgb(9 10 13 / 68%);
@@ -1643,53 +1644,40 @@ button {
   background: var(--hover);
 }
 
-.od-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 10px 12px 0;
-}
-
-.od-tab {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 14px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  border-radius: 3px 3px 0 0;
-  cursor: pointer;
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text3);
-  transition:
-    color 120ms,
-    border-color 120ms;
-}
-
-.od-tab:hover {
-  color: var(--text2);
-}
-
-.od-tab.active {
-  color: var(--text);
-  border-bottom-color: var(--cut);
-}
-
 .od-body {
   padding: 16px 18px 18px;
 }
 
-/* File tab */
+/* Divider between the dropzone and the URL field */
+.od-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 15px 0;
+}
+
+.od-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
+}
+
+.od-divider-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text3);
+}
+
+/* File dropzone */
 .od-dropzone {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 11px;
   width: 100%;
-  padding: 34px 20px;
+  padding: 28px 20px;
   border: 2px dashed var(--hairline2);
   border-radius: 6px;
   background: var(--canvas);
@@ -1724,7 +1712,7 @@ button {
   color: var(--text3);
 }
 
-/* URL tab */
+/* URL field */
 .od-label {
   display: block;
   font-family: var(--font-mono);
@@ -2257,7 +2245,13 @@ button {
 
 @media (width <= 720px) {
   .od-scrim {
-    padding: 64px 14px 14px;
+    /* Full-width dialog that scrolls; less top inset to claim the short
+       viewport. The card is already min(480px, 100%), so it spans the width. */
+    padding: 40px 12px 12px;
+  }
+
+  .od-dropzone {
+    padding: 22px 16px;
   }
 
   .od-input-row {

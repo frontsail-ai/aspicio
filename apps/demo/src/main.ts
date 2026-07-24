@@ -236,12 +236,8 @@ app.innerHTML = `
         <div class="od-head-title">${icons.filePlus}<span>OPEN DXF</span></div>
         <button id="od-close" class="od-close" type="button">${icons.close(18)}</button>
       </div>
-      <div class="od-tabs">
-        <button id="od-tab-file" class="od-tab" type="button">${icons.file} From file</button>
-        <button id="od-tab-url" class="od-tab" type="button">${icons.link(14)} From URL</button>
-      </div>
       <div class="od-body">
-        <div id="od-file" class="od-file" hidden>
+        <div id="od-form" class="od-form">
           <button id="od-dropzone" class="od-dropzone" type="button">
             ${icons.dropArrow}
             <div>
@@ -250,8 +246,11 @@ app.innerHTML = `
             </div>
             <div class="od-dz-note">.DXF · ASCII OR BINARY · PARSED LOCALLY, NEVER UPLOADED</div>
           </button>
-        </div>
-        <div id="od-url" class="od-url" hidden>
+          <div class="od-divider">
+            <span class="od-divider-line"></span>
+            <span class="od-divider-label">OR OPEN FROM A URL</span>
+            <span class="od-divider-line"></span>
+          </div>
           <label class="od-label" for="od-input">DRAWING URL</label>
           <div class="od-input-row">
             <div class="od-input-wrap">
@@ -294,7 +293,7 @@ app.innerHTML = `
           <div class="od-try">
             <div class="od-try-title">TRY THIS</div>
             <div id="od-tip-status" class="od-try-item"><span class="od-try-dot">·</span><span id="od-tip-status-text"></span></div>
-            <div id="od-tip-download" class="od-try-item"><span class="od-try-dot">·</span><span>Download the file, then open it from the <button id="od-try-file" class="od-try-link" type="button">From file</button> tab.</span></div>
+            <div id="od-tip-download" class="od-try-item"><span class="od-try-dot">·</span><span>Download the file, then <button id="od-try-file" class="od-try-link" type="button">drop it in</button> above.</span></div>
             <div id="od-tip-direct" class="od-try-item"><span class="od-try-dot">·</span><span>Check the link points directly at a <span class="od-lit">.dxf</span> (not an HTML page).</span></div>
             <div id="od-tip-cors" class="od-try-item"><span class="od-try-dot">·</span><span>Host it somewhere CORS-enabled (S3 with public read, a raw GitHub URL, etc.).</span></div>
           </div>
@@ -357,13 +356,9 @@ let restoringView = false;
 let hashWriteTimer: number | null = null;
 const layerRows = new Map<string, HTMLLIElement>();
 
-// Open-DXF dialog state. `tab` picks file/url; `phase` overlays loading/cors/
-// invalid onto the active tab (see renderDialog).
+// Open-DXF dialog state. The dropzone and URL field live together in one form;
+// `phase` overlays loading/cors/invalid onto it (see renderDialog).
 let dialogOpen = false;
-let dialogTab: "file" | "url" = "file";
-// The tab the dialog reopens on — remembers the last one the user chose so a
-// run of URL loads doesn't force re-clicking "From URL" each time.
-let lastTab: "file" | "url" = "file";
 let dialogPhase: "idle" | "loading" | "cors" | "invalid" = "idle";
 let dialogAbort: AbortController | null = null;
 let pastedUrl = "";
@@ -1088,14 +1083,13 @@ function normalizeUrl(raw: string): string | null {
   return isHttpUrl(withScheme) ? withScheme : null;
 }
 
-/** Reflect dialog state (open, tab, phase) onto the DOM. */
+/** Reflect dialog state (open, phase) onto the DOM. */
 function renderDialog(): void {
   $("#open-dialog").hidden = !dialogOpen;
+  // The form (dropzone + URL field) shows unless a fetch is in flight or its
+  // error card is up; those two states take over the body.
   const busy = dialogPhase === "loading" || dialogPhase === "cors";
-  $("#od-tab-file").classList.toggle("active", dialogTab === "file");
-  $("#od-tab-url").classList.toggle("active", dialogTab === "url");
-  $("#od-file").hidden = !(dialogTab === "file" && !busy);
-  $("#od-url").hidden = !(dialogTab === "url" && !busy);
+  $("#od-form").hidden = busy;
   $("#od-loading").hidden = dialogPhase !== "loading";
   $("#od-cors").hidden = dialogPhase !== "cors";
   $("#od-invalid").hidden = dialogPhase !== "invalid";
@@ -1142,14 +1136,11 @@ function renderRecents(): void {
   }
 }
 
-function openDialog(tab: "file" | "url" = lastTab): void {
+function openDialog(): void {
   dialogOpen = true;
-  dialogTab = tab;
-  lastTab = tab;
   dialogPhase = "idle";
   renderRecents();
   renderDialog();
-  if (tab === "url") window.setTimeout(() => urlInput.focus(), 0);
 }
 
 function cancelDialogFetch(): void {
@@ -1166,14 +1157,11 @@ function closeDialog(): void {
   renderDialog();
 }
 
-function selectTab(tab: "file" | "url"): void {
-  dialogTab = tab;
-  lastTab = tab;
-  // A tab click backs out of an error/invalid state; an in-flight load keeps
-  // showing its progress regardless of the active tab.
-  if (dialogPhase === "cors" || dialogPhase === "invalid") dialogPhase = "idle";
+/** Back out of an error/invalid state to the form (dropzone + URL field). */
+function backToForm(focusUrl = false): void {
+  dialogPhase = "idle";
   renderDialog();
-  if (tab === "url" && dialogPhase === "idle") urlInput.focus();
+  if (focusUrl) urlInput.focus();
 }
 
 function renderDialogProgress(p: FetchProgress): void {
@@ -1209,7 +1197,6 @@ function httpTip(status: number | undefined): string {
  *  flow (Try again / Edit URL) instead of dropping them onto the file toast. */
 function showDialogError(url: string, kind: FetchErrorKind | "parse", status?: number): void {
   dialogOpen = true;
-  dialogTab = "url";
   dialogPhase = "cors";
   urlInput.value = url;
   const network = kind === "network" || kind === "scheme";
@@ -1293,17 +1280,17 @@ function dismissPaste(): void {
 }
 
 $("#od-close").addEventListener("click", closeDialog);
-$("#od-tab-file").addEventListener("click", () => selectTab("file"));
-$("#od-tab-url").addEventListener("click", () => selectTab("url"));
 $("#od-dropzone").addEventListener("click", () => {
   closeDialog();
   fileInput.click();
 });
-$("#od-try-file").addEventListener("click", () => selectTab("file"));
+// From the error card: "drop it in" returns to the form (the dropzone is right
+// there); "Edit URL" does the same but drops focus into the URL field.
+$("#od-try-file").addEventListener("click", () => backToForm());
 $("#od-open").addEventListener("click", () => void submitDialogUrl());
 $("#od-cancel").addEventListener("click", cancelDialogLoad);
 $("#od-retry").addEventListener("click", () => void submitDialogUrl());
-$("#od-edit").addEventListener("click", () => selectTab("url"));
+$("#od-edit").addEventListener("click", () => backToForm(true));
 $("#od-clear").addEventListener("click", () => {
   clearRecents();
   renderRecents();
@@ -1330,7 +1317,7 @@ $("#open-dialog").addEventListener("click", (e) => {
 $("#paste-open").addEventListener("click", () => {
   const url = pastedUrl;
   dismissPaste();
-  openDialog("url");
+  openDialog();
   urlInput.value = url;
   void submitDialogUrl();
 });
@@ -1359,12 +1346,10 @@ fileInput.addEventListener("change", () => {
   if (file) void openSource(file, file.name);
 });
 
-// The main open buttons reopen on the last-used tab; "Choose another file" on
-// the error toast is explicitly a file action.
-for (const id of ["#open", "#empty-open"]) {
+// Every open control raises the same one-view dialog (dropzone + URL field).
+for (const id of ["#open", "#empty-open", "#error-open"]) {
   $(id).addEventListener("click", () => openDialog());
 }
-$("#error-open").addEventListener("click", () => openDialog("file"));
 for (const id of ["#load-sample", "#empty-sample", "#error-sample"]) {
   $(id).addEventListener("click", loadSample);
 }
