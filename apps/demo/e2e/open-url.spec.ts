@@ -32,10 +32,10 @@ test("Open-DXF dialog gates the URL submit on a valid http(s) URL", async ({ pag
   await page.locator("#open").click();
   await expect(page.locator("#open-dialog")).toBeVisible();
 
-  // Defaults to the file tab with the dropzone.
+  // The dropzone and the URL field are shown together — no tabs to switch.
   await expect(page.locator("#od-dropzone")).toBeVisible();
+  await expect(page.locator("#od-input")).toBeVisible();
 
-  await page.locator("#od-tab-url").click();
   const open = page.locator("#od-open");
   await expect(open).toBeDisabled();
 
@@ -77,7 +77,6 @@ test("a scheme-less URL is fetched as https://", async ({ page }) => {
     }),
   );
   await page.locator("#open").click();
-  await page.locator("#od-tab-url").click();
   await page.locator("#od-input").fill("cdn.example.test/box.dxf"); // no scheme
   await page.locator("#od-open").click();
   await expect(page.locator("#file-chip")).toHaveText("box.dxf");
@@ -90,7 +89,6 @@ test("loads a DXF from a remote URL and makes it a shareable link", async ({ pag
   await serveFixture(page);
 
   await page.locator("#open").click();
-  await page.locator("#od-tab-url").click();
   await page.locator("#od-input").fill(REMOTE);
   await page.locator("#od-open").click();
 
@@ -110,7 +108,6 @@ test("a fetch failure shows the CORS guidance card, not a broken load", async ({
   await page.route(REMOTE, (route) => route.abort());
 
   await page.locator("#open").click();
-  await page.locator("#od-tab-url").click();
   await page.locator("#od-input").fill(REMOTE);
   await page.locator("#od-open").click();
 
@@ -129,7 +126,6 @@ test("an HTTP error tailors the guidance to the status", async ({ page }) => {
     route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "nope" }),
   );
   await page.locator("#open").click();
-  await page.locator("#od-tab-url").click();
   await page.locator("#od-input").fill(REMOTE);
   await page.locator("#od-open").click();
 
@@ -158,7 +154,6 @@ test("a URL that returns non-DXF bytes stays in the URL flow", async ({ page }) 
 
   // Load a valid drawing first, establishing its share hash.
   await page.locator("#open").click();
-  await page.locator("#od-tab-url").click();
   await page.locator("#od-input").fill(REMOTE);
   await page.locator("#od-open").click();
   await expect(page.locator("#file-chip")).toHaveText("box.dxf");
@@ -166,7 +161,6 @@ test("a URL that returns non-DXF bytes stays in the URL flow", async ({ page }) 
 
   // Now open a URL that downloads fine but isn't a DXF.
   await page.locator("#open").click();
-  await page.locator("#od-tab-url").click();
   await page.locator("#od-input").fill(BAD);
   await page.locator("#od-open").click();
 
@@ -241,23 +235,27 @@ test("a hashchange that loads a drawing closes an open dialog", async ({ page })
   await expect(page.locator("#open-dialog")).toBeVisible();
 });
 
-test("the dialog reopens on the tab last used", async ({ page }) => {
+test("the dialog shows the dropzone and URL field together", async ({ page }) => {
   await page.locator("#open").click();
-  await expect(page.locator("#od-dropzone")).toBeVisible(); // defaults to file first time
-  await page.locator("#od-tab-url").click();
-  await page.keyboard.press("Escape");
+  // Both open paths are visible at once, separated by the divider — nothing to
+  // switch between, so reopening never lands on the "wrong" surface.
+  await expect(page.locator("#od-dropzone")).toBeVisible();
+  await expect(page.locator("#od-input")).toBeVisible();
+  await expect(page.locator(".od-divider-label")).toHaveText("OR OPEN FROM A URL");
 
-  // Reopening lands on From URL, not back on From file.
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#open-dialog")).toBeHidden();
+
+  // Reopening shows the same combined form.
   await page.locator("#open").click();
-  await expect(page.locator("#od-url")).toBeVisible();
-  await expect(page.locator("#od-tab-url")).toHaveClass(/active/);
+  await expect(page.locator("#od-dropzone")).toBeVisible();
+  await expect(page.locator("#od-input")).toBeVisible();
 });
 
 test("remembers recent URLs and can clear them", async ({ page }) => {
   await serveFixture(page);
 
   await page.locator("#open").click();
-  await page.locator("#od-tab-url").click();
   await page.locator("#od-input").fill(REMOTE);
   await page.locator("#od-open").click();
   await expect(page.locator("#file-chip")).toHaveText("box.dxf");
@@ -265,7 +263,6 @@ test("remembers recent URLs and can clear them", async ({ page }) => {
   // Reopen — the load shows up under RECENT, with its origin host so same-named
   // files from different hosts stay distinguishable (#6).
   await page.locator("#open").click();
-  await page.locator("#od-tab-url").click();
   await expect(page.locator("#od-recents")).toBeVisible();
   await expect(page.locator(".od-recent-name")).toHaveText("box.dxf");
   await expect(page.locator(".od-recent-host")).toHaveText("remote.test");
@@ -290,6 +287,28 @@ test("pasting a .dxf link raises a confirm toast that loads it", async ({ page }
   await expect(page.locator("#file-chip")).toHaveText("box.dxf");
 });
 
+test("pasting a DXF link while the dialog is open fills the URL field once", async ({ page }) => {
+  await page.locator("#open").click();
+  await expect(page.locator("#open-dialog")).toBeVisible();
+
+  // Focus is on the Open button, not the field. Dispatch a real paste event:
+  // the handler fills the field AND must cancel the event, so the browser
+  // doesn't also insert the text into the input it just focused (double paste).
+  const result = await page.evaluate((url) => {
+    const dt = new DataTransfer();
+    dt.setData("text", url);
+    const ev = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+    window.dispatchEvent(ev);
+    const input = document.querySelector<HTMLInputElement>("#od-input");
+    return { value: input?.value, prevented: ev.defaultPrevented };
+  }, REMOTE);
+
+  expect(result.value).toBe(REMOTE); // filled exactly once, not doubled
+  expect(result.prevented).toBe(true); // native insert suppressed
+  await expect(page.locator("#od-open")).toBeEnabled();
+  await expect(page.locator("#paste-toast")).toBeHidden();
+});
+
 test("opening a local file clears a stale remote share hash", async ({ page }) => {
   await serveFixture(page);
   await page.goto(`/#src=${encodeURIComponent(REMOTE)}`);
@@ -301,4 +320,25 @@ test("opening a local file clears a stale remote share hash", async ({ page }) =
   await page.locator("#file").setInputFiles(fixture("layout.dxf"));
   await expect(page.locator("#file-chip")).toHaveText("layout.dxf");
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("");
+});
+
+test("dragging a file over the open dialog shows the drop overlay on top", async ({ page }) => {
+  await page.locator("#open").click();
+  await expect(page.locator("#open-dialog")).toBeVisible();
+
+  // Drag a file in while the dialog is up — a drop supersedes the dialog, so
+  // its hint must render above it, not behind.
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.items.add(new File(["x"], "x.dxf"));
+    window.dispatchEvent(new DragEvent("dragenter", { dataTransfer: dt, bubbles: true }));
+  });
+  await expect(page.locator("#drop")).toBeVisible();
+
+  // The element under the viewport centre belongs to the drop overlay, not the
+  // dialog — i.e. the overlay is stacked on top.
+  const topIsDrop = await page.evaluate(
+    () => !!document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest("#drop"),
+  );
+  expect(topIsDrop).toBe(true);
 });

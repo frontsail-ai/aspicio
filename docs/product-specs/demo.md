@@ -131,26 +131,32 @@ and terms of use. The links are absent while a drawing is displayed
 
 ### DEMO-17: Open-DXF dialog
 
-The Open-DXF control (top bar and empty screen) opens one dialog with two
-tabs. **From file** is a dashed dropzone that opens the native picker (and
-notes files are parsed locally, never uploaded). **From URL** takes a
-drawing URL: the Open action stays disabled until the field holds a valid
+The Open-DXF control (top bar and empty screen) opens one dialog that shows
+both open paths at once — no tabs to switch between. A dashed dropzone opens
+the native picker (and notes files are parsed locally, never uploaded);
+below an "OR OPEN FROM A URL" divider, a drawing-URL field takes it from
+there: the Open action stays disabled until the field holds a valid
 `http(s)://` URL, and Enter submits. A submitted URL is streamed with a
 live byte/percent progress bar and a Cancel control; when the server omits
-`Content-Length` the bar runs indeterminate and only bytes are shown. The
-tab remembers up to five recently loaded URLs (filename, origin host, and
-size, newest first, with a Clear action) — the host disambiguates same-named
-files from different origins; clicking one refills the field without loading it.
+`Content-Length` the bar runs indeterminate and only bytes are shown. Below
+the field, the dialog remembers up to five recently loaded URLs (filename,
+origin host, and size, newest first, with a Clear action) — the host
+disambiguates same-named files from different origins; clicking one refills
+the field without loading it.
 
 A fetch failure shows a dedicated guidance card — honest about the cause
 (a cross-origin block and an unreachable host are indistinguishable in the
 browser; an HTTP status is named) — with download-and-open advice and
-Try-again / Edit-URL actions; a valid fetch that isn't a valid DXF falls
-back to the standard error toast (DEMO-3). The dialog anchors a fixed
-distance from the top so the header and tabs stay put while the body
-switches; Escape or a backdrop click dismisses it (Cancel, not the
-backdrop, exits an in-flight fetch). Pasting a `.dxf` link anywhere while
-the dialog is closed raises a toast that confirms the URL before loading.
+Try-again / Edit-URL actions; both return to the combined form. A valid
+fetch that isn't a valid DXF falls back to the standard error toast
+(DEMO-3). The dialog anchors a fixed distance from the top so the header
+stays put while the body switches between the form, progress, and error
+states; on a narrow screen it spans the width and scrolls. Escape or a
+backdrop click dismisses it (Cancel, not the backdrop, exits an in-flight
+fetch). Pasting a `.dxf` link anywhere while the dialog is closed raises a
+toast that confirms the URL before loading; pasting one while the dialog is
+open drops the link straight into the URL field, ready to submit (unless the
+field already has focus, where the native paste applies).
 
 ### DEMO-18: Remote URLs are deep-linkable
 
