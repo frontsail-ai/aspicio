@@ -1283,20 +1283,25 @@ function maybeShowPasteConfirm(text: string): void {
 /** With the dialog already open, a pasted DXF link drops straight into the URL
  *  field instead of raising the confirm toast (the field is the toast's
  *  purpose here). Skipped while the user is typing into the field — native
- *  paste wins there — and while a fetch is in flight. */
-function fillUrlFromPaste(text: string): void {
-  if (document.activeElement === urlInput || dialogPhase === "loading") return;
-  if (!looksLikeDxfUrl(text)) return;
+ *  paste wins there — and while a fetch is in flight. Returns whether it
+ *  consumed the paste, so the caller can suppress the browser's own insert. */
+function fillUrlFromPaste(text: string): boolean {
+  if (document.activeElement === urlInput || dialogPhase === "loading") return false;
+  if (!looksLikeDxfUrl(text)) return false;
   urlInput.value = text.trim();
   dialogPhase = "idle"; // reveal the form if a cors/invalid card was up
   renderDialog();
   urlInput.focus();
+  return true;
 }
 
-/** Route a paste: fill the open dialog's field, or offer the confirm toast. */
-function handlePastedText(text: string): void {
-  if (dialogOpen) fillUrlFromPaste(text);
-  else maybeShowPasteConfirm(text);
+/** Route a paste: fill the open dialog's field, or offer the confirm toast.
+ *  Returns true when it filled the field (the caller then preventDefaults so
+ *  the browser doesn't also insert the text into the input we just focused). */
+function handlePastedText(text: string): boolean {
+  if (dialogOpen) return fillUrlFromPaste(text);
+  maybeShowPasteConfirm(text);
+  return false;
 }
 
 function dismissPaste(): void {
@@ -1350,7 +1355,9 @@ $("#paste-dismiss").addEventListener("click", dismissPaste);
 $("#paste-close").addEventListener("click", dismissPaste);
 window.addEventListener("paste", (e) => {
   const text = e.clipboardData?.getData("text") ?? "";
-  handlePastedText(text);
+  // When we fill the field ourselves, stop the browser from also inserting the
+  // text into the input we just focused — otherwise the URL lands twice.
+  if (handlePastedText(text)) e.preventDefault();
 });
 // Esc closes the dialog (or cancels an in-flight fetch). The core shortcut
 // handler is disabled while the dialog is open, so this is the only Esc path.
@@ -1664,5 +1671,7 @@ window.__demo = {
   },
   pickAt: (x, y) => viewer.pickEntity(x, y),
   snapAt: (x, y) => viewer.snap(x, y),
-  simulatePaste: (text) => handlePastedText(text),
+  simulatePaste: (text) => {
+    handlePastedText(text);
+  },
 };
