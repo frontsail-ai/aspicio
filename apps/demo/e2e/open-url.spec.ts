@@ -287,6 +287,18 @@ test("pasting a .dxf link raises a confirm toast that loads it", async ({ page }
   await expect(page.locator("#file-chip")).toHaveText("box.dxf");
 });
 
+test("pasting a DXF link while the dialog is open fills the URL field", async ({ page }) => {
+  await page.locator("#open").click();
+  await expect(page.locator("#open-dialog")).toBeVisible();
+
+  // The dialog already shows the URL field, so a pasted link drops into it
+  // (ready to submit) rather than raising the confirm toast.
+  await page.evaluate((url) => window.__demo?.simulatePaste(url), REMOTE);
+  await expect(page.locator("#od-input")).toHaveValue(REMOTE);
+  await expect(page.locator("#od-open")).toBeEnabled();
+  await expect(page.locator("#paste-toast")).toBeHidden();
+});
+
 test("opening a local file clears a stale remote share hash", async ({ page }) => {
   await serveFixture(page);
   await page.goto(`/#src=${encodeURIComponent(REMOTE)}`);

@@ -154,7 +154,9 @@ stays put while the body switches between the form, progress, and error
 states; on a narrow screen it spans the width and scrolls. Escape or a
 backdrop click dismisses it (Cancel, not the backdrop, exits an in-flight
 fetch). Pasting a `.dxf` link anywhere while the dialog is closed raises a
-toast that confirms the URL before loading.
+toast that confirms the URL before loading; pasting one while the dialog is
+open drops the link straight into the URL field, ready to submit (unless the
+field already has focus, where the native paste applies).
 
 ### DEMO-18: Remote URLs are deep-linkable
 

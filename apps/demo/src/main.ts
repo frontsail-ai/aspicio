@@ -1266,12 +1266,37 @@ function cancelDialogLoad(): void {
 }
 
 /** Pasting a .dxf link anywhere (dialog closed) offers to open it. */
-function maybeShowPasteConfirm(text: string): void {
+/** A pasted string that looks like a remote DXF link. */
+function looksLikeDxfUrl(text: string): boolean {
   const trimmed = text.trim();
-  if (dialogOpen || !isHttpUrl(trimmed) || !/\.dxf(\?|#|$)/i.test(trimmed)) return;
+  return isHttpUrl(trimmed) && /\.dxf(\?|#|$)/i.test(trimmed);
+}
+
+function maybeShowPasteConfirm(text: string): void {
+  if (dialogOpen || !looksLikeDxfUrl(text)) return;
+  const trimmed = text.trim();
   pastedUrl = trimmed;
   $("#paste-url").textContent = trimmed;
   $("#paste-toast").hidden = false;
+}
+
+/** With the dialog already open, a pasted DXF link drops straight into the URL
+ *  field instead of raising the confirm toast (the field is the toast's
+ *  purpose here). Skipped while the user is typing into the field — native
+ *  paste wins there — and while a fetch is in flight. */
+function fillUrlFromPaste(text: string): void {
+  if (document.activeElement === urlInput || dialogPhase === "loading") return;
+  if (!looksLikeDxfUrl(text)) return;
+  urlInput.value = text.trim();
+  dialogPhase = "idle"; // reveal the form if a cors/invalid card was up
+  renderDialog();
+  urlInput.focus();
+}
+
+/** Route a paste: fill the open dialog's field, or offer the confirm toast. */
+function handlePastedText(text: string): void {
+  if (dialogOpen) fillUrlFromPaste(text);
+  else maybeShowPasteConfirm(text);
 }
 
 function dismissPaste(): void {
@@ -1325,7 +1350,7 @@ $("#paste-dismiss").addEventListener("click", dismissPaste);
 $("#paste-close").addEventListener("click", dismissPaste);
 window.addEventListener("paste", (e) => {
   const text = e.clipboardData?.getData("text") ?? "";
-  maybeShowPasteConfirm(text);
+  handlePastedText(text);
 });
 // Esc closes the dialog (or cancels an in-flight fetch). The core shortcut
 // handler is disabled while the dialog is open, so this is the only Esc path.
@@ -1639,5 +1664,5 @@ window.__demo = {
   },
   pickAt: (x, y) => viewer.pickEntity(x, y),
   snapAt: (x, y) => viewer.snap(x, y),
-  simulatePaste: (text) => maybeShowPasteConfirm(text),
+  simulatePaste: (text) => handlePastedText(text),
 };
