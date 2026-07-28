@@ -20,11 +20,37 @@ const DXF_MARKER = "AutoCAD Binary DXF";
 const fixture = (name: string): string =>
   fileURLToPath(new URL(`../fixtures/${name}.ts`, import.meta.url));
 
-async function bundle(name: string): Promise<string> {
+/**
+ * How the repo's own apps resolve the workspace packages: aliased to source
+ * for instant HMR, subpaths first (a string alias matches prefixes and the
+ * first match wins).
+ *
+ * This is a second, independent resolution path, and it reads a different
+ * half of each `sideEffects` field — `./src/formats/*` rather than
+ * `./dist/formats/*`. A package that covers only the published layout drops
+ * its side-effect-only format module in every in-repo app, which is exactly
+ * how four example apps once shipped a viewer with no parser.
+ */
+const SOURCE_ALIAS = {
+  "@aspicio/core/dxf": pkgSrc("core/src/dxf.ts"),
+  "@aspicio/core": pkgSrc("core/src/index.ts"),
+  "@aspicio/elements/formats/dxf": pkgSrc("elements/src/formats/dxf.ts"),
+  "@aspicio/elements": pkgSrc("elements/src/index.ts"),
+  "@aspicio/react/formats/dxf": pkgSrc("react/src/formats/dxf.ts"),
+  "@aspicio/vue/formats/dxf": pkgSrc("vue/src/formats/dxf.ts"),
+  "@aspicio/svelte/formats/dxf": pkgSrc("svelte/src/formats/dxf.js"),
+};
+
+function pkgSrc(rel: string): string {
+  return fileURLToPath(new URL(`../../../packages/${rel}`, import.meta.url));
+}
+
+async function bundle(name: string, alias?: Record<string, string>): Promise<string> {
   const result = (await build({
     root: fileURLToPath(new URL("..", import.meta.url)),
     logLevel: "silent",
     configFile: false,
+    ...(alias ? { resolve: { alias } } : {}),
     build: {
       write: false,
       minify: false,
@@ -114,6 +140,17 @@ test.each(["react", "vue", "svelte"])(
   "the @aspicio/%s format entry survives bundling",
   async (veneer) => {
     expect(await bundle(`${veneer}-dxf`)).toContain(DXF_MARKER);
+  },
+  TIMEOUT,
+);
+
+// Both halves of `sideEffects` matter, because the repo consumes these
+// packages two ways. The published layout is covered above; this is the
+// source-aliased path every example app and the demo actually use.
+test.each(["elements", "react", "vue", "svelte"])(
+  "the %s format entry survives bundling from source too",
+  async (pkg) => {
+    expect(await bundle(`${pkg}-dxf`, SOURCE_ALIAS)).toContain(DXF_MARKER);
   },
   TIMEOUT,
 );

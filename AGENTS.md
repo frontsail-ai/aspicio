@@ -93,7 +93,10 @@ docs/             architecture, guidelines, product specs, releasing
   (`@aspicio/core/dxf`) must be listed **before** the bare
   `@aspicio/core` alias: a string alias matches prefixes and first match
   wins, so the bare one would otherwise rewrite the subpath to
-  `…/core/src/index.ts/dxf`.
+  `…/core/src/index.ts/dxf`. A package's `sideEffects` globs must cover
+  **both** layouts (`./dist/formats/*` and `./src/formats/*`): published
+  consumers resolve through `dist`, in-repo apps through source aliases,
+  and a dist-only glob silently drops side-effect modules in the latter.
 - Specs lead. Cite spec IDs (`VIEW-3`, `INV-2`) in plans, tests, and PRs;
   surface conflicts instead of silently editing either side. Full rules:
   [docs/guidelines.md](docs/guidelines.md).

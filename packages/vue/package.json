@@ -15,7 +15,8 @@
   ],
   "type": "module",
   "sideEffects": [
-    "./dist/formats/*"
+    "./dist/formats/*",
+    "./src/formats/*"
   ],
   "exports": {
     ".": "./dist/index.mjs",

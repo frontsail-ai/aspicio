@@ -21,6 +21,21 @@ That means the gate needs the packages **built**. The repo gate runs
 `dist` exists — hence this workspace's `build` script runs the gate, after
 its workspace dependencies have built.
 
+## Two resolution paths, both guarded
+
+The packages are consumed two ways, and each reads a different half of a
+`sideEffects` field:
+
+| Path                         | Resolves via               | Matches            |
+| ---------------------------- | -------------------------- | ------------------ |
+| Published consumer           | `node_modules` + `exports` | `./dist/formats/*` |
+| In-repo app (demo, examples) | Vite source aliases        | `./src/formats/*`  |
+
+A package that declares only the published half drops its side-effect-only
+format module in every in-repo app — which is how four example apps once
+built a viewer with no parser in it, passing every dev-server test and
+failing only the production-build smoke. Both paths have fixtures here.
+
 ## Why the fixtures are not type-checked
 
 Same reason, one step further: `vp check` runs before any build, so the
