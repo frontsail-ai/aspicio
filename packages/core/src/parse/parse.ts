@@ -502,7 +502,10 @@ export function parseDxfBytes(source: string | ArrayBuffer | Uint8Array): Drawin
 export function sniffDxf(bytes: Uint8Array): boolean {
   if (isBinaryDxf(bytes)) return true;
   // A group code is at most 4 digits; allow the leading whitespace real files
-  // pad with, and a UTF-8 BOM. One short line is all we need to look at.
+  // pad with, a UTF-8 BOM, and blank opening lines. Those blank lines make
+  // dxf-parser throw, so claiming the file changes nothing about whether it
+  // loads — it only buys the better of two errors: "Not a valid DXF file",
+  // which names the format, over "Not a supported drawing file" (PARSE-12).
   const head = new TextDecoder().decode(bytes.subarray(0, 64));
-  return /^\uFEFF?[ \t]*\d{1,4}[ \t]*\r?\n/.test(head);
+  return /^\uFEFF?(?:[ \t]*\r?\n)*[ \t]*\d{1,4}[ \t]*\r?\n/.test(head);
 }

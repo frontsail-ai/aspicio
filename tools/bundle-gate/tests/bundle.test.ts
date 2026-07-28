@@ -85,7 +85,10 @@ function entryGraph(specifier: string): string {
     seen.add(file);
     const code = readFileSync(file, "utf8");
     parts.push(code);
-    for (const match of code.matchAll(/(?:from|import)\s*"((?:\.|@aspicio\/)[^"]*)"/g)) {
+    // `\(?` catches `import("…")`: a lazily-loaded parser is still a parser
+    // on the entry, and it evades the bundled half entirely — an unused
+    // dynamic import tree-shakes away with the function that holds it.
+    for (const match of code.matchAll(/(?:from|import)\s*\(?\s*"((?:\.|@aspicio\/)[^"]*)"/g)) {
       const spec = match[1];
       if (!spec) continue;
       // Workspace siblings count: a leak in core reaches every package that

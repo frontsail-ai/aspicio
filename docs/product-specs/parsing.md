@@ -1,6 +1,7 @@
 # Parsing & document model
 
-Behavior of turning DXF input into the normalized drawing document.
+Behavior of turning drawing input into the normalized document. DXF's own
+rules are below; how a format gets chosen is PARSE-13.
 
 Prefix: `PARSE`.
 
@@ -8,8 +9,9 @@ Prefix: `PARSE`.
 
 ### PARSE-1: Accepted input forms
 
-A drawing loads from DXF text, a `File`/`Blob`, or an `ArrayBuffer`; bytes
-are decoded as UTF-8.
+A drawing loads from text, a `File`/`Blob`, an `ArrayBuffer`, or raw bytes;
+every form normalizes to bytes before a format is chosen (PARSE-13). DXF
+text is decoded as UTF-8.
 
 ### PARSE-2: Binary DXF is decoded
 

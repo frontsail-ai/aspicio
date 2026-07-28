@@ -129,6 +129,11 @@ test("sniffDxf claims group-code text and binary DXF, and nothing else", () => {
   expect(sniffDxf(enc("999\nA comment first\n0\nSECTION\n"))).toBe(true);
   expect(sniffDxf(enc("  0\r\nSECTION\r\n"))).toBe(true); // padded codes, CRLF
   expect(sniffDxf(enc("﻿0\nSECTION\n"))).toBe(true); // BOM
+  // Blank opening lines are claimed on purpose: dxf-parser rejects them, so
+  // this only decides which error the reader gets, and the DXF-specific one
+  // names the format they actually have.
+  expect(sniffDxf(enc("\n0\nSECTION\n"))).toBe(true);
+  expect(sniffDxf(enc("\r\n  \r\n0\nSECTION\n"))).toBe(true);
   expect(sniffDxf(enc("AutoCAD Binary DXF\r\n\x1a\x00rest"))).toBe(true);
 
   expect(sniffDxf(enc("<!doctype html><title>x</title>"))).toBe(false);
@@ -137,4 +142,14 @@ test("sniffDxf claims group-code text and binary DXF, and nothing else", () => {
   expect(sniffDxf(enc('{\n  "json": true\n}\n'))).toBe(false);
   expect(sniffDxf(new Uint8Array([0x00, 0x01, 0x02, 0x50, 0x4b]))).toBe(false);
   expect(sniffDxf(enc("12345\nsix digits is not a group code\n"))).toBe(false);
+});
+
+// A near-miss DXF should say so. dxf-parser throws on leading blank lines, so
+// such a file never loaded either way — but the error naming DXF is the more
+// useful of the two (PARSE-12).
+test("a DXF with leading blank lines fails as DXF, not as an unknown format", async () => {
+  const error = await parseWith([dxfParser], `\n${MINIMAL_DXF}`).catch((e: unknown) => e);
+  expect(error).toBeInstanceOf(DrawingParseError);
+  expect((error as DrawingParseError).message).toBe("Not a valid DXF file");
+  expect((error as DrawingParseError).format).toBe("dxf");
 });
