@@ -5,12 +5,13 @@
  * host would. Doubles as the browser test harness for @aspicio/elements.
  */
 import "@aspicio/elements";
-import type { DxfViewer, LayerInfo, ViewerStats } from "@aspicio/core";
+import "@aspicio/elements/formats/dxf";
+import type { DrawingViewer, LayerInfo, ViewerStats } from "@aspicio/core";
 
 declare global {
   interface Window {
     /** The live viewer instance, exposed for the browser console (and tests). */
-    __viewer?: DxfViewer | null;
+    __viewer?: DrawingViewer | null;
   }
 }
 
@@ -18,7 +19,7 @@ const embed = document.querySelector("aspicio-embed");
 const stats = document.getElementById("stats");
 
 embed?.addEventListener("viewer-change", (e) => {
-  window.__viewer = (e as CustomEvent<{ viewer: DxfViewer | null }>).detail.viewer;
+  window.__viewer = (e as CustomEvent<{ viewer: DrawingViewer | null }>).detail.viewer;
 });
 
 embed?.addEventListener("loaded", (e) => {

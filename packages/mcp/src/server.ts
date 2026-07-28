@@ -58,7 +58,7 @@ export function createServer(): McpServer {
       outputSchema: DRAWING_SUMMARY_SHAPE,
     },
     async ({ source }) => {
-      const summary = describeDxf(await loadDxf(source));
+      const summary = await describeDxf(await loadDxf(source));
       return {
         content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
         structuredContent: summary as unknown as Record<string, unknown>,
@@ -86,7 +86,7 @@ export function createServer(): McpServer {
       },
     },
     async ({ source, width }) => {
-      const png = renderPng(await loadDxf(source), width);
+      const png = await renderPng(await loadDxf(source), width);
       return {
         content: [
           { type: "image", data: Buffer.from(png).toString("base64"), mimeType: "image/png" },

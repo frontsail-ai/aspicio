@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { dashPolyline } from "../src/geom/dash.ts";
-import type { DxfDocument, Entity, LineTypeDef, Point2 } from "../src/model/types.ts";
+import type { DrawingDocument, Entity, LineTypeDef, Point2 } from "../src/model/types.ts";
 import { parseDxf } from "../src/parse/parse.ts";
 import { tessellate } from "../src/tessellate/tessellate.ts";
 
@@ -44,7 +44,7 @@ test("dots (0-length) still emit a short visible piece", () => {
 
 /* ---------- through the pipeline ---------- */
 
-function dashDoc(entities: Entity[], lineTypes: [string, LineTypeDef][]): DxfDocument {
+function dashDoc(entities: Entity[], lineTypes: [string, LineTypeDef][]): DrawingDocument {
   return {
     layers: new Map([
       ["0", { name: "0", color: 0xffffff, visible: true, frozen: false, entityCount: 0 }],

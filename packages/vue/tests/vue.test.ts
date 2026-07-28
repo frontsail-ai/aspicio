@@ -2,10 +2,11 @@
 import { mount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
-import type { DxfViewer } from "@aspicio/core";
-import { DxfEmbed } from "../src/DxfEmbed.ts";
-import { DxfLayerPanel } from "../src/DxfLayerPanel.ts";
-import { DxfPreview } from "../src/DxfPreview.ts";
+import type { DrawingViewer } from "@aspicio/core";
+import { AspicioEmbed } from "../src/AspicioEmbed.ts";
+import "../src/formats/dxf.ts";
+import { AspicioLayerPanel } from "../src/AspicioLayerPanel.ts";
+import { AspicioPreview } from "../src/AspicioPreview.ts";
 
 /* ---------- @aspicio/core double ---------- */
 
@@ -66,7 +67,7 @@ const mock = vi.hoisted(() => {
 });
 
 vi.mock("@aspicio/core", () => ({
-  DxfViewer: mock.MockViewer,
+  DrawingViewer: mock.MockViewer,
   attachShortcuts: (target: EventTarget, viewer: { fitView: () => void }) => {
     const onKey = (ev: Event): void => {
       if ((ev as KeyboardEvent).key.toLowerCase() === "f") viewer.fitView();
@@ -100,10 +101,10 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-/* ---------- DxfPreview ---------- */
+/* ---------- AspicioPreview ---------- */
 
 test("mounts a viewer and disposes on unmount", async () => {
-  const w = mount(DxfPreview, { attachTo: document.body });
+  const w = mount(AspicioPreview, { attachTo: document.body });
   await flush();
   expect(mock.instances).toHaveLength(1);
   expect(lastViewer().container).toBe(shadow(w.element).querySelector(".canvas-host"));
@@ -112,7 +113,7 @@ test("mounts a viewer and disposes on unmount", async () => {
 });
 
 test("loads src and emits `loaded` with layers and stats", async () => {
-  const w = mount(DxfPreview, { props: { src: "dxf-data" }, attachTo: document.body });
+  const w = mount(AspicioPreview, { props: { src: "dxf-data" }, attachTo: document.body });
   await flush();
   expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
   expect(lastViewer().load).toHaveBeenCalledTimes(1);
@@ -123,7 +124,7 @@ test("loads src and emits `loaded` with layers and stats", async () => {
 });
 
 test("srcUrl uses loadUrl; switching to src wins afterwards", async () => {
-  const w = mount(DxfPreview, { props: { srcUrl: "/plan.dxf" }, attachTo: document.body });
+  const w = mount(AspicioPreview, { props: { srcUrl: "/plan.dxf" }, attachTo: document.body });
   await flush();
   expect(lastViewer().loadUrl).toHaveBeenCalledWith("/plan.dxf");
   await w.setProps({ src: "dxf-data" });
@@ -135,7 +136,7 @@ test('switching srcUrl→src through Vue state loads the data (null coerces to "
   // The File-upload flow: start from a URL, then null the URL and set data.
   // Vue's patchDOMProp turns the null into "" on the element — which must
   // count as "no source", not as a URL to fetch.
-  const w = mount(DxfPreview, { props: { srcUrl: "/plan.dxf" }, attachTo: document.body });
+  const w = mount(AspicioPreview, { props: { srcUrl: "/plan.dxf" }, attachTo: document.body });
   await flush();
   expect(lastViewer().loadUrl).toHaveBeenCalledWith("/plan.dxf");
 
@@ -147,7 +148,7 @@ test('switching srcUrl→src through Vue state loads the data (null coerces to "
 });
 
 test("emits `load-error` for failed loads", async () => {
-  const w = mount(DxfPreview, { props: { src: "ok" }, attachTo: document.body });
+  const w = mount(AspicioPreview, { props: { src: "ok" }, attachTo: document.body });
   await flush();
   lastViewer().load.mockRejectedValueOnce(new Error("boom"));
   await w.setProps({ src: "broken" });
@@ -157,16 +158,16 @@ test("emits `load-error` for failed loads", async () => {
 });
 
 test("exposes the viewer and emits `viewer-change`", async () => {
-  const w = mount(DxfPreview, { attachTo: document.body });
+  const w = mount(AspicioPreview, { attachTo: document.body });
   await flush();
-  expect((w.vm as unknown as { viewer: DxfViewer }).viewer).toBe(
-    lastViewer() as unknown as DxfViewer,
+  expect((w.vm as unknown as { viewer: DrawingViewer }).viewer).toBe(
+    lastViewer() as unknown as DrawingViewer,
   );
   expect(w.emitted("viewer-change")?.[0]?.[0]).toBe(lastViewer());
 });
 
 test("showDownload=false hides the download control", async () => {
-  const w = mount(DxfPreview, { props: { showDownload: false }, attachTo: document.body });
+  const w = mount(AspicioPreview, { props: { showDownload: false }, attachTo: document.body });
   await flush();
   expect(shadow(w.element).querySelector('[aria-label="Download"]')).toBeNull();
   await w.setProps({ showDownload: true });
@@ -175,7 +176,7 @@ test("showDownload=false hides the download control", async () => {
 });
 
 test("shortcuts prop wires keyboard control", async () => {
-  const w = mount(DxfPreview, { props: { shortcuts: true }, attachTo: document.body });
+  const w = mount(AspicioPreview, { props: { shortcuts: true }, attachTo: document.body });
   await flush();
   const container = shadow(w.element).querySelector(".canvas-host") as HTMLElement;
   container.dispatchEvent(new KeyboardEvent("keydown", { key: "f", bubbles: true }));
@@ -184,7 +185,7 @@ test("shortcuts prop wires keyboard control", async () => {
 
 test("binding @hover-layer enables canvas hover-picking", async () => {
   const onHover = vi.fn();
-  const w = mount(DxfPreview, {
+  const w = mount(AspicioPreview, {
     props: { src: "dxf-data", "onHover-layer": onHover },
     attachTo: document.body,
   });
@@ -200,7 +201,7 @@ test("binding @hover-layer enables canvas hover-picking", async () => {
 });
 
 test("without a hover-layer listener, picking stays off", async () => {
-  const w = mount(DxfPreview, { props: { src: "dxf-data" }, attachTo: document.body });
+  const w = mount(AspicioPreview, { props: { src: "dxf-data" }, attachTo: document.body });
   await flush();
   const container = shadow(w.element).querySelector(".canvas-host") as HTMLElement;
   container.dispatchEvent(
@@ -210,10 +211,10 @@ test("without a hover-layer listener, picking stays off", async () => {
   expect(lastViewer().pickLayer).not.toHaveBeenCalled();
 });
 
-/* ---------- DxfEmbed ---------- */
+/* ---------- AspicioEmbed ---------- */
 
 test("renders panel and preview together and loads src", async () => {
-  const w = mount(DxfEmbed, { props: { src: "dxf-data" }, attachTo: document.body });
+  const w = mount(AspicioEmbed, { props: { src: "dxf-data" }, attachTo: document.body });
   await flush();
   expect(lastViewer().load).toHaveBeenCalledWith("dxf-data");
   const panel = embedShadow(w).querySelector("aspicio-layer-panel");
@@ -223,7 +224,7 @@ test("renders panel and preview together and loads src", async () => {
 });
 
 test("panel=right docks after the preview; panel=none hides it", async () => {
-  const w = mount(DxfEmbed, {
+  const w = mount(AspicioEmbed, {
     props: { src: "dxf-data", panel: "right" },
     attachTo: document.body,
   });
@@ -236,12 +237,12 @@ test("panel=right docks after the preview; panel=none hides it", async () => {
 });
 
 test("themed embeds default to a transparent canvas; explicit background wins", async () => {
-  mount(DxfEmbed, { props: { src: "dxf-data" }, attachTo: document.body });
+  mount(AspicioEmbed, { props: { src: "dxf-data" }, attachTo: document.body });
   await flush();
   expect(lastViewer().options).toMatchObject({ background: null });
 
   mock.instances.length = 0;
-  mount(DxfEmbed, {
+  mount(AspicioEmbed, {
     props: { src: "dxf-data", options: { background: 0x112233 } },
     attachTo: document.body,
   });
@@ -250,7 +251,7 @@ test("themed embeds default to a transparent canvas; explicit background wins", 
 });
 
 test("panelStyle reaches the inner panel via CSSOM", async () => {
-  const w = mount(DxfEmbed, {
+  const w = mount(AspicioEmbed, {
     props: { src: "dxf-data", panelStyle: { width: "300px" } },
     attachTo: document.body,
   });
@@ -260,17 +261,17 @@ test("panelStyle reaches the inner panel via CSSOM", async () => {
 });
 
 test("re-emits loaded / viewer-change and exposes the viewer", async () => {
-  const w = mount(DxfEmbed, { props: { src: "dxf-data" }, attachTo: document.body });
+  const w = mount(AspicioEmbed, { props: { src: "dxf-data" }, attachTo: document.body });
   await flush();
   expect(w.emitted("loaded")).toHaveLength(1);
   expect(w.emitted("viewer-change")?.[0]?.[0]).toBe(lastViewer());
-  expect((w.vm as unknown as { viewer: DxfViewer }).viewer).toBe(
-    lastViewer() as unknown as DxfViewer,
+  expect((w.vm as unknown as { viewer: DrawingViewer }).viewer).toBe(
+    lastViewer() as unknown as DrawingViewer,
   );
 });
 
 test("canvas hover reverse-highlights the matching panel row", async () => {
-  const w = mount(DxfEmbed, { props: { src: "dxf-data" }, attachTo: document.body });
+  const w = mount(AspicioEmbed, { props: { src: "dxf-data" }, attachTo: document.body });
   await flush();
   const preview = embedShadow(w).querySelector("aspicio-preview");
   const container = shadow(preview).querySelector(".canvas-host") as HTMLElement;
@@ -287,14 +288,14 @@ test("canvas hover reverse-highlights the matching panel row", async () => {
   expect(reversed?.querySelector(".name")?.textContent?.trim()).toBe("CUT");
 });
 
-/* ---------- DxfLayerPanel ---------- */
+/* ---------- AspicioLayerPanel ---------- */
 
 test("drives the viewer through the panel, unwrapping reactive proxies", async () => {
   const raw = new mock.MockViewer(document.createElement("div"));
   // A viewer held in reactive state arrives as a proxy — the veneer must
   // hand the element the raw instance.
-  const proxied = reactive(raw) as unknown as DxfViewer;
-  const w = mount(DxfLayerPanel, { props: { viewer: proxied }, attachTo: document.body });
+  const proxied = reactive(raw) as unknown as DrawingViewer;
+  const w = mount(AspicioLayerPanel, { props: { viewer: proxied }, attachTo: document.body });
   await flush();
   const el = w.element as Element & { viewer: unknown };
   expect(el.viewer).toBe(raw);
@@ -303,8 +304,8 @@ test("drives the viewer through the panel, unwrapping reactive proxies", async (
 });
 
 test("reverseHighlightLayer and hints flow through", async () => {
-  const viewer = new mock.MockViewer(document.createElement("div")) as unknown as DxfViewer;
-  const w = mount(DxfLayerPanel, {
+  const viewer = new mock.MockViewer(document.createElement("div")) as unknown as DrawingViewer;
+  const w = mount(AspicioLayerPanel, {
     props: { viewer, reverseHighlightLayer: "CUT", hints: false },
     attachTo: document.body,
   });

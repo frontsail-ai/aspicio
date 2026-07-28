@@ -64,3 +64,23 @@ tarballs.
 
 READMEs, skills, and tool descriptions state only shipped behavior; drift
 guards tie taught API names to the source that defines them.
+
+### INV-11: Format parsers live behind their own entry point
+
+A format's parser is reachable only through a dedicated entry point
+(`@aspicio/core/dxf`, `@aspicio/elements/formats/dxf`, and the matching
+subpath on each framework binding). The root entries of `@aspicio/core`
+and the binding packages contain no parser and imply no format, so a
+consumer of one format never ships another format's code. Separation is
+guaranteed by module boundaries, never by bundler tree-shaking, and is
+proven by a bundle-composition gate that runs inside the repo gate for
+every published frontend package.
+
+### INV-12: A name carries "Dxf" iff the thing is DXF-specific
+
+Format-neutral types read `Drawing*` (`DrawingDocument`, `DrawingParser`,
+`DrawingParseError`); product-level components and themes read `Aspicio*`;
+only DXF-specific API keeps `Dxf` (`parseDxf`, `binaryDxfToText`, the
+`/dxf` entry points). Names that are external contracts — npm package
+names, custom element tags, MCP tool names, HTTP paths — are exempt: they
+are stable regardless of what they describe.

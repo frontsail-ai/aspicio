@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { ocsToWcs } from "../src/geom/ocs.ts";
-import type { DxfDocument, Entity } from "../src/model/types.ts";
+import type { DrawingDocument, Entity } from "../src/model/types.ts";
 import { parseDxf } from "../src/parse/parse.ts";
 import { tessellate } from "../src/tessellate/tessellate.ts";
 
@@ -29,7 +29,10 @@ test("tilted normal projects OCS axes onto the view plane", () => {
 
 /* ---------- mirrored entities through the pipeline ---------- */
 
-function makeDoc(entities: Entity[], blocks: DxfDocument["blocks"] = new Map()): DxfDocument {
+function makeDoc(
+  entities: Entity[],
+  blocks: DrawingDocument["blocks"] = new Map(),
+): DrawingDocument {
   return {
     layers: new Map([
       ["0", { name: "0", color: 0xffffff, visible: true, frozen: false, entityCount: 0 }],

@@ -1,7 +1,8 @@
-import { DxfViewer, attachShortcuts } from "@aspicio/core";
-import type { DxfSource, DxfViewerOptions, LayerInfo, ViewerStats } from "@aspicio/core";
+import { DrawingParseError, DrawingViewer, attachShortcuts } from "@aspicio/core";
+import type { DrawingSource, DrawingViewerOptions, LayerInfo, ViewerStats } from "@aspicio/core";
 import { LitElement, css, html, nothing } from "lit";
 import type { PropertyValues, TemplateResult } from "lit";
+import { registeredFormats } from "./formats.ts";
 import { tokenStyles } from "./theme.ts";
 
 /** Payload of the `loaded` event. */
@@ -17,7 +18,7 @@ export interface LoadedDetail {
  * Attributes: `src-url`, `no-download`, `shortcuts`, `hover-pick`.
  * Properties: `src` (text | File | Blob | ArrayBuffer), `options`
  * (applied at creation; changing them recreates the viewer), and the
- * readonly `viewer` (the full DxfViewer for camera control, layer
+ * readonly `viewer` (the full DrawingViewer for camera control, layer
  * toggling, hit-testing, exports). Between `src` and `src-url`, the most
  * recently set source wins; if both are set at creation, `src-url` does.
  * Events: `loaded` ({layers, stats}), `load-error` ({error}),
@@ -35,16 +36,16 @@ export class AspicioPreview extends LitElement {
     _viewerReady: { state: true },
   };
 
-  declare src: DxfSource | null;
+  declare src: DrawingSource | null;
   declare srcUrl: string | null;
-  declare options: DxfViewerOptions | undefined;
+  declare options: DrawingViewerOptions | undefined;
   declare noDownload: boolean;
   declare shortcuts: boolean;
   declare hoverPick: boolean;
   declare _downloadOpen: boolean;
   declare _viewerReady: boolean;
 
-  #viewer: DxfViewer | null = null;
+  #viewer: DrawingViewer | null = null;
   #firstCycleDone = false;
   /** Which source was set most recently — the one loads use (ELEM-3). */
   #activeSource: "src" | "url" | null = null;
@@ -66,8 +67,8 @@ export class AspicioPreview extends LitElement {
     this._viewerReady = false;
   }
 
-  /** The live DxfViewer instance, or null before first render / after disconnect. */
-  get viewer(): DxfViewer | null {
+  /** The live DrawingViewer instance, or null before first render / after disconnect. */
+  get viewer(): DrawingViewer | null {
     return this.#viewer;
   }
 
@@ -196,10 +197,13 @@ export class AspicioPreview extends LitElement {
     const container = this.#container;
     if (!container) return;
     this.#appliedOptionsKey = JSON.stringify(this.options ?? {});
-    const instance = new DxfViewer(
-      container,
-      JSON.parse(this.#appliedOptionsKey) as DxfViewerOptions,
-    );
+    const instance = new DrawingViewer(container, {
+      ...(JSON.parse(this.#appliedOptionsKey) as DrawingViewerOptions),
+      // Deliberately outside the serialized comparison key: the registry is a
+      // live array, not host-supplied data, so importing a format must never
+      // count as an options change and tear down the WebGL context (ELEM-9).
+      parsers: registeredFormats(),
+    });
     this.#viewer = instance;
     this._viewerReady = true;
     this.#emit("viewer-change", { viewer: instance });
@@ -224,10 +228,18 @@ export class AspicioPreview extends LitElement {
     const viewer = this.#viewer;
     if (!viewer || this.#activeSource == null) return;
     const token = ++this.#loadToken;
+    // The core error names the core entry point; a host of these components
+    // needs the elements one instead (ELEM-9).
     const loading =
-      this.#activeSource === "url"
-        ? viewer.loadUrl(this.srcUrl as string)
-        : viewer.load(this.src as DxfSource);
+      registeredFormats().length === 0
+        ? Promise.reject(
+            new DrawingParseError(
+              'No formats imported — add `import "@aspicio/elements/formats/dxf"`',
+            ),
+          )
+        : this.#activeSource === "url"
+          ? viewer.loadUrl(this.srcUrl as string)
+          : viewer.load(this.src as DrawingSource);
     loading
       .then(() => {
         if (token !== this.#loadToken || viewer !== this.#viewer) return; // superseded

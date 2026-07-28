@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { DxfParseError, parseDxf, parseDxfBytes } from "../src/parse/parse.ts";
+import { DrawingParseError } from "../src/parse/errors.ts";
+import { parseDxf, parseDxfBytes } from "../src/parse/parse.ts";
 
 /** Build a DXF from (code, value) pairs. */
 function dxf(...pairs: (string | number)[]): string {
@@ -378,7 +379,7 @@ test("invalid input yields a clean, honest error (never a raw parser message)", 
     } catch (e) {
       thrown = e;
     }
-    expect(thrown, `should throw for ${JSON.stringify(src)}`).toBeInstanceOf(DxfParseError);
+    expect(thrown, `should throw for ${JSON.stringify(src)}`).toBeInstanceOf(DrawingParseError);
     expect((thrown as Error).message).toBe("Not a valid DXF file");
   }
 });
@@ -391,7 +392,7 @@ test("empty and whitespace-only input reads as empty, not invalid", () => {
     } catch (e) {
       thrown = e;
     }
-    expect(thrown).toBeInstanceOf(DxfParseError);
+    expect(thrown).toBeInstanceOf(DrawingParseError);
     expect((thrown as Error).message).toBe("The file is empty");
   }
 });

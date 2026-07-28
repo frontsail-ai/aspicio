@@ -14,7 +14,9 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "paths": {
+      "@aspicio/core/dxf": ["../core/src/dxf.ts"],
       "@aspicio/core": ["../core/src/index.ts"],
+      "@aspicio/elements/formats/dxf": ["../elements/src/formats/dxf.ts"],
       "@aspicio/elements": ["../elements/src/index.ts"]
     },
     "verbatimModuleSyntax": true,

@@ -4,7 +4,7 @@ import { binaryDxfToText, isBinaryDxf } from "./binary.ts";
 import { DEFAULT_CURVE_SEGMENTS, sampleArc, sampleBulge } from "../geom/arc.ts";
 import type {
   BlockDef,
-  DxfDocument,
+  DrawingDocument,
   Entity,
   HatchEntity,
   LayerInfo,
@@ -18,6 +18,7 @@ import type {
 } from "../model/types.ts";
 import { decodeTextSpecials, stripMText } from "../text/layout.ts";
 import { unitLabel } from "../units.ts";
+import { DrawingParseError } from "./errors.ts";
 import { HatchHandler } from "./hatch.ts";
 import type { HatchBoundary, RawHatchEntity } from "./hatch.ts";
 import { ViewportHandler } from "./viewport.ts";
@@ -26,23 +27,23 @@ import type { RawViewport } from "./viewport.ts";
 const DEG2RAD = Math.PI / 180;
 const DEFAULT_COLOR = 0xffffff;
 
-/**
- * A parse failure phrased for a person. dxf-parser's own messages are library
- * internals that mislead — "Empty file" fires for any single-line non-empty
- * input, and "Unexpected end of input: EOF group not read…" is jargon — so we
- * never surface them (PARSE-12). Callers on every surface (viewer, API, MCP)
- * show `message` directly.
- */
-export class DxfParseError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "DxfParseError";
-  }
-}
+/** This parser's format name, as carried by its errors (PARSE-13). */
+export const DXF_FORMAT = "dxf";
 
-/** Empty (or whitespace-only) input reads as empty; anything else is invalid. */
-function parseError(text: string): DxfParseError {
-  return new DxfParseError(text.trim().length === 0 ? "The file is empty" : "Not a valid DXF file");
+/**
+ * Empty (or whitespace-only) input reads as empty; anything else is invalid.
+ *
+ * dxf-parser's own messages are library internals that mislead — "Empty file"
+ * fires for any single-line non-empty input, and "Unexpected end of input: EOF
+ * group not read…" is jargon — so we never surface them (PARSE-12). The error
+ * carries "dxf" as its format: this parser claimed the bytes and then rejected
+ * them, which is a different report than "no parser claimed it".
+ */
+function parseError(text: string): DrawingParseError {
+  return new DrawingParseError(
+    text.trim().length === 0 ? "The file is empty" : "Not a valid DXF file",
+    DXF_FORMAT,
+  );
 }
 
 function point2(p: { x?: number; y?: number } | undefined): Point2 {
@@ -380,7 +381,7 @@ function runParser(text: string): ReturnType<DxfParser["parseSync"]> {
 }
 
 /** Parse DXF text into the normalized Aspicio document model. */
-export function parseDxf(text: string): DxfDocument {
+export function parseDxf(text: string): DrawingDocument {
   let dxf: ReturnType<DxfParser["parseSync"]>;
   try {
     dxf = runParser(text);
@@ -482,8 +483,26 @@ export function parseDxf(text: string): DxfDocument {
  * as UTF-8, which also covers ASCII; pre-2007 files using an ANSI code page
  * ($DWGCODEPAGE) will decode non-ASCII text as U+FFFD.
  */
-export function parseDxfBytes(source: string | ArrayBuffer | Uint8Array): DxfDocument {
+export function parseDxfBytes(source: string | ArrayBuffer | Uint8Array): DrawingDocument {
   if (typeof source === "string") return parseDxf(source);
   const bytes = source instanceof Uint8Array ? source : new Uint8Array(source);
   return parseDxf(isBinaryDxf(bytes) ? binaryDxfToText(bytes) : new TextDecoder().decode(bytes));
+}
+
+/**
+ * True when `bytes` look like DXF — the registry's sniff for this format
+ * (PARSE-13).
+ *
+ * DXF text has no magic number, so the test is the shape of its first record:
+ * a group code on its own line. That accepts the two real-world openings (a
+ * `999` comment or `0`/`SECTION`) and rejects prose, markup, and other binary
+ * formats, which is the line PARSE-12 draws between "not a supported drawing
+ * file" and "not a valid DXF file". Binary DXF is claimed by its sentinel.
+ */
+export function sniffDxf(bytes: Uint8Array): boolean {
+  if (isBinaryDxf(bytes)) return true;
+  // A group code is at most 4 digits; allow the leading whitespace real files
+  // pad with, and a UTF-8 BOM. One short line is all we need to look at.
+  const head = new TextDecoder().decode(bytes.subarray(0, 64));
+  return /^\uFEFF?[ \t]*\d{1,4}[ \t]*\r?\n/.test(head);
 }

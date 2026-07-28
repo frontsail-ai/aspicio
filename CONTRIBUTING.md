@@ -28,6 +28,11 @@ just check     # the repo gate (vp run ready)
 
 ## Testing
 
+- **Bundle gate** (`tools/bundle-gate/`, Vitest driving real Vite
+  builds): proves a single-format consumer bundles no other format's
+  code (INV-11). It runs in the `build` phase, because it resolves the
+  packages through their published `exports`/`sideEffects` maps rather
+  than source aliases.
 - **Unit tests** (`packages/core/tests/`, plus the binding packages
   `packages/{elements,react,vue,svelte}/tests/`, Vitest): parsing,
   geometry math, tessellation, camera invariants, gestures (happy-dom),

@@ -11,12 +11,12 @@ Try the viewer live at [aspicio.frontsail.app](https://aspicio.frontsail.app/).
 npm install @aspicio/react react three   # @aspicio/core comes along; react 18/19 and three (>=0.184) are peers
 ```
 
-- `<DxfEmbed>` — batteries included: layer list + interactive preview in one
+- `<AspicioEmbed>` — batteries included: layer list + interactive preview in one
   component.
-- `<DxfPreview>` — the embeddable canvas alone: pan/zoom/rotate (mouse and
+- `<AspicioPreview>` — the embeddable canvas alone: pan/zoom/rotate (mouse and
   multi-touch), animated fit, batched WebGL rendering. No chrome. Pass
   `onHoverLayer` to hit-test the layer under the cursor.
-- `<DxfLayerPanel>` — the ready-made layer list, identical to the demo app:
+- `<AspicioLayerPanel>` — the ready-made layer list, identical to the demo app:
   header with layer count, visibility checkboxes, effective-color swatches,
   entity counts, hover-to-highlight, double-click-to-solo (with a banner),
   and a gesture-hints footer. `theme="none"` renders a minimal unstyled list.
@@ -24,18 +24,19 @@ npm install @aspicio/react react three   # @aspicio/core comes along; react 18/1
 ## One component
 
 ```tsx
-import { DxfEmbed } from "@aspicio/react";
+import { AspicioEmbed } from "@aspicio/react";
+import "@aspicio/react/formats/dxf";
 
 // file: File | Blob | ArrayBuffer | string (DXF text) — or use srcUrl
-<DxfEmbed src={file} style={{ height: 480 }} />;
+<AspicioEmbed src={file} style={{ height: 480 }} />;
 ```
 
 Props: `panel="left" | "right" | "none"`, `panelStyle`, `options`,
-`onLoaded`, `onError`, plus a `ref` exposing the full `DxfViewer`.
+`onLoaded`, `onError`, plus a `ref` exposing the full `DrawingViewer`.
 
 ### Theming
 
-`DxfEmbed` and `DxfLayerPanel` ship with the Aspicio demo look by default —
+`AspicioEmbed` and `AspicioLayerPanel` ship with the Aspicio demo look by default —
 dark panel, blueprint grid behind a transparent canvas, hover states. Pass
 `theme="none"` to drop the chrome for a minimal structure.
 
@@ -58,17 +59,17 @@ elsewhere.
 
 ```tsx
 import { useRef, useState } from "react";
-import type { DxfViewer } from "@aspicio/core";
-import { DxfLayerPanel, DxfPreview } from "@aspicio/react";
+import type { DrawingViewer } from "@aspicio/core";
+import { AspicioLayerPanel, AspicioPreview } from "@aspicio/react";
 
 export function DrawingPage({ url }: { url: string }) {
-  const viewerRef = useRef<DxfViewer>(null);
-  const [viewer, setViewer] = useState<DxfViewer | null>(null);
+  const viewerRef = useRef<DrawingViewer>(null);
+  const [viewer, setViewer] = useState<DrawingViewer | null>(null);
 
   return (
     <div style={{ display: "flex", height: 480 }}>
-      <DxfLayerPanel viewer={viewer} style={{ width: 220 }} />
-      <DxfPreview
+      <AspicioLayerPanel viewer={viewer} style={{ width: 220 }} />
+      <AspicioPreview
         ref={viewerRef}
         srcUrl={url}
         options={{ background: 0x16181d }}
@@ -104,3 +105,11 @@ Notes:
   "open at this view" links. The demo's `viewurl.ts` is a full reference.
 - StrictMode and SSR safe: the viewer is created only after mount (the
   underlying elements are import-safe in Node) and disposed on unmount.
+
+## Migrating from 0.x
+
+Two breaking changes ship together:
+
+1. **Formats are opted into by import.** Add `import "@aspicio/react/formats/dxf";` once —
+   without it every load fails with an error saying exactly that.
+2. **Format-neutral names dropped their `Dxf` prefix**: `<DxfEmbed>` / `<DxfPreview>` / `<DxfLayerPanel>` → `<AspicioEmbed>` / `<AspicioPreview>` / `<AspicioLayerPanel>`, `DxfTheme` → `AspicioTheme`, and `DxfViewer` → `DrawingViewer`.

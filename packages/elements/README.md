@@ -28,6 +28,7 @@ npm install @aspicio/elements three   # @aspicio/core and lit come along; three 
 ```html
 <script type="module">
   import "@aspicio/elements"; // registers the elements
+  import "@aspicio/elements/formats/dxf"; // opts into the DXF format
 </script>
 
 <aspicio-embed src-url="/drawing.dxf" style="height: 480px"></aspicio-embed>
@@ -37,7 +38,7 @@ Attributes: `src-url`, `panel` (`left` | `right` | `none`), `theme`
 (`aspicio` | `none`), `no-download`, `shortcuts`. Rich data goes through
 properties: `src` (DXF text | File | Blob | ArrayBuffer), `options`
 (viewer options), `panelStyle` (style object applied to the inner
-panel). The readonly `viewer` property exposes the full `DxfViewer`.
+panel). The readonly `viewer` property exposes the full `DrawingViewer`.
 
 Events (all `CustomEvent`s dispatched on the element):
 
@@ -148,3 +149,11 @@ used.
   module is safe to import in SSR (Node) environments — the viewer is
   only created in the browser. See `apps/elements-example` for a full
   setup.
+
+## Migrating from 0.x
+
+Two breaking changes ship together:
+
+1. **Formats are opted into by import.** Add `import "@aspicio/elements/formats/dxf";` once —
+   without it every load fails with an error saying exactly that.
+2. **Format-neutral names dropped their `Dxf` prefix**: `DxfTheme` → `AspicioTheme`. The element tag names are unchanged.

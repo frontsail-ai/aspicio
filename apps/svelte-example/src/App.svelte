@@ -1,11 +1,12 @@
 <!--
-  Minimal real-world usage of the Svelte bindings: <DxfEmbed> renders the
+  Minimal real-world usage of the Svelte bindings: <AspicioEmbed> renders the
   layer panel + interactive viewer from a URL, with keyboard shortcuts on.
   Doubles as the browser test harness for the embed.
 -->
 <script lang="ts">
-  import type { DxfViewer, ViewerStats } from "@aspicio/core";
-  import { DxfEmbed } from "@aspicio/svelte";
+  import type { DrawingViewer, ViewerStats } from "@aspicio/core";
+  import { AspicioEmbed } from "@aspicio/svelte";
+  import "@aspicio/svelte/formats/dxf";
   import type { LoadedInfo } from "@aspicio/svelte";
 
   let stats: ViewerStats | null = $state(null);
@@ -26,11 +27,11 @@
     </span>
   </header>
   <main style="flex: 1; min-height: 0; padding: 16px;">
-    <DxfEmbed
+    <AspicioEmbed
       srcUrl="/sample.dxf"
       shortcuts
       style="height: 100%; border-radius: 8px;"
-      onviewerchange={(viewer: DxfViewer | null) => {
+      onviewerchange={(viewer: DrawingViewer | null) => {
         window.__viewer = viewer ?? undefined;
       }}
       onloaded={(info: LoadedInfo) => {

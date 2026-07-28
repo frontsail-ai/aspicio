@@ -1,6 +1,12 @@
-import type { DxfSource, DxfViewer, DxfViewerOptions, LayerInfo, ViewerStats } from "@aspicio/core";
+import type {
+  DrawingSource,
+  DrawingViewer,
+  DrawingViewerOptions,
+  LayerInfo,
+  ViewerStats,
+} from "@aspicio/core";
 import "@aspicio/elements";
-import type { AspicioPreview } from "@aspicio/elements";
+import type { AspicioPreview as AspicioPreviewElement } from "@aspicio/elements";
 import { defineComponent, getCurrentInstance, h, ref, toRaw } from "vue";
 import type { PropType } from "vue";
 
@@ -13,23 +19,23 @@ export interface LoadedInfo {
 /**
  * Chrome-less embeddable DXF viewer — a thin Vue veneer over the
  * framework-neutral `<aspicio-preview>` element from @aspicio/elements.
- * The exposed `viewer` (via template ref) is the full DxfViewer for
+ * The exposed `viewer` (via template ref) is the full DrawingViewer for
  * camera control, layer toggling, and hit-testing; pair with
- * DxfLayerPanel for a ready-made layer list.
+ * AspicioLayerPanel for a ready-made layer list.
  *
  * Emits: `loaded` ({layers, stats}), `load-error` (Error),
- * `viewer-change` (DxfViewer | null), `hover-layer` (string | null —
+ * `viewer-change` (DrawingViewer | null), `hover-layer` (string | null —
  * binding a listener enables canvas hover-picking).
  */
-export const DxfPreview = defineComponent({
-  name: "DxfPreview",
+export const AspicioPreview = defineComponent({
+  name: "AspicioPreview",
   props: {
     /** DXF data: text, File, Blob, or ArrayBuffer. The most recently set of src/srcUrl wins. */
-    src: { type: [String, Object] as PropType<DxfSource | null>, default: null },
+    src: { type: [String, Object] as PropType<DrawingSource | null>, default: null },
     /** URL to fetch a DXF from. The most recently set of src/srcUrl wins. */
     srcUrl: { type: String as PropType<string | null>, default: null },
     /** Viewer options, applied at creation (changing them recreates the viewer). */
-    options: { type: Object as PropType<DxfViewerOptions | undefined>, default: undefined },
+    options: { type: Object as PropType<DrawingViewerOptions | undefined>, default: undefined },
     /** Show the built-in Download control (SVG / PNG export). */
     showDownload: { type: Boolean, default: true },
     /** Keyboard shortcuts on the focused viewer: F fit, +/- zoom, R reset, A show all. */
@@ -40,11 +46,11 @@ export const DxfPreview = defineComponent({
   emits: {
     loaded: (_info: LoadedInfo) => true,
     "load-error": (_error: Error) => true,
-    "viewer-change": (_viewer: DxfViewer | null) => true,
+    "viewer-change": (_viewer: DrawingViewer | null) => true,
     "hover-layer": (_layer: string | null) => true,
   },
   setup(props, { emit, expose }) {
-    const el = ref<AspicioPreview | null>(null);
+    const el = ref<AspicioPreviewElement | null>(null);
     // Hover picking auto-enables when a hover-layer listener is bound
     // (parity with @aspicio/react's onHoverLayer behavior). Listener keys
     // arrive camelized from templates and hyphenated from h() callers.
@@ -52,8 +58,8 @@ export const DxfPreview = defineComponent({
     const hoverBound = "onHover-layer" in vnodeProps || "onHoverLayer" in vnodeProps;
 
     expose({
-      /** The live DxfViewer instance, or null before mount / after unmount. */
-      get viewer(): DxfViewer | null {
+      /** The live DrawingViewer instance, or null before mount / after unmount. */
+      get viewer(): DrawingViewer | null {
         return el.value?.viewer ?? null;
       },
     });
@@ -73,7 +79,7 @@ export const DxfPreview = defineComponent({
         "onLoad-error": (e: Event) =>
           emit("load-error", (e as CustomEvent<{ error: Error }>).detail.error),
         "onViewer-change": (e: Event) =>
-          emit("viewer-change", (e as CustomEvent<{ viewer: DxfViewer | null }>).detail.viewer),
+          emit("viewer-change", (e as CustomEvent<{ viewer: DrawingViewer | null }>).detail.viewer),
         "onHover-layer": (e: Event) =>
           emit("hover-layer", (e as CustomEvent<{ layer: string | null }>).detail.layer),
       });

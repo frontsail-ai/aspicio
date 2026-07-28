@@ -21,7 +21,7 @@ async function focusEmbed(page: Page): Promise<void> {
 test("the embed renders the drawing with a layer panel", async ({ page }) => {
   await loadEmbed(page);
   await expect(canvas(page)).toBeVisible();
-  await expect(page.locator("li")).toHaveCount(6); // DxfLayerPanel rows
+  await expect(page.locator("li")).toHaveCount(6); // AspicioLayerPanel rows
   await expect(page.locator("header")).toContainText("21 ENT");
 });
 

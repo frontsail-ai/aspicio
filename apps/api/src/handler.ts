@@ -1,4 +1,5 @@
-import { describeDrawing, parseDxfBytes, tessellate, tessellationToSvg } from "@aspicio/core";
+import { describeDrawing, parseWith, tessellate, tessellationToSvg } from "@aspicio/core";
+import { dxfParser } from "@aspicio/core/dxf";
 import { fetchDxf, HttpError, MAX_BYTES } from "./fetch.ts";
 import { handleMcp } from "./mcp.ts";
 import { openapi } from "./openapi.ts";
@@ -41,8 +42,10 @@ async function resolveDxf(req: Request, url: URL): Promise<Uint8Array> {
   return fetchDxf(src);
 }
 
-function handleDescribe(bytes: Uint8Array): Response {
-  const doc = parseDxfBytes(bytes);
+async function handleDescribe(bytes: Uint8Array): Promise<Response> {
+  // DXF-only endpoint: one parser in, so anything else is honestly
+  // reported as unsupported rather than mis-parsed (PARSE-13).
+  const doc = await parseWith([dxfParser], bytes);
   return json(describeDrawing(doc, tessellate(doc, {})));
 }
 
@@ -56,7 +59,7 @@ async function handleRender(bytes: Uint8Array, url: URL, renderPng: RenderPng): 
     throw new HttpError(400, "bg must be a hex color like %23rrggbb, or none");
   const background = bgParam === "none" ? undefined : (bgParam ?? DEFAULT_BG);
 
-  const doc = parseDxfBytes(bytes);
+  const doc = await parseWith([dxfParser], bytes);
   const svg = tessellationToSvg(tessellate(doc, {}), undefined, background ? { background } : {});
 
   if (format === "svg")
@@ -133,7 +136,7 @@ export async function handleRequest(
         // for Claude.ai and other web clients.
         return await handleMcp(req, renderPng, widgetHtml);
       case "/describe":
-        return handleDescribe(await resolveDxf(req, url));
+        return await handleDescribe(await resolveDxf(req, url));
       case "/render":
         // `await` matters: without it a rejection inside handleRender would
         // escape this try/catch and surface as an unhandled 500.

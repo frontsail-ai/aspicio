@@ -7,8 +7,14 @@ export default defineConfig({
   test: {
     // Resolve the workspace dependencies from source so tests don't require
     // a prior `vp run build` (CI runs tests first).
+    // Subpaths first: a string alias matches prefixes and the first match
+    // wins, so a bare entry would otherwise swallow "@aspicio/core/dxf".
     alias: {
+      "@aspicio/core/dxf": fileURLToPath(new URL("../core/src/dxf.ts", import.meta.url)),
       "@aspicio/core": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)),
+      "@aspicio/elements/formats/dxf": fileURLToPath(
+        new URL("../elements/src/formats/dxf.ts", import.meta.url),
+      ),
       "@aspicio/elements": fileURLToPath(new URL("../elements/src/index.ts", import.meta.url)),
     },
   },

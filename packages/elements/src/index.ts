@@ -18,7 +18,7 @@ export { AspicioLayerPanel } from "./aspicio-layer-panel.ts";
 export { AspicioPreview } from "./aspicio-preview.ts";
 export type { LoadedDetail } from "./aspicio-preview.ts";
 export { aspicioTokens } from "./theme.ts";
-export type { DxfTheme } from "./theme.ts";
+export type { AspicioTheme } from "./theme.ts";
 
 // Guarded registration: safe under repeated imports (two bundles on one
 // page) and under Node's SSR shim, which provides a customElements stub.

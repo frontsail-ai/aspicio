@@ -5,6 +5,10 @@ export default defineConfig({
   resolve: {
     alias: {
       // Consume core from source for instant HMR during development.
+      // Subpaths first: a string alias matches prefixes, first match wins.
+      "@aspicio/core/dxf": fileURLToPath(
+        new URL("../../packages/core/src/dxf.ts", import.meta.url),
+      ),
       "@aspicio/core": fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
     },
   },

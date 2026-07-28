@@ -1,7 +1,7 @@
 import { css } from "lit";
 
 /** Visual theme for the ready-made elements. */
-export type DxfTheme = "aspicio" | "none";
+export type AspicioTheme = "aspicio" | "none";
 
 /**
  * Design tokens lifted from the Aspicio demo app, exposed as CSS custom

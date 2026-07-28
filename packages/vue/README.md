@@ -12,12 +12,12 @@ Svelte, and plain-HTML embeds share one implementation and one look
 npm install @aspicio/vue vue three   # @aspicio/core and @aspicio/elements come along; vue 3.4+ and three (>=0.184) are peers
 ```
 
-- `<DxfEmbed>` — batteries included: layer list + interactive preview in
+- `<AspicioEmbed>` — batteries included: layer list + interactive preview in
   one component.
-- `<DxfPreview>` — the embeddable canvas alone: pan/zoom/rotate (mouse
+- `<AspicioPreview>` — the embeddable canvas alone: pan/zoom/rotate (mouse
   and multi-touch), animated fit, batched WebGL rendering. No chrome.
   Bind `@hover-layer` to hit-test the layer under the cursor.
-- `<DxfLayerPanel>` — the ready-made layer list, identical to the demo
+- `<AspicioLayerPanel>` — the ready-made layer list, identical to the demo
   app: header with layer count, visibility checkboxes, effective-color
   swatches, entity counts, hover-to-highlight, double-click-to-solo
   (with a banner), and a gesture-hints footer. `theme="none"` renders a
@@ -27,14 +27,15 @@ npm install @aspicio/vue vue three   # @aspicio/core and @aspicio/elements come 
 
 ```vue
 <script setup>
-import { DxfEmbed } from "@aspicio/vue";
+import { AspicioEmbed } from "@aspicio/vue";
+import "@aspicio/vue/formats/dxf";
 
 const onLoaded = ({ layers, stats }) => console.log(stats.entityCount);
 </script>
 
 <template>
   <!-- src also accepts File | Blob | ArrayBuffer | DXF text via :src -->
-  <DxfEmbed src-url="/drawing.dxf" style="height: 480px" @loaded="onLoaded" />
+  <AspicioEmbed src-url="/drawing.dxf" style="height: 480px" @loaded="onLoaded" />
 </template>
 ```
 
@@ -46,7 +47,7 @@ digging).
 
 ## The full viewer
 
-The template ref exposes the complete `DxfViewer` — `fitView`, `zoomBy`,
+The template ref exposes the complete `DrawingViewer` — `fitView`, `zoomBy`,
 `setLayerVisible`, `pickLayer`, `view`, `toSVG`, `toPNG`:
 
 ```vue
@@ -58,7 +59,7 @@ const fit = () => embed.value?.viewer?.fitView();
 </script>
 
 <template>
-  <DxfEmbed ref="embed" src-url="/drawing.dxf" />
+  <AspicioEmbed ref="embed" src-url="/drawing.dxf" />
 </template>
 ```
 
@@ -68,7 +69,7 @@ reactive viewer buys nothing and costs proxy overhead.
 
 ## Custom layout
 
-Compose `DxfPreview` + `DxfLayerPanel` yourself and hand the panel the
+Compose `AspicioPreview` + `AspicioLayerPanel` yourself and hand the panel the
 viewer from `@viewer-change`; `reverse-highlight-layer` wires
 canvas-hover to the row highlight (the embed does this automatically).
 
@@ -89,3 +90,11 @@ itself; load IBM Plex Sans/Mono in your page for the exact demo look.
 - SSR-safe (Nuxt): importing the package is fine in Node; the viewer is
   created only after client-side mount. See `apps/vue-example` for a
   full setup.
+
+## Migrating from 0.x
+
+Two breaking changes ship together:
+
+1. **Formats are opted into by import.** Add `import "@aspicio/vue/formats/dxf";` once —
+   without it every load fails with an error saying exactly that.
+2. **Format-neutral names dropped their `Dxf` prefix**: `<DxfEmbed>` / `<DxfPreview>` / `<DxfLayerPanel>` → `<AspicioEmbed>` / `<AspicioPreview>` / `<AspicioLayerPanel>`, `DxfTheme` → `AspicioTheme`, and `DxfViewer` → `DrawingViewer`.

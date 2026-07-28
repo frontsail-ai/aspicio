@@ -47,17 +47,17 @@ test("loadDxf treats multi-line DXF text as inline bytes (not a path)", async ()
 test("loadDxf reads a local file path", async () => {
   const path = join(mkdtempSync(join(tmpdir(), "aspicio-mcp-")), "drawing.dxf");
   writeFileSync(path, DXF);
-  const summary = describeDxf(await loadDxf(path));
+  const summary = await describeDxf(await loadDxf(path));
   expect(summary.entityCount).toBe(2);
 });
 
-test("describeDxf summarizes entity types", () => {
-  const summary = describeDxf(new TextEncoder().encode(DXF));
+test("describeDxf summarizes entity types", async () => {
+  const summary = await describeDxf(new TextEncoder().encode(DXF));
   expect(summary.entityTypes).toEqual({ LINE: 1, CIRCLE: 1 });
 });
 
-test("renderPng returns PNG bytes", () => {
-  const png = renderPng(new TextEncoder().encode(DXF), 300);
+test("renderPng returns PNG bytes", async () => {
+  const png = await renderPng(new TextEncoder().encode(DXF), 300);
   expect(Buffer.from(png.subarray(0, 4)).toString("hex")).toBe(PNG_MAGIC);
   expect(png.length).toBeGreaterThan(100);
 });
@@ -70,7 +70,7 @@ test("a real path containing DXF-ish words still reads from disk", async () => {
   const dir = mkdtempSync(join(tmpdir(), "aspicio-SECTION-"));
   const path = join(dir, "EOF-plan.dxf");
   writeFileSync(path, DXF);
-  expect(describeDxf(await loadDxf(path)).entityCount).toBe(2);
+  expect((await describeDxf(await loadDxf(path))).entityCount).toBe(2);
 });
 
 test("URL sources are guarded: private hosts, redirect hops, and the size cap", async () => {
@@ -83,7 +83,7 @@ test("URL sources are guarded: private hosts, redirect hops, and the size cap", 
   try {
     // Happy path: fetched bytes parse.
     globalThis.fetch = (async () => new Response(DXF)) as typeof fetch;
-    expect(describeDxf(await loadDxf("https://example.com/a.dxf")).entityCount).toBe(2);
+    expect((await describeDxf(await loadDxf("https://example.com/a.dxf"))).entityCount).toBe(2);
 
     // A public URL redirecting to a private address is refused at the hop.
     globalThis.fetch = (async () =>

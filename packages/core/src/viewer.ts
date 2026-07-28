@@ -3,8 +3,9 @@ import { describeEntity } from "./entity-info.ts";
 import type { EntityInfo } from "./entity-info.ts";
 import { tessellationToSvg } from "./export.ts";
 import { attachGestures } from "./input/gestures.ts";
-import type { DxfDocument, Entity, LayerInfo, Point2 } from "./model/types.ts";
-import { parseDxfBytes } from "./parse/parse.ts";
+import type { DrawingDocument, Entity, LayerInfo, Point2 } from "./model/types.ts";
+import { parseWith } from "./parse/registry.ts";
+import type { DrawingParser, DrawingSource } from "./parse/registry.ts";
 import { pickEntity as pickEntityHit, pickLayer } from "./pick/pick.ts";
 import { SceneRenderer } from "./render/renderer.ts";
 import { buildSnapIndex } from "./snap/snap.ts";
@@ -15,7 +16,7 @@ import type { Tessellation } from "./tessellate/tessellate.ts";
 /** The model space's name in `getSpaces()` / `setActiveSpace()`. */
 const MODEL_SPACE = "Model";
 
-export interface DxfViewerOptions {
+export interface DrawingViewerOptions {
   /**
    * Canvas clear color, 24-bit RGB — or null for a transparent canvas
    * (the page background shows through). Default: dark slate.
@@ -23,6 +24,17 @@ export interface DxfViewerOptions {
   background?: number | null;
   /** Segments per full circle when flattening curves. Default: 72. */
   curveSegments?: number;
+  /**
+   * The formats this viewer accepts, tried in order (PARSE-13, VIEW-15).
+   * Core imports no parser of its own — pass `dxfParser` from
+   * "@aspicio/core/dxf" — which is what keeps a PDF-only app free of DXF
+   * code and vice versa (INV-11).
+   *
+   * The array is read when a load starts, not at construction, so a list
+   * that fills in later (a format module imported after the viewer exists)
+   * still counts.
+   */
+  parsers?: readonly DrawingParser[];
 }
 
 export interface ViewerStats {
@@ -65,19 +77,18 @@ export interface PickedEntity {
   layer: string;
 }
 
-/** Everything the viewer accepts as a DXF source. */
-export type DxfSource = string | ArrayBuffer | Blob;
+export type { DrawingSource } from "./parse/registry.ts";
 
 /**
  * The Aspicio viewer facade: owns a canvas inside `container`, renders a
- * DXF document, and exposes layers, camera fitting, and events.
+ * drawing document, and exposes layers, camera fitting, and events.
  */
-export class DxfViewer {
+export class DrawingViewer {
   private readonly container: HTMLElement;
   private readonly canvas: HTMLCanvasElement;
   private readonly renderer: SceneRenderer;
   private readonly camera = new Camera2D();
-  private readonly options: DxfViewerOptions;
+  private readonly options: DrawingViewerOptions;
   private readonly detachGestures: () => void;
   private readonly resizeObserver: ResizeObserver;
   private readonly listeners = new Map<ViewerEvent, Set<Listener>>();
@@ -93,9 +104,9 @@ export class DxfViewer {
    * this so rapid clicks accumulate instead of reading a mid-flight camera. */
   private pendingView: ViewState | null = null;
 
-  document: DxfDocument | null = null;
+  document: DrawingDocument | null = null;
 
-  constructor(container: HTMLElement, options: DxfViewerOptions = {}) {
+  constructor(container: HTMLElement, options: DrawingViewerOptions = {}) {
     this.container = container;
     this.options = options;
 
@@ -121,11 +132,11 @@ export class DxfViewer {
     this.handleResize();
   }
 
-  /** Load a DXF from text, a File/Blob, or an ArrayBuffer (ASCII or binary). */
-  async load(source: DxfSource): Promise<void> {
-    // The byte→document policy (binary detection included) lives in
-    // parseDxfBytes — one place, shared with the API and MCP surfaces.
-    this.document = parseDxfBytes(source instanceof Blob ? await source.arrayBuffer() : source);
+  /** Load a drawing from text, a File/Blob, an ArrayBuffer, or bytes. */
+  async load(source: DrawingSource): Promise<void> {
+    // Which format wins is decided by sniffing against the configured
+    // parsers — one policy, shared with the API and MCP surfaces (PARSE-13).
+    this.document = await parseWith(this.options.parsers ?? [], source);
     this.activeSpace = MODEL_SPACE;
     this.activate(tessellate(this.document, { curveSegments: this.options.curveSegments }));
     this.emit("loaded");

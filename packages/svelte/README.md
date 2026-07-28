@@ -14,12 +14,12 @@ Svelte version (5+). Try the viewer live at
 npm install @aspicio/svelte svelte three   # @aspicio/core and @aspicio/elements come along; svelte 5 and three (>=0.184) are peers
 ```
 
-- `<DxfEmbed>` — batteries included: layer list + interactive preview in
+- `<AspicioEmbed>` — batteries included: layer list + interactive preview in
   one component.
-- `<DxfPreview>` — the embeddable canvas alone: pan/zoom/rotate (mouse
+- `<AspicioPreview>` — the embeddable canvas alone: pan/zoom/rotate (mouse
   and multi-touch), animated fit, batched WebGL rendering. No chrome.
   Providing `onhoverlayer` hit-tests the layer under the cursor.
-- `<DxfLayerPanel>` — the ready-made layer list, identical to the demo
+- `<AspicioLayerPanel>` — the ready-made layer list, identical to the demo
   app: header with layer count, visibility checkboxes, effective-color
   swatches, entity counts, hover-to-highlight, double-click-to-solo
   (with a banner), and a gesture-hints footer. `theme="none"` renders a
@@ -29,13 +29,14 @@ npm install @aspicio/svelte svelte three   # @aspicio/core and @aspicio/elements
 
 ```svelte
 <script>
-  import { DxfEmbed } from "@aspicio/svelte";
+  import { AspicioEmbed } from "@aspicio/svelte";
+  import "@aspicio/svelte/formats/dxf";
 
   const onloaded = ({ layers, stats }) => console.log(stats.entityCount);
 </script>
 
 <!-- src also accepts File | Blob | ArrayBuffer | DXF text -->
-<DxfEmbed srcUrl="/drawing.dxf" style="height: 480px" {onloaded} />
+<AspicioEmbed srcUrl="/drawing.dxf" style="height: 480px" {onloaded} />
 ```
 
 Props: `src`, `srcUrl`, `panel` (`left` | `right` | `none`), `theme`
@@ -45,22 +46,22 @@ Props: `src`, `srcUrl`, `panel` (`left` | `right` | `none`), `theme`
 
 ## The full viewer
 
-`bind:this` exposes `viewer()` — the complete `DxfViewer` (`fitView`,
+`bind:this` exposes `viewer()` — the complete `DrawingViewer` (`fitView`,
 `zoomBy`, `setLayerVisible`, `pickLayer`, `view`, `toSVG`, `toPNG`):
 
 ```svelte
 <script>
-  import { DxfEmbed } from "@aspicio/svelte";
+  import { AspicioEmbed } from "@aspicio/svelte";
   let embed;
 </script>
 
-<DxfEmbed bind:this={embed} srcUrl="/drawing.dxf" />
+<AspicioEmbed bind:this={embed} srcUrl="/drawing.dxf" />
 <button onclick={() => embed.viewer()?.fitView()}>Fit</button>
 ```
 
 ## Custom layout
 
-Compose `DxfPreview` + `DxfLayerPanel` yourself and hand the panel the
+Compose `AspicioPreview` + `AspicioLayerPanel` yourself and hand the panel the
 viewer from `onviewerchange`; `reverseHighlightLayer` wires canvas-hover
 to the row highlight (the embed does this automatically).
 
@@ -82,3 +83,11 @@ itself; load IBM Plex Sans/Mono in your page for the exact demo look.
   mismatch: SvelteKit compiles it for server and client alike, and the
   viewer is only created in the browser. See `apps/svelte-example` for a
   full setup.
+
+## Migrating from 0.x
+
+Two breaking changes ship together:
+
+1. **Formats are opted into by import.** Add `import "@aspicio/svelte/formats/dxf";` once —
+   without it every load fails with an error saying exactly that.
+2. **Format-neutral names dropped their `Dxf` prefix**: `<DxfEmbed>` / `<DxfPreview>` / `<DxfLayerPanel>` → `<AspicioEmbed>` / `<AspicioPreview>` / `<AspicioLayerPanel>`, `DxfTheme` → `AspicioTheme`, and `DxfViewer` → `DrawingViewer`.

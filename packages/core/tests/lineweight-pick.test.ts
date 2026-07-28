@@ -1,12 +1,12 @@
 import { expect, test } from "vite-plus/test";
 import { Camera2D } from "../src/camera/camera2d.ts";
 import { describeEntity } from "../src/entity-info.ts";
-import type { DxfDocument, Entity } from "../src/model/types.ts";
+import type { DrawingDocument, Entity } from "../src/model/types.ts";
 import { parseDxf } from "../src/parse/parse.ts";
 import { pickEntity } from "../src/pick/pick.ts";
 import { tessellate } from "../src/tessellate/tessellate.ts";
 
-function makeDoc(entities: Entity[], layerWeight?: number): DxfDocument {
+function makeDoc(entities: Entity[], layerWeight?: number): DrawingDocument {
   return {
     layers: new Map([
       [

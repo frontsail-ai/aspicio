@@ -10,7 +10,8 @@
  * way to open another file unless the server sets `allowFilePicker` (the flag
  * is the reserved gate; no picker UI exists yet).
  */
-import { DxfViewer, isEmptyLayer } from "@aspicio/core";
+import { DrawingViewer, isEmptyLayer } from "@aspicio/core";
+import { dxfParser } from "@aspicio/core/dxf";
 import type { LayerInfo } from "@aspicio/core";
 import { App } from "@modelcontextprotocol/ext-apps";
 import type { McpUiDisplayMode } from "@modelcontextprotocol/ext-apps";
@@ -265,7 +266,7 @@ shadow.innerHTML = `<style>${STYLE}</style>
 const el = (id: string): HTMLElement => shadow.getElementById(id) as HTMLElement;
 const root = el("root");
 
-const viewer = new DxfViewer(el("viewer"), { background: CANVAS_BG });
+const viewer = new DrawingViewer(el("viewer"), { background: CANVAS_BG, parsers: [dxfParser] });
 
 // ---------------------------------------------------------------------------
 // State cards (replace the canvas — never overlay a stale drawing)

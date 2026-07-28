@@ -1,6 +1,6 @@
-import type { DxfViewer } from "@aspicio/core";
+import type { DrawingViewer } from "@aspicio/core";
 import "@aspicio/elements";
-import type { DxfTheme } from "@aspicio/elements";
+import type { AspicioTheme } from "@aspicio/elements";
 import { defineComponent, h, toRaw } from "vue";
 import type { PropType } from "vue";
 
@@ -14,13 +14,13 @@ import type { PropType } from "vue";
  * minimal list; style internals via the element's `::part()` hooks and
  * `--aspicio-*` custom properties.
  */
-export const DxfLayerPanel = defineComponent({
-  name: "DxfLayerPanel",
+export const AspicioLayerPanel = defineComponent({
+  name: "AspicioLayerPanel",
   props: {
-    /** The viewer to control — from DxfPreview's exposed viewer or viewer-change emit. */
-    viewer: { type: Object as PropType<DxfViewer | null>, default: null },
+    /** The viewer to control — from AspicioPreview's exposed viewer or viewer-change emit. */
+    viewer: { type: Object as PropType<DrawingViewer | null>, default: null },
     /** Visual theme. Defaults to the Aspicio demo look; "none" renders a minimal list. */
-    theme: { type: String as PropType<DxfTheme>, default: "aspicio" },
+    theme: { type: String as PropType<AspicioTheme>, default: "aspicio" },
     /** Layer hovered on the canvas; its row is reverse-highlighted. */
     reverseHighlightLayer: { type: String as PropType<string | null>, default: null },
     /** Show the gesture-hints footer (themed mode only). */

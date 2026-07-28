@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vite-plus/test";
 import { FONT_CAP_HEIGHT, glyph } from "../src/text/font.ts";
 import { decodeTextSpecials, layoutText, stripMText } from "../src/text/layout.ts";
-import type { DxfDocument, Entity } from "../src/model/types.ts";
+import type { DrawingDocument, Entity } from "../src/model/types.ts";
 import { parseDxf } from "../src/parse/parse.ts";
 import { tessellate } from "../src/tessellate/tessellate.ts";
 
@@ -143,7 +143,7 @@ test("the font decodes via the Buffer fallback when atob is unavailable", async 
 
 /* ---------- through the pipeline ---------- */
 
-function textDoc(entities: Entity[]): DxfDocument {
+function textDoc(entities: Entity[]): DrawingDocument {
   return {
     layers: new Map([
       ["0", { name: "0", color: 0xffffff, visible: true, frozen: false, entityCount: 0 }],

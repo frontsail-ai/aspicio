@@ -57,7 +57,7 @@ const read = (p: string): string => readFileSync(join(ROOT, p), "utf8");
 const DRIFT_GUARD: Array<{ skill: string; source: string; names: string[] }> = [
   {
     skill: "skills/aspicio-embed/SKILL.md",
-    source: "packages/react/src/DxfPreview.tsx",
+    source: "packages/react/src/AspicioPreview.tsx",
     names: ["src", "srcUrl", "showDownload", "shortcuts", "onLoaded", "onError", "onViewer"],
   },
   {
@@ -77,7 +77,14 @@ const DRIFT_GUARD: Array<{ skill: string; source: string; names: string[] }> = [
   {
     skill: "skills/aspicio-embed/SKILL.md",
     source: "packages/core/src/index.ts",
-    names: ["parseDxfBytes", "tessellationToSvg", "describeDrawing"],
+    names: ["tessellationToSvg", "describeDrawing", "parseWith"],
+  },
+  // Formats live behind their own entry point (INV-11) — the skill has to
+  // teach the import, not just the function.
+  {
+    skill: "skills/aspicio-embed/SKILL.md",
+    source: "packages/core/src/dxf.ts",
+    names: ["dxfParser", "parseDxfBytes"],
   },
   {
     skill: "skills/aspicio-inspect-dxf/SKILL.md",

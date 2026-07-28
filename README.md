@@ -26,7 +26,7 @@ renderer, the HTTP API, and the MCP server — is a thin adapter over the same e
 so a drawing is equally readable everywhere.
 
 ```
-DXF bytes ──parse──▶ DxfDocument ──tessellate──▶ Tessellation ──┬─▶ WebGL renderer (viewer)
+DXF bytes ──parse──▶ DrawingDocument ──tessellate──▶ Tessellation ──┬─▶ WebGL renderer (viewer)
               (normalized model)      (batched geometry)        ├─▶ SVG string (export / API / MCP)
                                                                 └─▶ DrawingSummary (describe)
 ```
@@ -49,10 +49,15 @@ bindings needed:
 ```html
 <script type="module">
   import "@aspicio/elements";
+  import "@aspicio/elements/formats/dxf";
 </script>
 
 <aspicio-embed src-url="/drawing.dxf" style="height: 480px"></aspicio-embed>
 ```
+
+Formats are opted into by import: the package brings the components, the
+`formats/*` entry brings the parser. That is what keeps a DXF app from
+shipping every other format's code — and every flavor below does the same.
 
 ### React
 
@@ -60,9 +65,10 @@ The same embed with idiomatic props and a `ref` exposing the full
 viewer, via [`@aspicio/react`](packages/react):
 
 ```tsx
-import { DxfEmbed } from "@aspicio/react";
+import { AspicioEmbed } from "@aspicio/react";
+import "@aspicio/react/formats/dxf";
 
-<DxfEmbed src={file} style={{ height: 480 }} />;
+<AspicioEmbed src={file} style={{ height: 480 }} />;
 ```
 
 ### Vue
@@ -72,11 +78,12 @@ Typed props and emits with unwrapped payloads, via
 
 ```vue
 <script setup>
-import { DxfEmbed } from "@aspicio/vue";
+import { AspicioEmbed } from "@aspicio/vue";
+import "@aspicio/vue/formats/dxf";
 </script>
 
 <template>
-  <DxfEmbed src-url="/drawing.dxf" style="height: 480px" />
+  <AspicioEmbed src-url="/drawing.dxf" style="height: 480px" />
 </template>
 ```
 
@@ -87,10 +94,11 @@ via [`@aspicio/svelte`](packages/svelte):
 
 ```svelte
 <script>
-  import { DxfEmbed } from "@aspicio/svelte";
+  import { AspicioEmbed } from "@aspicio/svelte";
+  import "@aspicio/svelte/formats/dxf";
 </script>
 
-<DxfEmbed srcUrl="/drawing.dxf" style="height: 480px" />
+<AspicioEmbed srcUrl="/drawing.dxf" style="height: 480px" />
 ```
 
 ### Vanilla TypeScript
@@ -99,9 +107,12 @@ Skip the ready-made UI and drive the viewer directly from
 [`@aspicio/core`](packages/core) — bring your own chrome:
 
 ```ts
-import { DxfViewer } from "@aspicio/core";
+import { DrawingViewer } from "@aspicio/core";
+import { dxfParser } from "@aspicio/core/dxf";
 
-const viewer = new DxfViewer(document.querySelector("#preview")!);
+const viewer = new DrawingViewer(document.querySelector("#preview")!, {
+  parsers: [dxfParser],
+});
 await viewer.load(file); // File | Blob | ArrayBuffer | DXF text (ASCII or binary)
 ```
 
@@ -111,9 +122,10 @@ Parse, describe, and render with no browser at all (server-side
 previews, thumbnails, pipelines):
 
 ```ts
-import { parseDxfBytes, tessellate, describeDrawing, tessellationToSvg } from "@aspicio/core";
+import { parseWith, tessellate, describeDrawing, tessellationToSvg } from "@aspicio/core";
+import { dxfParser } from "@aspicio/core/dxf";
 
-const doc = parseDxfBytes(bytes); // ASCII or binary DXF
+const doc = await parseWith([dxfParser], bytes); // ASCII or binary DXF
 const drawing = tessellate(doc);
 const summary = describeDrawing(doc, drawing); // units, bounds, layers, texts…
 const svg = tessellationToSvg(drawing);
@@ -198,7 +210,7 @@ upload flow so remote surfaces can handle local files.
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | [`@aspicio/core`](packages/core)         | The viewer library: parsing, tessellation, rendering, camera, input                                                 |
 | [`@aspicio/elements`](packages/elements) | Web components: `<aspicio-embed>`, `<aspicio-preview>`, `<aspicio-layer-panel>` — plain HTML, Svelte, any framework |
-| [`@aspicio/react`](packages/react)       | React bindings: `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>`                                                     |
+| [`@aspicio/react`](packages/react)       | React bindings: `<AspicioEmbed>`, `<AspicioPreview>`, `<AspicioLayerPanel>`                                         |
 | [`@aspicio/vue`](packages/vue)           | Vue 3 bindings: the same three components with typed props and emits                                                |
 | [`@aspicio/svelte`](packages/svelte)     | Svelte 5 bindings: the same three components as raw .svelte source                                                  |
 | [`@aspicio/mcp`](packages/mcp)           | MCP server for AI agents: `describe_dxf` + `render_dxf`                                                             |
@@ -218,13 +230,13 @@ flowchart TD
     VUEAPP["Vue app"]
     SVELTEAPP["Svelte app"]
 
-    REACT["<b>@aspicio/react</b><br/>&lt;DxfEmbed&gt; · &lt;DxfPreview&gt; · &lt;DxfLayerPanel&gt;<br/><i>thin @lit/react veneer, API-stable</i>"]
-    VUE["<b>@aspicio/vue</b><br/>&lt;DxfEmbed&gt; · &lt;DxfPreview&gt; · &lt;DxfLayerPanel&gt;<br/><i>thin Vue 3 veneer, typed emits</i>"]
-    SVELTE["<b>@aspicio/svelte</b><br/>&lt;DxfEmbed&gt; · &lt;DxfPreview&gt; · &lt;DxfLayerPanel&gt;<br/><i>raw Svelte 5 source, compiled by your bundler</i>"]
+    REACT["<b>@aspicio/react</b><br/>&lt;AspicioEmbed&gt; · &lt;AspicioPreview&gt; · &lt;AspicioLayerPanel&gt;<br/><i>thin @lit/react veneer, API-stable</i>"]
+    VUE["<b>@aspicio/vue</b><br/>&lt;AspicioEmbed&gt; · &lt;AspicioPreview&gt; · &lt;AspicioLayerPanel&gt;<br/><i>thin Vue 3 veneer, typed emits</i>"]
+    SVELTE["<b>@aspicio/svelte</b><br/>&lt;AspicioEmbed&gt; · &lt;AspicioPreview&gt; · &lt;AspicioLayerPanel&gt;<br/><i>raw Svelte 5 source, compiled by your bundler</i>"]
     ELEMENTS["<b>@aspicio/elements</b><br/>&lt;aspicio-embed&gt; · &lt;aspicio-preview&gt; · &lt;aspicio-layer-panel&gt;<br/><i>Lit web components — the one embed-UI implementation</i>"]
     CORE["<b>@aspicio/core</b><br/>parse → tessellate → render<br/><i>camera · input · picking · SVG/PNG export · headless describe</i>"]
 
-    REACTAPP -->|"idiomatic props, ref → DxfViewer"| REACT
+    REACTAPP -->|"idiomatic props, ref → DrawingViewer"| REACT
     REACT -->|"wraps"| ELEMENTS
     HTMLAPP -->|"attributes + DOM events"| ELEMENTS
     VUEAPP -->|"idiomatic props + emits"| VUE
@@ -232,7 +244,7 @@ flowchart TD
     SVELTEAPP -->|"typed callback props"| SVELTE
     SVELTE -->|"wraps"| ELEMENTS
     ELEMENTS -->|"drives"| CORE
-    HTMLAPP -.->|"or hand-rolled UI on the DxfViewer API"| CORE
+    HTMLAPP -.->|"or hand-rolled UI on the DrawingViewer API"| CORE
 
     classDef pkg fill:#191c22,stroke:#4c8dff,color:#e7e3da
     classDef app fill:#1f232b,stroke:#3a3f4a,color:#9aa0ab

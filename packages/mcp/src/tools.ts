@@ -2,10 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import {
   describeDrawing,
   type DrawingSummary,
-  parseDxfBytes,
+  parseWith,
   tessellate,
   tessellationToSvg,
 } from "@aspicio/core";
+import { dxfParser } from "@aspicio/core/dxf";
 import { Resvg } from "@resvg/resvg-js";
 
 const DEFAULT_BG = "#16181d";
@@ -90,14 +91,14 @@ export async function loadDxf(source: string): Promise<Uint8Array> {
 }
 
 /** Structured JSON summary of DXF bytes. */
-export function describeDxf(bytes: Uint8Array): DrawingSummary {
-  const doc = parseDxfBytes(bytes);
+export async function describeDxf(bytes: Uint8Array): Promise<DrawingSummary> {
+  const doc = await parseWith([dxfParser], bytes);
   return describeDrawing(doc, tessellate(doc, {}));
 }
 
 /** Render DXF bytes to a PNG (SVG → resvg). */
-export function renderPng(bytes: Uint8Array, width = DEFAULT_WIDTH): Uint8Array {
-  const doc = parseDxfBytes(bytes);
+export async function renderPng(bytes: Uint8Array, width = DEFAULT_WIDTH): Promise<Uint8Array> {
+  const doc = await parseWith([dxfParser], bytes);
   const svg = tessellationToSvg(tessellate(doc, {}), undefined, { background: DEFAULT_BG });
   return new Resvg(svg, { fitTo: { mode: "width", value: width } }).render().asPng();
 }

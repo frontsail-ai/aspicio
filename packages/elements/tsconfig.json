@@ -14,7 +14,8 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "paths": {
-      "@aspicio/core": ["../core/src/index.ts"]
+      "@aspicio/core": ["../core/src/index.ts"],
+      "@aspicio/core/dxf": ["../core/src/dxf.ts"]
     },
     "verbatimModuleSyntax": true,
     "skipLibCheck": true

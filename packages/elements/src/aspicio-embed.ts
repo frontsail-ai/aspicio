@@ -1,7 +1,7 @@
-import type { DxfSource, DxfViewer, DxfViewerOptions } from "@aspicio/core";
+import type { DrawingSource, DrawingViewer, DrawingViewerOptions } from "@aspicio/core";
 import { LitElement, css, html, nothing } from "lit";
 import type { PropertyValues, TemplateResult } from "lit";
-import type { DxfTheme } from "./theme.ts";
+import type { AspicioTheme } from "./theme.ts";
 import { canvasBackgroundStyles, tokenStyles } from "./theme.ts";
 
 export type PanelSide = "left" | "right" | "none";
@@ -16,7 +16,7 @@ export type PanelSide = "left" | "right" | "none";
  *   <aspicio-embed src-url="/drawing.dxf" style="height: 480px"></aspicio-embed>
  *
  * The `viewer` property (and the `viewer-change` event) exposes the full
- * DxfViewer for camera control; compose <aspicio-preview> and
+ * DrawingViewer for camera control; compose <aspicio-preview> and
  * <aspicio-layer-panel> directly when you need a custom layout.
  * `loaded`, `load-error`, and `hover-layer` events are re-dispatched from
  * this element.
@@ -37,16 +37,16 @@ export class AspicioEmbed extends LitElement {
     _viewer: { state: true },
   };
 
-  declare src: DxfSource | null;
+  declare src: DrawingSource | null;
   declare srcUrl: string | null;
-  declare options: DxfViewerOptions | undefined;
+  declare options: DrawingViewerOptions | undefined;
   declare panel: PanelSide;
-  declare theme: DxfTheme;
+  declare theme: AspicioTheme;
   declare panelStyle: Partial<CSSStyleDeclaration> | undefined;
   declare noDownload: boolean;
   declare shortcuts: boolean;
   declare _reverseHighlight: string | null;
-  declare _viewer: DxfViewer | null;
+  declare _viewer: DrawingViewer | null;
 
   constructor() {
     super();
@@ -62,8 +62,8 @@ export class AspicioEmbed extends LitElement {
     this._viewer = null;
   }
 
-  /** The live DxfViewer instance of the inner preview, or null. */
-  get viewer(): DxfViewer | null {
+  /** The live DrawingViewer instance of the inner preview, or null. */
+  get viewer(): DrawingViewer | null {
     return this._viewer;
   }
 
@@ -119,7 +119,7 @@ export class AspicioEmbed extends LitElement {
     }
   }
 
-  #onViewerChange = (e: CustomEvent<{ viewer: DxfViewer | null }>): void => {
+  #onViewerChange = (e: CustomEvent<{ viewer: DrawingViewer | null }>): void => {
     this._viewer = e.detail.viewer;
     this.#redispatch(e);
   };
@@ -133,7 +133,7 @@ export class AspicioEmbed extends LitElement {
     this.dispatchEvent(new CustomEvent(e.type, { detail: e.detail }));
   };
 
-  #previewOptions(): DxfViewerOptions | undefined {
+  #previewOptions(): DrawingViewerOptions | undefined {
     // The demo look draws its blueprint grid behind a transparent canvas;
     // respect an explicit background if the caller set one.
     const themed = this.theme !== "none";

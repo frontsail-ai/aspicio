@@ -56,7 +56,7 @@ released under the MIT license.
   `@aspicio/elements` (framework-neutral web components:
   `<aspicio-embed>`, `<aspicio-preview>`, `<aspicio-layer-panel>`),
   and `@aspicio/react` / `@aspicio/vue` / `@aspicio/svelte` (the same
-  three components — `<DxfEmbed>`, `<DxfPreview>`, `<DxfLayerPanel>` —
+  three components — `<AspicioEmbed>`, `<AspicioPreview>`, `<AspicioLayerPanel>` —
   as thin framework bindings over the elements).
 
 ## Docs

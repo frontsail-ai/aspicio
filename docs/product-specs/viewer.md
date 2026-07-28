@@ -94,3 +94,11 @@ The viewer lists model space plus named paper-space layouts; switching
 re-tessellates, re-fits, and renders the layout's sheet geometry with each
 viewport's model content scaled and clipped to its window. Unknown names
 are ignored.
+
+### VIEW-15: Loading requires a configured parser
+
+The viewer parses nothing by itself: `parsers` in `DrawingViewerOptions`
+decides which formats it accepts (PARSE-13). A viewer created without
+parsers loads nothing and says so, naming the import that fixes it
+("no format parsers configured — pass `parsers: [dxfParser]` from
+`@aspicio/core/dxf`").

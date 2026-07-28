@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { triangulate } from "../src/geom/triangulate.ts";
-import type { DxfDocument, Entity } from "../src/model/types.ts";
+import type { DrawingDocument, Entity } from "../src/model/types.ts";
 import { parseDxf } from "../src/parse/parse.ts";
 import { tessellate } from "../src/tessellate/tessellate.ts";
 
@@ -51,7 +51,7 @@ test("degenerate rings produce no triangles", () => {
 
 /* ---------- pipeline: SOLID / POINT / DIMENSION / HATCH ---------- */
 
-function makeDoc(entities: Entity[], blocks?: DxfDocument["blocks"]): DxfDocument {
+function makeDoc(entities: Entity[], blocks?: DrawingDocument["blocks"]): DrawingDocument {
   return {
     layers: new Map([
       ["0", { name: "0", color: 0xffffff, visible: true, frozen: false, entityCount: 0 }],

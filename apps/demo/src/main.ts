@@ -5,7 +5,8 @@ import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
 import "./style.css";
-import { DxfViewer, attachShortcuts, niceLength, partitionLayers } from "@aspicio/core";
+import { DrawingViewer, attachShortcuts, niceLength, partitionLayers } from "@aspicio/core";
+import { dxfParser } from "@aspicio/core/dxf";
 import type { EntityInfo, LayerInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
 import { decodeView, encodeView, packLayers } from "./viewurl.ts";
 import type { ViewLink } from "./viewurl.ts";
@@ -336,7 +337,7 @@ const measureOverlay = app.querySelector<SVGSVGElement>("#measure-overlay")!;
 type Mode = "empty" | "loading" | "loaded" | "error";
 
 const viewerEl = $<HTMLElement>("#viewer");
-const viewer = new DxfViewer(viewerEl, { background: null });
+const viewer = new DrawingViewer(viewerEl, { background: null, parsers: [dxfParser] });
 
 let mode: Mode = "empty";
 let currentName = "";
@@ -1641,7 +1642,7 @@ window.addEventListener("hashchange", () => openFromLink(decodeView(location.has
 /* Test hook: lets e2e tests observe viewer + demo interaction state. */
 declare global {
   interface Window {
-    __aspicio?: DxfViewer;
+    __aspicio?: DrawingViewer;
     __demo?: {
       readonly selectedIndex: number | null;
       readonly measureActive: boolean;

@@ -1,17 +1,18 @@
-import type { DxfViewer, ViewerStats } from "@aspicio/core";
-import { DxfEmbed } from "@aspicio/vue";
+import type { DrawingViewer, ViewerStats } from "@aspicio/core";
+import { AspicioEmbed } from "@aspicio/vue";
+import "@aspicio/vue/formats/dxf";
 import type { LoadedInfo } from "@aspicio/vue";
 import { createApp, defineComponent, h, ref } from "vue";
 
 declare global {
   interface Window {
     /** The live viewer instance, exposed for the browser console (and tests). */
-    __viewer?: DxfViewer | null;
+    __viewer?: DrawingViewer | null;
   }
 }
 
 /**
- * Minimal real-world usage of the Vue bindings: <DxfEmbed> renders the
+ * Minimal real-world usage of the Vue bindings: <AspicioEmbed> renders the
  * layer panel + interactive viewer from a URL, with keyboard shortcuts on.
  * Authored with h() render functions so the toolchain needs no SFC
  * compiler (SFC usage looks the same — see the @aspicio/vue README).
@@ -61,11 +62,11 @@ const App = defineComponent({
             ],
           ),
           h("main", { style: { flex: "1", minHeight: "0", padding: "16px" } }, [
-            h(DxfEmbed, {
+            h(AspicioEmbed, {
               srcUrl: "/sample.dxf",
               shortcuts: true,
               style: { height: "100%", borderRadius: "8px" },
-              "onViewer-change": (viewer: DxfViewer | null) => {
+              "onViewer-change": (viewer: DrawingViewer | null) => {
                 window.__viewer = viewer;
               },
               onLoaded: (info: LoadedInfo) => {

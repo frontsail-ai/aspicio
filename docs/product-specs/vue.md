@@ -11,7 +11,7 @@ Prefix: `VUE`.
 
 ### VUE-1: One-component embed
 
-`<DxfEmbed>` renders a complete integration — layer panel plus
+`<AspicioEmbed>` renders a complete integration — layer panel plus
 interactive preview — from a single `src` (text/File/Blob/ArrayBuffer)
 or `src-url` prop, with the panel dockable left/right or hidden.
 
@@ -58,3 +58,12 @@ panel styles. Webfonts are never loaded by the library.
 
 Importing the package is safe in Node (Nuxt SSR); the viewer is created
 only after client-side mount and disposed on unmount.
+
+### VUE-9: Formats are opted into by import
+
+Importing the package brings the components but no file format. A host
+imports the formats it wants — `@aspicio/vue/formats/dxf` — and a host
+that imports none gets a clear load error rather than a silent blank
+canvas (VIEW-15). Format modules are read when a load starts, not when a
+component mounts, so import order never matters and importing a format
+never recreates a live viewer.

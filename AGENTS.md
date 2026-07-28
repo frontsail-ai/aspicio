@@ -19,7 +19,7 @@ MCP server, and installable skills/plugins. Live demo:
 
 ## Architecture in 30 seconds
 
-`parse → DxfDocument → tessellate → { WebGL render | SVG | describe }`.
+`parse → DrawingDocument → tessellate → { WebGL render | SVG | describe }`.
 Everything up to WebGL is headless (browser/Node/Workers). Core is
 framework-free; embed UI lives once in the Lit web components
 (`packages/elements`), with `packages/react`, `packages/vue`, and
@@ -32,7 +32,7 @@ Details: [docs/architecture.md](docs/architecture.md).
 ```
 packages/core     the library: parse → tessellate → render, camera, input
 packages/elements <aspicio-embed> / <aspicio-preview> / <aspicio-layer-panel> (Lit)
-packages/react    <DxfEmbed> / <DxfPreview> / <DxfLayerPanel> — React veneer over elements
+packages/react    <AspicioEmbed> / <AspicioPreview> / <AspicioLayerPanel> — React veneer over elements
 packages/vue      the same three components as a Vue 3 veneer over elements
 packages/svelte   the same three components as Svelte 5 source (.svelte) over elements
 packages/mcp      stdio MCP server (describe_dxf, render_dxf)
@@ -89,7 +89,11 @@ docs/             architecture, guidelines, product specs, releasing
   (INV-7); e2e fixtures cover both ByLayer and per-entity colors (INV-8).
 - Workspace type resolution: checks/tests resolve `@aspicio/core` from
   source (tsconfig `paths` **and** the vite alias — new workspaces need
-  both); pack/deploy steps use the built dist.
+  both); pack/deploy steps use the built dist. Subpath aliases
+  (`@aspicio/core/dxf`) must be listed **before** the bare
+  `@aspicio/core` alias: a string alias matches prefixes and first match
+  wins, so the bare one would otherwise rewrite the subpath to
+  `…/core/src/index.ts/dxf`.
 - Specs lead. Cite spec IDs (`VIEW-3`, `INV-2`) in plans, tests, and PRs;
   surface conflicts instead of silently editing either side. Full rules:
   [docs/guidelines.md](docs/guidelines.md).
