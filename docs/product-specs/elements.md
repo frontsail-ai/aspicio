@@ -71,3 +71,10 @@ canvas (VIEW-15). Format modules are read when a load starts, not when a
 component is constructed, so import order never matters and importing a
 format never recreates a live viewer. The `options` property stays plain
 data; parsers are not passed through it.
+
+The registry is closed by design: the components accept only the formats
+this package's own `formats/*` entries register. A third-party parser
+still reaches the viewer through its `parsers` option (VIEW-15) and can
+drive the layer panel bound to that viewer (ELEM-2), but it cannot teach
+the preview or embed a new format. Opening the registry is additive and
+waits for a real use case.
