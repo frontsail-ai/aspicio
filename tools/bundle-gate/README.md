@@ -20,3 +20,12 @@ That means the gate needs the packages **built**. The repo gate runs
 `vp check && vp run -r test && vp run -r build`, so tests run before any
 `dist` exists — hence this workspace's `build` script runs the gate, after
 its workspace dependencies have built.
+
+## Why the fixtures are not type-checked
+
+Same reason, one step further: `vp check` runs before any build, so the
+fixtures' `@aspicio/*` imports have nothing to resolve to on a clean tree —
+exactly the CI-truth condition the repo gate enforces. They are excluded from
+linting in the root `vite.config.ts` and from this workspace's tsconfig
+program. Nothing is lost: a broken specifier fails the Vite build that the
+gate runs, which is the only place it would matter.

@@ -12,5 +12,11 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["fixtures/**/*.ts", "tests/**/*.ts"]
+  /*
+   * Fixtures are build inputs, not source: they resolve `@aspicio/*` through
+   * node_modules and `exports` (that is the whole point — see README), which
+   * only exists after a build. `vp check` runs before builds, so type-checking
+   * them here would fail on a clean tree. Vite resolves them at gate time.
+   */
+  "include": ["tests/**/*.ts"]
 }
