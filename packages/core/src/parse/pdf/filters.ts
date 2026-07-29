@@ -40,26 +40,70 @@ const IMAGE_FILTERS = new Set([
  * that falling back is cheaper than rejecting the file.
  */
 export async function inflate(bytes: Uint8Array): Promise<Uint8Array> {
-  let firstError: unknown;
   for (const format of ["deflate", "deflate-raw"] as const) {
-    try {
-      const stream = new Blob([bytes as BlobPart])
-        .stream()
-        .pipeThrough(new DecompressionStream(format));
-      return new Uint8Array(await new Response(stream).arrayBuffer());
-    } catch (error) {
-      firstError ??= error;
-    }
+    const out = await inflatePartial(bytes, format);
+    if (out.length > 0) return out;
   }
-  throw new FlateError(firstError);
+  throw new FlateError();
+}
+
+/**
+ * Inflate as far as the data allows, keeping whatever decoded.
+ *
+ * Real PDFs carry streams with bytes after the compressed data, and streams
+ * truncated by a wrong `/Length`. `DecompressionStream` rejects both outright,
+ * discarding output it had already produced. Four streams in the Ghent PDF/X-4
+ * suite are exactly this — valid zlib with a trailing byte — and refusing them
+ * would fail the whole file over a byte nobody reads.
+ */
+async function inflatePartial(
+  bytes: Uint8Array,
+  format: "deflate" | "deflate-raw",
+): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  try {
+    const stream = new DecompressionStream(format);
+    const reader = stream.readable.getReader();
+    // Read and write concurrently: a stream that errors part-way still hands
+    // back everything it decoded before the error.
+    const drain = (async () => {
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) chunks.push(value);
+        }
+      } catch {
+        /* truncated or trailing garbage — keep what decoded */
+      }
+    })();
+    const writer = stream.writable.getWriter();
+    try {
+      await writer.write(bytes as BufferSource);
+      await writer.close();
+    } catch {
+      /* the reader side reports the real problem */
+    }
+    await drain;
+  } catch {
+    return new Uint8Array();
+  }
+
+  const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
 }
 
 /** Thrown when neither zlib nor raw deflate can read a stream. */
 export class FlateError extends Error {
-  constructor(cause?: unknown) {
+  constructor() {
     super("Could not decompress a PDF stream");
     this.name = "FlateError";
-    this.cause = cause;
   }
 }
 

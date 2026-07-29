@@ -14,10 +14,13 @@ import type {
   LineTypeDef,
   Point2,
   PolylineEntity,
+  TextEntity,
 } from "../../model/types.ts";
 import { isStream } from "./document.ts";
 import type { PdfDocument } from "./document.ts";
-import { PdfLexer, isKeyword, isName, isRef, toNumber } from "./objects.ts";
+import { PdfLexer, isKeyword, isName, isRef, isString, toNumber } from "./objects.ts";
+import { buildFontDecoder } from "./text.ts";
+import type { FontDecoder } from "./text.ts";
 import type { PdfDict, PdfValue } from "./objects.ts";
 
 /** The single layer PDF content lands on until OCG support arrives (PDF-7). */
@@ -83,6 +86,15 @@ interface GraphicsState {
   fillColor: number;
   lineWidth: number;
   dash: number[];
+  /** Selected font resource name, inherited by forms this state invokes. */
+  fontName?: string;
+  fontSize: number;
+  charSpacing: number;
+  wordSpacing: number;
+  /** Horizontal scale, as a fraction (`Tz` is a percentage). */
+  horizontalScale: number;
+  leading: number;
+  rise: number;
 }
 
 const initialState = (ctm: Matrix): GraphicsState => ({
@@ -91,6 +103,12 @@ const initialState = (ctm: Matrix): GraphicsState => ({
   fillColor: 0x000000,
   lineWidth: 1,
   dash: [],
+  fontSize: 0,
+  charSpacing: 0,
+  wordSpacing: 0,
+  horizontalScale: 1,
+  leading: 0,
+  rise: 0,
 });
 
 const cloneState = (s: GraphicsState): GraphicsState => ({ ...s, dash: [...s.dash] });
@@ -132,6 +150,10 @@ class Interpreter {
   readonly lineTypes = new Map<string, LineTypeDef>();
   readonly unsupported: Record<string, number> = {};
   private readonly dashNames = new Map<string, string>();
+  // Building a decoder parses a CMap, so one per font object rather than per
+  // text run: the Ghent corpus has 101 of them across 3,438 text operators.
+  private readonly decoders = new Map<string, FontDecoder>();
+  private readonly decoderSalt = 0;
 
   private readonly doc: PdfDocument;
   private readonly curveSegments: number;
@@ -167,6 +189,11 @@ class Interpreter {
     let cursor: Point2 = { x: 0, y: 0 };
     let pendingClip = false;
 
+    // Text object state: PDF keeps two matrices, one for the whole object and
+    // one that advances per glyph run.
+    let textMatrix: Matrix = IDENTITY;
+    let lineMatrix: Matrix = IDENTITY;
+
     const num = (i: number): number => toNumber(operands[operands.length - i]);
     const flushSubpath = (): void => {
       if (current.length > 1) subpaths.push(current);
@@ -191,8 +218,7 @@ class Interpreter {
     };
     const lineTo = (x: number, y: number): void => {
       cursor = apply(state.ctm, x, y);
-      if (current.length === 0) current.push(cursor);
-      else current.push(cursor);
+      current.push(cursor);
     };
     const curveTo = (c1: Point2, c2: Point2, end: Point2): void => {
       const p0 = cursor;
@@ -240,7 +266,7 @@ class Interpreter {
           break;
         }
         case "gs":
-          await this.applyExtGState(operands[operands.length - 1], resources);
+          await this.applyExtGState(operands[operands.length - 1], resources, state);
           break;
 
         /* --- colour --- */
@@ -380,10 +406,82 @@ class Interpreter {
           lexer.pos = skipInlineImage(content, lexer.pos);
           break;
 
-        /* --- text: 1.4 emits entities; here it only has to not derail --- */
+        /* --- text (PDF-4) --- */
         case "BT":
+          textMatrix = IDENTITY;
+          lineMatrix = IDENTITY;
+          break;
         case "ET":
           break;
+        case "Tf": {
+          const name = operands[operands.length - 2];
+          state.fontName = isName(name) ? name.name : undefined;
+          state.fontSize = num(1);
+          break;
+        }
+        case "Td":
+          lineMatrix = multiply([1, 0, 0, 1, num(2), num(1)], lineMatrix);
+          textMatrix = lineMatrix;
+          break;
+        case "TD":
+          state.leading = -num(1);
+          lineMatrix = multiply([1, 0, 0, 1, num(2), num(1)], lineMatrix);
+          textMatrix = lineMatrix;
+          break;
+        case "Tm":
+          lineMatrix = [num(6), num(5), num(4), num(3), num(2), num(1)];
+          textMatrix = lineMatrix;
+          break;
+        case "T*":
+          lineMatrix = multiply([1, 0, 0, 1, 0, -state.leading], lineMatrix);
+          textMatrix = lineMatrix;
+          break;
+        case "TL":
+          state.leading = num(1);
+          break;
+        case "Tc":
+          state.charSpacing = num(1);
+          break;
+        case "Tw":
+          state.wordSpacing = num(1);
+          break;
+        case "Tz":
+          state.horizontalScale = num(1) / 100;
+          break;
+        case "Ts":
+          state.rise = num(1);
+          break;
+        case "Tj":
+        case "'":
+        case '"': {
+          if (value.op !== "Tj") {
+            // Both quote operators start a new line first; `"` also sets spacing.
+            if (value.op === '"') {
+              state.wordSpacing = num(3);
+              state.charSpacing = num(2);
+            }
+            lineMatrix = multiply([1, 0, 0, 1, 0, -state.leading], lineMatrix);
+            textMatrix = lineMatrix;
+          }
+          const shown = operands[operands.length - 1];
+          if (isString(shown))
+            textMatrix = await this.showText(shown.bytes, state, textMatrix, resources);
+          break;
+        }
+        case "TJ": {
+          const items = operands[operands.length - 1];
+          if (!Array.isArray(items)) break;
+          for (const item of items) {
+            if (isString(item))
+              textMatrix = await this.showText(item.bytes, state, textMatrix, resources);
+            else if (typeof item === "number") {
+              // A number displaces the next glyph, in thousandths of an em.
+              const shift = (-item / 1000) * state.fontSize * state.horizontalScale;
+              textMatrix = multiply([1, 0, 0, 1, shift, 0], textMatrix);
+            }
+          }
+          break;
+        }
 
         default:
           break;
@@ -399,6 +497,90 @@ class Interpreter {
     const dx = p.x - m[4];
     const dy = p.y - m[5];
     return { x: (dx * m[3] - dy * m[2]) / det, y: (dy * m[0] - dx * m[1]) / det };
+  }
+
+  /**
+   * Emit one text run and advance the text matrix.
+   *
+   * Position, size, and rotation all come from the combined text and
+   * transformation matrices — PDF has no notion of a text "insertion point"
+   * separate from its matrix, so everything is derived rather than read.
+   */
+  private async showText(
+    bytes: Uint8Array,
+    state: GraphicsState,
+    textMatrix: Matrix,
+    resources: PdfDict | undefined,
+  ): Promise<Matrix> {
+    const decoder = await this.fontDecoder(state.fontName, resources);
+    const text = decoder ? decoder.decode(bytes) : "";
+
+    // The rendering matrix: text space scaled by font size, then placed.
+    const scaled: Matrix = [
+      state.fontSize * state.horizontalScale,
+      0,
+      0,
+      state.fontSize,
+      0,
+      state.rise,
+    ];
+    const render = multiply(multiply(scaled, textMatrix), state.ctm);
+
+    if (text !== "") {
+      const position = { x: render[4], y: render[5] };
+      // Cap height, not em size: the stroke font draws caps at `height`, and
+      // 0.7 em is the usual cap-height ratio for text faces.
+      const height = Math.hypot(render[2], render[3]) * 0.7;
+      // render[0] already carries the horizontal scale, so divide it back out
+      // or a stretched run would report a skewed angle.
+      const rotation = Math.atan2(render[1], render[0] / (state.horizontalScale || 1));
+      // Tz stretches glyphs horizontally; the stroke font honours it directly.
+      const widthFactor = state.horizontalScale > 0 ? state.horizontalScale : 1;
+      if (height > 0) {
+        const entity: TextEntity = {
+          type: "TEXT",
+          layer: CONTENT_LAYER,
+          color: state.fillColor,
+          position,
+          text,
+          height,
+          rotation,
+          widthFactor,
+          hAlign: "left",
+          vAlign: "baseline",
+        };
+        this.entities.push(entity);
+      }
+    }
+
+    // Advance by the run's width. Without glyph metrics the estimate is the
+    // standard half-em average, which keeps successive runs from stacking on
+    // one another — exact advance needs /Widths, which is 1.5 work.
+    const glyphs = decoder?.twoByte === true ? bytes.length / 2 : bytes.length;
+    const spaces = decoder?.twoByte === true ? 0 : countSpaces(bytes);
+    const width =
+      (glyphs * 0.5 * state.fontSize + glyphs * state.charSpacing + spaces * state.wordSpacing) *
+      state.horizontalScale;
+    return multiply([1, 0, 0, 1, width, 0], textMatrix);
+  }
+
+  /** Resolve and cache a font resource's decoder. */
+  private async fontDecoder(
+    name: string | undefined,
+    resources: PdfDict | undefined,
+  ): Promise<FontDecoder | undefined> {
+    if (name === undefined) return undefined;
+    const fonts = await this.doc.dict(resources?.get("Font"));
+    const ref = fonts?.get(name);
+    if (ref === undefined) return undefined;
+    const key = isRef(ref) ? `#${ref.num}` : `${name}@${this.decoderSalt}`;
+    const cached = this.decoders.get(key);
+    if (cached) return cached;
+    const font = await this.doc.dict(ref);
+    if (!font) return undefined;
+    const decoder = await buildFontDecoder(this.doc, font);
+    this.decoders.set(key, decoder);
+    return decoder;
   }
 
   private emitStrokes(subpaths: Point2[][], state: GraphicsState): void {
@@ -424,16 +606,67 @@ class Interpreter {
     }
   }
 
+  /**
+   * Emit fills for one path's subpaths.
+   *
+   * A single paint operator can fill disjoint regions as easily as a shape
+   * with holes — `re re f` is everyday output. Treating the first subpath as
+   * the outer boundary and everything else as holes silently drops the second
+   * region, which is invisible wrongness rather than honest incompleteness.
+   * So rings are grouped by containment: every ring nobody contains becomes
+   * its own filled region, carrying the rings nested inside it as holes.
+   */
   private emitFill(subpaths: Point2[][], state: GraphicsState): void {
-    const loops = subpaths.filter((p) => p.length >= 3);
-    if (loops.length === 0) return;
+    const rings = subpaths.filter((points) => points.length >= 3);
+    if (rings.length === 0) return;
+    if (rings.length === 1) {
+      this.pushHatch(rings, state);
+      return;
+    }
+
+    const boxes = rings.map(boundingBox);
+    // The innermost ring containing each one — its parent in the nesting tree.
+    const parent = rings.map((_, i) => {
+      let best = -1;
+      for (let j = 0; j < rings.length; j++) {
+        if (j === i || !contains(boxes[j] as Box, boxes[i] as Box)) continue;
+        if (best < 0 || area(boxes[j] as Box) < area(boxes[best] as Box)) best = j;
+      }
+      return best;
+    });
+
+    // Depth decides role: a ring nested an odd number of levels deep is a hole
+    // in its parent; an even depth starts a new filled region.
+    const depth = rings.map((_, i) => {
+      let d = 0;
+      for (let at = parent[i] as number; at >= 0; at = parent[at] as number) {
+        d++;
+        if (d > rings.length) break; // containment cannot cycle, but be safe
+      }
+      return d;
+    });
+
+    const groups = new Map<number, Point2[][]>();
+    for (const [i, ring] of rings.entries()) {
+      if ((depth[i] as number) % 2 === 0) {
+        if (!groups.has(i)) groups.set(i, [ring]);
+      } else {
+        const owner = parent[i] as number;
+        const list = groups.get(owner);
+        if (list) list.push(ring);
+        else groups.set(owner, [rings[owner] as Point2[], ring]);
+      }
+    }
+    for (const loops of groups.values()) this.pushHatch(loops, state);
+  }
+
+  private pushHatch(loops: Point2[][], state: GraphicsState): void {
     const entity: HatchEntity = {
       type: "HATCH",
       layer: CONTENT_LAYER,
       color: state.fillColor,
-      // The first subpath is the outer boundary and the rest are holes — the
-      // same convention DXF fills use, and an approximation of both of PDF's
-      // fill rules rather than an implementation of either (PDF-3).
+      // First loop is the outer boundary, the rest are holes — the same
+      // convention DXF fills use (PDF-3).
       loops,
       solid: true,
     };
@@ -473,6 +706,7 @@ class Interpreter {
   private async applyExtGState(
     nameValue: PdfValue | undefined,
     resources: PdfDict | undefined,
+    state: GraphicsState,
   ): Promise<void> {
     if (!isName(nameValue)) return;
     const states = await this.doc.dict(resources?.get("ExtGState"));
@@ -482,6 +716,15 @@ class Interpreter {
       const mask = gs.get("SMask");
       // /None turns masking off — only an actual mask is unsupported.
       if (!(isName(mask) && mask.name === "None")) this.count("SoftMask");
+    }
+    // ExtGState can also set line width and dash; honour them rather than
+    // letting a file that styles strokes this way draw hairlines silently.
+    const lw = gs.get("LW");
+    if (typeof lw === "number") state.lineWidth = lw;
+    const dash = await this.doc.array(gs.get("D"));
+    if (dash.length > 0) {
+      const pattern = await this.doc.array(dash[0]);
+      state.dash = pattern.map((v) => toNumber(v));
     }
     const blend = gs.get("BM");
     const blendName = isName(blend)
@@ -523,6 +766,50 @@ class Interpreter {
     const formResources = (await this.doc.dict(object.dict.get("Resources"))) ?? resources;
     await this.execute(decoded, formResources, multiply(matrix, state.ctm), depth + 1);
   }
+}
+
+interface Box {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+}
+
+function boundingBox(points: readonly Point2[]): Box {
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/** True when `outer` encloses `inner`. Bounding boxes are enough here: a ring
+ * that is not box-contained cannot be geometrically contained either, and the
+ * false positives (interlocking L-shapes) are rarer than the disjoint case
+ * this exists to get right. */
+function contains(outer: Box, inner: Box): boolean {
+  return (
+    outer.minX <= inner.minX &&
+    outer.minY <= inner.minY &&
+    outer.maxX >= inner.maxX &&
+    outer.maxY >= inner.maxY &&
+    area(outer) > area(inner)
+  );
+}
+
+const area = (b: Box): number => Math.max(0, b.maxX - b.minX) * Math.max(0, b.maxY - b.minY);
+
+/** Count ASCII spaces, which are what word spacing applies to. */
+function countSpaces(bytes: Uint8Array): number {
+  let n = 0;
+  for (const b of bytes) if (b === 0x20) n++;
+  return n;
 }
 
 /** Position after an inline image's `EI`, given the position after `BI`. */

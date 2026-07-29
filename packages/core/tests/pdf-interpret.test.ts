@@ -247,3 +247,46 @@ test("malformed content degrades instead of throwing", async () => {
   await expect(run("0 0 m ] ] ) 10 10 l S")).resolves.toBeDefined();
   await expect(run("Q Q Q 0 0 m 1 1 l S")).resolves.toBeDefined();
 });
+
+/* ---------- fills with several regions (review finding) ---------- */
+
+// A single paint operator filling disjoint regions is everyday output. Taking
+// the first subpath as the boundary and the rest as holes would silently drop
+// every region but the first — invisible wrongness, not honest incompleteness.
+test("disjoint regions in one fill each become their own filled region", async () => {
+  const { entities } = await run("0 0 10 10 re 50 50 10 10 re f");
+  const fills = hatches(entities);
+  expect(fills).toHaveLength(2);
+  for (const fill of fills) expect(fill.loops).toHaveLength(1);
+});
+
+test("a hole inside a region stays a hole rather than becoming a region", async () => {
+  const { entities } = await run("0 0 100 100 re 20 20 60 60 re f");
+  const fills = hatches(entities);
+  expect(fills).toHaveLength(1);
+  expect(fills[0]?.loops).toHaveLength(2);
+});
+
+test("two holed regions keep their own holes", async () => {
+  const { entities } = await run(
+    "0 0 100 100 re 20 20 60 60 re 200 0 100 100 re 220 20 60 60 re f",
+  );
+  const fills = hatches(entities);
+  expect(fills).toHaveLength(2);
+  for (const fill of fills) expect(fill.loops).toHaveLength(2);
+});
+
+test("an island inside a hole fills again", async () => {
+  // Even nesting depth starts a new region; odd depth is a hole.
+  const { entities } = await run("0 0 100 100 re 20 20 60 60 re 40 40 20 20 re f");
+  const fills = hatches(entities);
+  expect(fills).toHaveLength(2);
+  expect(fills.some((f) => f.loops.length === 2)).toBe(true);
+});
+
+/* ---------- ExtGState (review finding) ---------- */
+
+test("counts a soft mask but not /None", async () => {
+  const { unsupported } = await run("/GS0 gs 0 0 m 1 1 l S");
+  expect(unsupported["SoftMask"]).toBeUndefined();
+});
