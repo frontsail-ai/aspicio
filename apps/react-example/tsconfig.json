@@ -17,6 +17,7 @@
     "esModuleInterop": true,
     "paths": {
       "@aspicio/core/dxf": ["../../packages/core/src/dxf.ts"],
+      "@aspicio/core/pdf": ["../../packages/core/src/pdf.ts"],
       "@aspicio/core": ["../../packages/core/src/index.ts"],
       "@aspicio/elements/formats/dxf": ["../../packages/elements/src/formats/dxf.ts"],
       "@aspicio/elements": ["../../packages/elements/src/index.ts"],

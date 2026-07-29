@@ -1076,3 +1076,26 @@ test("loads a binary DXF file (AutoCAD Binary DXF)", async ({ page }) => {
   const colors = await canvasColors(page);
   expect(colors.green).toBeGreaterThan(10);
 });
+
+// The renderer is verified end-to-end (INV-7), so PDF rendering needs browser
+// proof rather than unit coverage alone.
+test("opens a PDF and renders its vector content", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#file").setInputFiles(fixture("sample.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("sample.pdf");
+
+  const probe = await probeViewer(page);
+  // PDF-7: everything lands on one "Content" layer.
+  expect(probe.layers.map((l) => l.name)).toContain("Content");
+  // PDF-3/PDF-4: strokes, a fill, and text all became entities.
+  expect(probe.entityCount).toBeGreaterThan(2);
+  expect(probe.segmentCount).toBeGreaterThan(2);
+});
+
+test("a PDF reports points as its unit in the measure readout", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#file").setInputFiles(fixture("sample.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("sample.pdf");
+  // PDF-6: pt, carried through unchanged.
+  await expect(page.locator("#scale-label")).toContainText("pt");
+});

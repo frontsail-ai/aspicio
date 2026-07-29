@@ -7,6 +7,7 @@ import "@fontsource/ibm-plex-sans/600.css";
 import "./style.css";
 import { DrawingViewer, attachShortcuts, niceLength, partitionLayers } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
+import { pdfParser } from "@aspicio/core/pdf";
 import type { EntityInfo, LayerInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
 import { decodeView, encodeView, packLayers } from "./viewurl.ts";
 import type { ViewLink } from "./viewurl.ts";
@@ -139,13 +140,13 @@ app.innerHTML = `
         <div class="empty-inner">
           ${reticle(52, "var(--text2)", "var(--text3)")}
           <div class="empty-kicker">NO DRAWING LOADED</div>
-          <h1 class="empty-title">Open a DXF to view it</h1>
+          <h1 class="empty-title">Open a drawing to view it</h1>
           <div class="empty-body">Drop a file anywhere in the window, pick one from your machine, or load the bundled sample.</div>
           <div class="empty-actions">
             <button id="empty-open" class="btn-primary" type="button">Open DXF</button>
             <button id="empty-sample" class="btn-ghost" type="button">Load sample</button>
           </div>
-          <div class="empty-supports">SUPPORTS · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · SPLINE · TEXT · MTEXT · INSERT · DIMENSION · HATCH · SOLID · POINT</div>
+          <div class="empty-supports">OPENS · DXF · PDF<br>DXF ENTITIES · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · SPLINE · TEXT · MTEXT · INSERT · DIMENSION · HATCH · SOLID · POINT</div>
           <nav class="empty-links" aria-label="Project links">
             <a href="/docs/">Docs</a>
             <a href="/mcp/">MCP</a>
@@ -212,12 +213,12 @@ app.innerHTML = `
       </aside>
     </main>
   </div>
-  <input id="file" type="file" accept=".dxf" hidden>
+  <input id="file" type="file" accept=".dxf,.pdf" hidden>
   <div id="drop" class="drop-overlay" hidden>
     <div class="drop-frame">
       ${icons.drop}
       <div class="drop-title">DROP DXF TO OPEN</div>
-      <div class="drop-sub">.dxf files only · released anywhere</div>
+      <div class="drop-sub">.dxf and .pdf · released anywhere</div>
     </div>
   </div>
   <div id="shortcuts" class="shortcuts-overlay" hidden>
@@ -242,10 +243,10 @@ app.innerHTML = `
           <button id="od-dropzone" class="od-dropzone" type="button">
             ${icons.dropArrow}
             <div>
-              <div class="od-dz-title">Drop a .dxf file here</div>
+              <div class="od-dz-title">Drop a .dxf or .pdf file here</div>
               <div class="od-dz-sub">or click to browse your machine</div>
             </div>
-            <div class="od-dz-note">.DXF · ASCII OR BINARY · PARSED LOCALLY, NEVER UPLOADED</div>
+            <div class="od-dz-note">.DXF · .PDF · PARSED LOCALLY, NEVER UPLOADED</div>
           </button>
           <div class="od-divider">
             <span class="od-divider-line"></span>
@@ -295,7 +296,7 @@ app.innerHTML = `
             <div class="od-try-title">TRY THIS</div>
             <div id="od-tip-status" class="od-try-item"><span class="od-try-dot">·</span><span id="od-tip-status-text"></span></div>
             <div id="od-tip-download" class="od-try-item"><span class="od-try-dot">·</span><span>Download the file, then <button id="od-try-file" class="od-try-link" type="button">drop it in</button> above.</span></div>
-            <div id="od-tip-direct" class="od-try-item"><span class="od-try-dot">·</span><span>Check the link points directly at a <span class="od-lit">.dxf</span> (not an HTML page).</span></div>
+            <div id="od-tip-direct" class="od-try-item"><span class="od-try-dot">·</span><span>Check the link points directly at a <span class="od-lit">.dxf</span> or <span class="od-lit">.pdf</span> (not an HTML page).</span></div>
             <div id="od-tip-cors" class="od-try-item"><span class="od-try-dot">·</span><span>Host it somewhere CORS-enabled (S3 with public read, a raw GitHub URL, etc.).</span></div>
           </div>
           <div class="od-cors-actions">
@@ -337,7 +338,7 @@ const measureOverlay = app.querySelector<SVGSVGElement>("#measure-overlay")!;
 type Mode = "empty" | "loading" | "loaded" | "error";
 
 const viewerEl = $<HTMLElement>("#viewer");
-const viewer = new DrawingViewer(viewerEl, { background: null, parsers: [dxfParser] });
+const viewer = new DrawingViewer(viewerEl, { background: null, parsers: [dxfParser, pdfParser] });
 
 let mode: Mode = "empty";
 let currentName = "";
@@ -1189,7 +1190,7 @@ function httpTip(status: number | undefined): string {
     return "The file may be private — make sure it's publicly downloadable.";
   if (status !== undefined && status >= 500)
     return "The server had a problem — try again in a moment.";
-  return "Check the link points straight at a downloadable .dxf.";
+  return "Check the link points straight at a downloadable .dxf or .pdf.";
 }
 
 /** Show the dialog's error state for a failed URL open, tailoring the title and
@@ -1266,11 +1267,11 @@ function cancelDialogLoad(): void {
   renderDialog();
 }
 
-/** Pasting a .dxf link anywhere (dialog closed) offers to open it. */
+/** Pasting a drawing link anywhere (dialog closed) offers to open it. */
 /** A pasted string that looks like a remote DXF link. */
 function looksLikeDxfUrl(text: string): boolean {
   const trimmed = text.trim();
-  return isHttpUrl(trimmed) && /\.dxf(\?|#|$)/i.test(trimmed);
+  return isHttpUrl(trimmed) && /\.(dxf|pdf)(\?|#|$)/i.test(trimmed);
 }
 
 function maybeShowPasteConfirm(text: string): void {
@@ -1415,7 +1416,7 @@ function download(data: Blob | string, filename: string): void {
   a.remove();
   if (typeof data !== "string") URL.revokeObjectURL(url);
 }
-const exportBaseName = (): string => currentName.replace(/\.dxf$/i, "") || "drawing";
+const exportBaseName = (): string => currentName.replace(/\.(dxf|pdf)$/i, "") || "drawing";
 
 $("#export-btn").addEventListener("click", (e) => {
   e.stopPropagation();

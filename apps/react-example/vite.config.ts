@@ -6,6 +6,9 @@ export default defineConfig({
     alias: {
       // Consume the workspace packages from source for instant HMR.
       // Subpaths first: a string alias matches prefixes, first match wins.
+      "@aspicio/core/pdf": fileURLToPath(
+        new URL("../../packages/core/src/pdf.ts", import.meta.url),
+      ),
       "@aspicio/core/dxf": fileURLToPath(
         new URL("../../packages/core/src/dxf.ts", import.meta.url),
       ),
