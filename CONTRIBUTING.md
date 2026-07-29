@@ -33,6 +33,12 @@ just check     # the repo gate (vp run ready)
   code (INV-11). It runs in the `build` phase, because it resolves the
   packages through their published `exports`/`sideEffects` maps rather
   than source aliases.
+- **Wiring gate** (`tools/wiring-gate/`, Vitest reading source and
+  manifests): proves every cross-workspace `@aspicio/*` import names a
+  subpath the target package actually exports, so a tsconfig path or
+  vite alias cannot be the only reason an import resolves. It also pins
+  the shared agent-tool table to zod alone. Cheap and alias-free — it
+  reads files rather than building.
 - **Unit tests** (`packages/core/tests/`, plus the binding packages
   `packages/{elements,react,vue,svelte}/tests/`, Vitest): parsing,
   geometry math, tessellation, camera invariants, gestures (happy-dom),
