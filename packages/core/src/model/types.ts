@@ -254,4 +254,10 @@ export interface DrawingDocument {
    * empty); hand-built documents may omit it (treated as no layouts).
    */
   layouts?: Layout[];
+  /**
+   * Which format produced this document ("dxf", "pdf") — so every surface can
+   * report it without re-sniffing the bytes (PARSE-13). Parsers always set it;
+   * hand-built documents may omit it.
+   */
+  format?: string;
 }

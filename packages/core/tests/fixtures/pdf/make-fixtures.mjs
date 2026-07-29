@@ -542,4 +542,31 @@ fontFixture("font-composite-embedded.pdf", [
   );
 }
 
-console.log("wrote review-probe fixtures");
+/* 20. Three pages, so page→space mapping has something to map (PDF-5). */
+{
+  const pageContent = (n) => `${n} ${n} m ${n * 10} ${n * 10} l S\n`;
+  const objs = [
+    catalog,
+    [2, "<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 /MediaBox [0 0 300 200] >>"],
+  ];
+  let obj = 3;
+  for (let i = 1; i <= 3; i++) {
+    const content = pageContent(i);
+    objs.push([obj, `<< /Type /Page /Parent 2 0 R /Contents ${obj + 1} 0 R >>`]);
+    objs.push([
+      obj + 1,
+      Buffer.concat([
+        enc(`<< /Length ${content.length} >>\nstream\n`),
+        enc(content),
+        enc("\nendstream"),
+      ]),
+    ]);
+    obj += 2;
+  }
+  writeFileSync("three-pages.pdf", classic(objs));
+}
+
+/* 21. A file with no pages at all. */
+writeFileSync("no-pages.pdf", classic([catalog, [2, "<< /Type /Pages /Kids [] /Count 0 >>"]]));
+
+console.log("wrote page fixtures");
