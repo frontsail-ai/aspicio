@@ -12,6 +12,7 @@
     "noEmit": true,
     "paths": {
       "@aspicio/core/dxf": ["../../packages/core/src/dxf.ts"],
+      "@aspicio/core/pdf": ["../../packages/core/src/pdf.ts"],
       "@aspicio/core": ["../../packages/core/src/index.ts"],
       "@aspicio/widget/meta": ["../widget/src/meta.ts"]
     },

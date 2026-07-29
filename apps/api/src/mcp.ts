@@ -39,6 +39,7 @@ async function loadDxf(source: string): Promise<Uint8Array> {
 // the contract tests round-trip real summaries through a validating client,
 // so drift from core fails CI.
 const DRAWING_SUMMARY_SHAPE = {
+  format: z.string().describe('Which format was read ("dxf", "pdf")'),
   units: z.string().describe('Drawing-unit label (e.g. "mm"), "" when unitless'),
   bounds: z
     .object({ minX: z.number(), minY: z.number(), maxX: z.number(), maxY: z.number() })

@@ -1,7 +1,12 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { expect, test } from "vite-plus/test";
+import { fileURLToPath } from "node:url";
 import { createServer } from "../src/server.ts";
+
+// A real PDF, passed by path: PDFs are binary, so an inline string source
+// would not survive the round trip that inline DXF text does.
+const PDF = fileURLToPath(new URL("../../core/tests/fixtures/pdf/minimal.pdf", import.meta.url));
 
 const DXF = [
   "0",
@@ -46,12 +51,26 @@ async function connect(): Promise<Client> {
   return client;
 }
 
-test("advertises describe_dxf and render_dxf over the protocol", async () => {
+// AGT-16: three pairs — one per format, plus one that detects from the bytes.
+test("advertises the six-tool matrix over the protocol", async () => {
   const client = await connect();
   const { tools } = await client.listTools();
-  expect(tools.map((t) => t.name).sort()).toEqual(["describe_dxf", "render_dxf"]);
+  expect(tools.map((t) => t.name).sort()).toEqual([
+    "describe_doc",
+    "describe_dxf",
+    "describe_pdf",
+    "render_doc",
+    "render_dxf",
+    "render_pdf",
+  ]);
   // Descriptions carry the usage guidance — usable by any client with no skill.
   expect(tools.every((t) => (t.description?.length ?? 0) > 40)).toBe(true);
+  // Every tool declares all three behaviour hints (AGT-6).
+  for (const tool of tools) {
+    expect(tool.annotations?.readOnlyHint).toBe(true);
+    expect(tool.annotations?.destructiveHint).toBe(false);
+    expect(tool.annotations?.openWorldHint).toBe(true);
+  }
 });
 
 test("describe_dxf returns a JSON summary as text content", async () => {
@@ -100,4 +119,29 @@ test("describe_dxf declares an output schema and returns matching structured con
   expect(sc.layers.map((l) => l.name)).toContain("WALLS");
   const text = (res.content as Array<{ text: string }>)[0].text;
   expect(JSON.parse(text)).toEqual(sc);
+});
+
+// AGT-16: a typed tool handed the wrong format names the tool that works,
+// rather than reporting a parse failure about the file.
+test("describe_dxf points at the PDF tool when given a PDF", async () => {
+  const client = await connect();
+  const res = await client.callTool({ name: "describe_dxf", arguments: { source: PDF } });
+  expect(res.isError).toBe(true);
+  const text = (res.content as { text?: string }[])[0]?.text ?? "";
+  expect(text).toMatch(/describe_pdf/);
+});
+
+test("describe_doc reads a PDF without being told the format", async () => {
+  const client = await connect();
+  const res = await client.callTool({ name: "describe_doc", arguments: { source: PDF } });
+  expect(res.isError).toBeFalsy();
+  const summary = res.structuredContent as { format?: string };
+  expect(summary.format).toBe("pdf");
+});
+
+test("describe_doc still reads a DXF", async () => {
+  const client = await connect();
+  const res = await client.callTool({ name: "describe_doc", arguments: { source: DXF } });
+  expect(res.isError).toBeFalsy();
+  expect((res.structuredContent as { format?: string }).format).toBe("dxf");
 });
