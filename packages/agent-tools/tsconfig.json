@@ -4,20 +4,12 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "lib": ["ES2023"],
-    "types": ["node"],
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "strict": true,
     "noUnusedLocals": true,
     "skipLibCheck": true,
-    "noEmit": true,
-    "paths": {
-      "@aspicio/core/dxf": ["../core/src/dxf.ts"],
-      "@aspicio/core/pdf": ["../core/src/pdf.ts"],
-      "@aspicio/core": ["../core/src/index.ts"],
-      "@aspicio/agent-tools": ["../agent-tools/src/index.ts"]
-    },
-    "resolveJsonModule": true
+    "noEmit": true
   },
   "include": ["src/**/*.ts"]
 }

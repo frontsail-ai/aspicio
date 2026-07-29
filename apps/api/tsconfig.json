@@ -14,10 +14,10 @@
       "@aspicio/core/dxf": ["../../packages/core/src/dxf.ts"],
       "@aspicio/core/pdf": ["../../packages/core/src/pdf.ts"],
       "@aspicio/core": ["../../packages/core/src/index.ts"],
-      "@aspicio/mcp/tools-meta": ["../../packages/mcp/src/tools-meta.ts"],
+      "@aspicio/agent-tools": ["../../packages/agent-tools/src/index.ts"],
       "@aspicio/widget/meta": ["../widget/src/meta.ts"]
     },
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "../widget/src/meta.ts", "../../packages/mcp/src/tools-meta.ts"]
+  "include": ["src/**/*.ts", "../widget/src/meta.ts", "../../packages/agent-tools/src/index.ts"]
 }

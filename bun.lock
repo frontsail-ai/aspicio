@@ -13,8 +13,8 @@
       "name": "@aspicio/api",
       "version": "0.0.0",
       "dependencies": {
+        "@aspicio/agent-tools": "workspace:*",
         "@aspicio/core": "workspace:*",
-        "@aspicio/mcp": "workspace:*",
         "@aspicio/widget": "workspace:*",
         "@modelcontextprotocol/ext-apps": "^1.7.4",
         "@modelcontextprotocol/sdk": "^1.29.0",
@@ -156,6 +156,17 @@
         "vite-plus": "catalog:",
       },
     },
+    "packages/agent-tools": {
+      "name": "@aspicio/agent-tools",
+      "version": "0.0.0",
+      "dependencies": {
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "typescript": "~6.0.2",
+        "vite-plus": "catalog:",
+      },
+    },
     "packages/core": {
       "name": "@aspicio/core",
       "version": "0.0.0",
@@ -208,6 +219,7 @@
         "zod": "^4.4.3",
       },
       "devDependencies": {
+        "@aspicio/agent-tools": "workspace:*",
         "@types/node": "^26.1.1",
         "typescript": "~6.0.2",
         "vite-plus": "catalog:",
@@ -293,6 +305,15 @@
         "vite-plus": "catalog:",
       },
     },
+    "tools/wiring-gate": {
+      "name": "@aspicio/wiring-gate",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/node": "^26.1.1",
+        "typescript": "~6.0.2",
+        "vite-plus": "catalog:",
+      },
+    },
   },
   "overrides": {
     "vite": "catalog:",
@@ -302,6 +323,8 @@
     "vite-plus": "0.2.4",
   },
   "packages": {
+    "@aspicio/agent-tools": ["@aspicio/agent-tools@workspace:packages/agent-tools"],
+
     "@aspicio/api": ["@aspicio/api@workspace:apps/api"],
 
     "@aspicio/bundle-gate": ["@aspicio/bundle-gate@workspace:tools/bundle-gate"],
@@ -333,6 +356,8 @@
     "@aspicio/widget": ["@aspicio/widget@workspace:apps/widget"],
 
     "@aspicio/widget-example": ["@aspicio/widget-example@workspace:apps/widget-example"],
+
+    "@aspicio/wiring-gate": ["@aspicio/wiring-gate@workspace:tools/wiring-gate"],
 
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
 

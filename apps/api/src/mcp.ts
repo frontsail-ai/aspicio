@@ -6,7 +6,7 @@ import {
   READ_ONLY_HINTS,
   TOOLS,
   widthSchema,
-} from "@aspicio/mcp/tools-meta";
+} from "@aspicio/agent-tools";
 import {
   registerAppResource,
   registerAppTool,

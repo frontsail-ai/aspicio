@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vite-plus/test";
 import { isPrivateHost } from "../src/fetch.ts";
-import { TOOLS } from "../../../packages/mcp/src/tools-meta.ts";
+import { TOOLS } from "@aspicio/agent-tools";
 import { handleRequest } from "../src/handler.ts";
 
 // A tiny valid drawing: a WALLS layer with one LINE and one CIRCLE.

@@ -1,17 +1,29 @@
 /**
- * @aspicio/mcp/tools-meta — the tool table both MCP surfaces share (AGT-16).
+ * @aspicio/agent-tools — the tool table both MCP surfaces implement (AGT-16).
  *
  * The stdio server and the hosted one have genuinely different plumbing: one
- * reads local files, the other is URL-only inside a Worker. What they must not
- * differ on is *which* tools exist and what each one claims to do — AGT-16's
- * whole assertion is that both offer the same six.
+ * reads local files, the other is URL-only inside a serverless function. What
+ * they must not differ on is *which* tools exist and what each one claims to
+ * do — AGT-16's whole assertion is that both offer the same six.
  *
  * So the metadata lives here and the handlers stay per-server. Two transcribed
  * tables would drift for the same reason four hand-copied OpenAPI operations
  * would.
  *
- * Deliberately free of runtime imports (no renderer, no filesystem) so a
- * Worker bundle can take the descriptions without taking a rasterizer.
+ * This package is neutral ground on purpose. It first lived inside
+ * `@aspicio/mcp`, which made a deployed HTTP service depend on the stdio CLI —
+ * and on the native rasterizer binary in that CLI's dependency list — to read
+ * a table of strings. A contract both surfaces implement belongs in neither of
+ * them.
+ *
+ * `private: true` with `exports` pointing at source, like `@aspicio/widget`:
+ * in-repo consumers resolve it legally rather than through an alias no
+ * published `exports` map sanctions. `@aspicio/mcp` takes it as a
+ * devDependency so tsdown bundles it into `dist/index.mjs` and the published
+ * CLI never names an unpublished package.
+ *
+ * Imports nothing but zod — asserted, not asserted-by-comment, in
+ * tools/wiring-gate.
  */
 
 import { z } from "zod";

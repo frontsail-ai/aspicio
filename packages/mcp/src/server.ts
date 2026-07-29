@@ -4,7 +4,7 @@ import { z } from "zod";
 // `initialize` reports the real published version, not the repo's 0.0.0
 // placeholder (registries display this field).
 import pkg from "../package.json";
-import { DRAWING_SUMMARY_SHAPE, READ_ONLY_HINTS, TOOLS, widthSchema } from "./tools-meta.ts";
+import { DRAWING_SUMMARY_SHAPE, READ_ONLY_HINTS, TOOLS, widthSchema } from "@aspicio/agent-tools";
 import {
   describeDoc,
   describeDxf,
