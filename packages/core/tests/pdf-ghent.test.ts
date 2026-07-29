@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vite-plus/test";
 import { PdfDocument, isStream } from "../src/parse/pdf/document.ts";
+import { checkStrictGate } from "../src/parse/pdf/gate.ts";
 import { isUndecoded } from "../src/parse/pdf/filters.ts";
 import { PdfLexer, isKeyword, isName, latin1 } from "../src/parse/pdf/objects.ts";
 
@@ -182,6 +183,14 @@ describe.skipIf(!available)("Ghent PDF Output Suite V5.0", () => {
     // PDF-8: these are counted, never attempted.
     expect(codecs.get("DCTDecode")).toBeGreaterThan(0);
   }, 120_000);
+
+  // The reason PDF-1 says "glyphs absent from the file" rather than "no
+  // embedded font program": this suite uses Type 3 fonts, whose glyphs are
+  // drawing procedures. The narrower rule would reject the acceptance corpus.
+  test("the acceptance corpus passes the strict gate", async () => {
+    await expect(checkStrictGate(await open(X4))).resolves.toBeUndefined();
+    await expect(checkStrictGate(await open(REFERENCE))).resolves.toBeUndefined();
+  }, 180_000);
 
   test("the reference render is pure raster — near-zero vector content", async () => {
     const doc = await open(REFERENCE);
