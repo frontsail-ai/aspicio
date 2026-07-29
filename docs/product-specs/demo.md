@@ -8,10 +8,13 @@ Prefix: `DEMO`.
 
 ### DEMO-1: Load paths
 
-A drawing opens via the bundled sample button, the Open-DXF dialog (a
-native file picker or a remote URL — see DEMO-17), or drag-and-drop
-anywhere in the window. While loading, a status line shows the file name;
-on success the top bar shows name, entity count, and segment count.
+A drawing opens via the bundled sample button, the Open dialog (a native
+file picker or a remote URL — see DEMO-17), or drag-and-drop anywhere in
+the window. The picker accepts every format the app has opted into (DXF
+and PDF); drag-and-drop and URLs are format-agnostic, because what a source
+is gets decided from its bytes (PARSE-13), never from its extension. While
+loading, a status line shows the file name; on success the top bar shows
+name, entity count, and segment count.
 
 ### DEMO-2: Unsupported-entity report
 
@@ -118,7 +121,7 @@ executing JavaScript: a descriptive title and meta description, share
 metadata with a preview image, structured data describing the app, and a
 static rendition of the empty screen — heading, a short description of
 what Aspicio is (in-browser viewing, no upload; library, API, and MCP
-surfaces), and the supported-entity list. Once the app boots it replaces
+surfaces), the formats it opens, and the supported-entity list. Once the app boots it replaces
 the static shell with the live empty screen; the two never disagree in
 substance.
 
@@ -129,9 +132,9 @@ the MCP server page, repository, published packages, privacy policy,
 and terms of use. The links are absent while a drawing is displayed
 (the canvas owns the screen).
 
-### DEMO-17: Open-DXF dialog
+### DEMO-17: Open dialog
 
-The Open-DXF control (top bar and empty screen) opens one dialog that shows
+The Open control (top bar and empty screen) opens one dialog that shows
 both open paths at once — no tabs to switch between. A dashed dropzone opens
 the native picker (and notes files are parsed locally, never uploaded);
 below an "OR OPEN FROM A URL" divider, a drawing-URL field takes it from
@@ -148,12 +151,12 @@ A fetch failure shows a dedicated guidance card — honest about the cause
 (a cross-origin block and an unreachable host are indistinguishable in the
 browser; an HTTP status is named) — with download-and-open advice and
 Try-again / Edit-URL actions; both return to the combined form. A valid
-fetch that isn't a valid DXF falls back to the standard error toast
-(DEMO-3). The dialog anchors a fixed distance from the top so the header
+fetch that no parser claims falls back to the standard error toast
+(DEMO-3, PARSE-12). The dialog anchors a fixed distance from the top so the header
 stays put while the body switches between the form, progress, and error
 states; on a narrow screen it spans the width and scrolls. Escape or a
 backdrop click dismisses it (Cancel, not the backdrop, exits an in-flight
-fetch). Pasting a `.dxf` link anywhere while the dialog is closed raises a
+fetch). Pasting a drawing link (`.dxf` or `.pdf`) anywhere while the dialog is closed raises a
 toast that confirms the URL before loading; pasting one while the dialog is
 open drops the link straight into the URL field, ready to submit (unless the
 field already has focus, where the native paste applies).

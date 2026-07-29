@@ -7,6 +7,7 @@ import "@fontsource/ibm-plex-sans/600.css";
 import "./style.css";
 import { DrawingViewer, attachShortcuts, niceLength, partitionLayers } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
+import { pdfParser } from "@aspicio/core/pdf";
 import type { EntityInfo, LayerInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
 import { decodeView, encodeView, packLayers } from "./viewurl.ts";
 import type { ViewLink } from "./viewurl.ts";
@@ -105,7 +106,7 @@ app.innerHTML = `
         </div>
       </div>
       <button id="load-sample" class="btn-ghost sample-btn" type="button">${icons.file} Sample</button>
-      <button id="open" class="btn-primary" type="button">${icons.filePlus} Open DXF</button>
+      <button id="open" class="btn-primary" type="button">${icons.filePlus} Open</button>
     </div>
     <div id="progress" class="progress" hidden><div class="progress-bar"></div></div>
     <div id="skipped-pop" class="skipped-pop" hidden>
@@ -139,13 +140,13 @@ app.innerHTML = `
         <div class="empty-inner">
           ${reticle(52, "var(--text2)", "var(--text3)")}
           <div class="empty-kicker">NO DRAWING LOADED</div>
-          <h1 class="empty-title">Open a DXF to view it</h1>
+          <h1 class="empty-title">Open a drawing to view it</h1>
           <div class="empty-body">Drop a file anywhere in the window, pick one from your machine, or load the bundled sample.</div>
           <div class="empty-actions">
-            <button id="empty-open" class="btn-primary" type="button">Open DXF</button>
+            <button id="empty-open" class="btn-primary" type="button">Open</button>
             <button id="empty-sample" class="btn-ghost" type="button">Load sample</button>
           </div>
-          <div class="empty-supports">SUPPORTS · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · SPLINE · TEXT · MTEXT · INSERT · DIMENSION · HATCH · SOLID · POINT</div>
+          <div class="empty-supports">OPENS · DXF · PDF<br>DXF ENTITIES · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · SPLINE · TEXT · MTEXT · INSERT · DIMENSION · HATCH · SOLID · POINT</div>
           <nav class="empty-links" aria-label="Project links">
             <a href="/docs/">Docs</a>
             <a href="/mcp/">MCP</a>
@@ -212,12 +213,12 @@ app.innerHTML = `
       </aside>
     </main>
   </div>
-  <input id="file" type="file" accept=".dxf" hidden>
+  <input id="file" type="file" accept=".dxf,.pdf" hidden>
   <div id="drop" class="drop-overlay" hidden>
     <div class="drop-frame">
       ${icons.drop}
-      <div class="drop-title">DROP DXF TO OPEN</div>
-      <div class="drop-sub">.dxf files only · released anywhere</div>
+      <div class="drop-title">DROP DRAWING TO OPEN</div>
+      <div class="drop-sub">.dxf and .pdf · released anywhere</div>
     </div>
   </div>
   <div id="shortcuts" class="shortcuts-overlay" hidden>
@@ -234,7 +235,7 @@ app.innerHTML = `
   <div id="open-dialog" class="od-scrim" hidden>
     <div id="od-card" class="od-card">
       <div class="od-head">
-        <div class="od-head-title">${icons.filePlus}<span>OPEN DXF</span></div>
+        <div class="od-head-title">${icons.filePlus}<span>OPEN DRAWING</span></div>
         <button id="od-close" class="od-close" type="button">${icons.close(18)}</button>
       </div>
       <div class="od-body">
@@ -242,10 +243,10 @@ app.innerHTML = `
           <button id="od-dropzone" class="od-dropzone" type="button">
             ${icons.dropArrow}
             <div>
-              <div class="od-dz-title">Drop a .dxf file here</div>
+              <div class="od-dz-title">Drop a .dxf or .pdf file here</div>
               <div class="od-dz-sub">or click to browse your machine</div>
             </div>
-            <div class="od-dz-note">.DXF · ASCII OR BINARY · PARSED LOCALLY, NEVER UPLOADED</div>
+            <div class="od-dz-note">.DXF · .PDF · PARSED LOCALLY, NEVER UPLOADED</div>
           </button>
           <div class="od-divider">
             <span class="od-divider-line"></span>
@@ -295,7 +296,7 @@ app.innerHTML = `
             <div class="od-try-title">TRY THIS</div>
             <div id="od-tip-status" class="od-try-item"><span class="od-try-dot">·</span><span id="od-tip-status-text"></span></div>
             <div id="od-tip-download" class="od-try-item"><span class="od-try-dot">·</span><span>Download the file, then <button id="od-try-file" class="od-try-link" type="button">drop it in</button> above.</span></div>
-            <div id="od-tip-direct" class="od-try-item"><span class="od-try-dot">·</span><span>Check the link points directly at a <span class="od-lit">.dxf</span> (not an HTML page).</span></div>
+            <div id="od-tip-direct" class="od-try-item"><span class="od-try-dot">·</span><span>Check the link points directly at a <span class="od-lit">.dxf</span> or <span class="od-lit">.pdf</span> (not an HTML page).</span></div>
             <div id="od-tip-cors" class="od-try-item"><span class="od-try-dot">·</span><span>Host it somewhere CORS-enabled (S3 with public read, a raw GitHub URL, etc.).</span></div>
           </div>
           <div class="od-cors-actions">
@@ -310,7 +311,7 @@ app.innerHTML = `
     <div class="paste-card">
       <span class="paste-icon">${icons.link(18)}</span>
       <div class="paste-content">
-        <div class="paste-title">Open this DXF link?</div>
+        <div class="paste-title">Open this drawing link?</div>
         <div id="paste-url" class="paste-url"></div>
         <div class="paste-actions">
           <button id="paste-open" class="paste-open" type="button">Open</button>
@@ -337,7 +338,7 @@ const measureOverlay = app.querySelector<SVGSVGElement>("#measure-overlay")!;
 type Mode = "empty" | "loading" | "loaded" | "error";
 
 const viewerEl = $<HTMLElement>("#viewer");
-const viewer = new DrawingViewer(viewerEl, { background: null, parsers: [dxfParser] });
+const viewer = new DrawingViewer(viewerEl, { background: null, parsers: [dxfParser, pdfParser] });
 
 let mode: Mode = "empty";
 let currentName = "";
@@ -357,7 +358,7 @@ let restoringView = false;
 let hashWriteTimer: number | null = null;
 const layerRows = new Map<string, HTMLLIElement>();
 
-// Open-DXF dialog state. The dropzone and URL field live together in one form;
+// Open dialog state. The dropzone and URL field live together in one form;
 // `phase` overlays loading/cors/invalid onto it (see renderDialog).
 let dialogOpen = false;
 let dialogPhase: "idle" | "loading" | "cors" | "invalid" = "idle";
@@ -1064,7 +1065,7 @@ async function loadRemoteUrl(
   pushRecent({ url, name, size: buffer.byteLength, ts: Date.now() });
 }
 
-/* ---------- open-DXF dialog ---------- */
+/* ---------- open dialog ---------- */
 
 const fileInput = $<HTMLInputElement>("#file");
 const urlInput = $<HTMLInputElement>("#od-input");
@@ -1189,12 +1190,12 @@ function httpTip(status: number | undefined): string {
     return "The file may be private — make sure it's publicly downloadable.";
   if (status !== undefined && status >= 500)
     return "The server had a problem — try again in a moment.";
-  return "Check the link points straight at a downloadable .dxf.";
+  return "Check the link points straight at a downloadable .dxf or .pdf.";
 }
 
 /** Show the dialog's error state for a failed URL open, tailoring the title and
  *  the TRY-THIS tips to the cause: a network/CORS block, an HTTP status, or a
- *  file that downloaded fine but isn't a valid DXF. Keeps the user in the URL
+ *  file that downloaded fine but no parser claims. Keeps the user in the URL
  *  flow (Try again / Edit URL) instead of dropping them onto the file toast. */
 function showDialogError(url: string, kind: FetchErrorKind | "parse", status?: number): void {
   dialogOpen = true;
@@ -1206,13 +1207,13 @@ function showDialogError(url: string, kind: FetchErrorKind | "parse", status?: n
   // network copy stays honest; an HTTP status and a parse failure are specific.
   $("#od-cors-title").textContent =
     kind === "parse"
-      ? "That file isn't a valid DXF"
+      ? "That file isn't a drawing we can open"
       : kind === "http"
         ? `The server returned ${status ?? "an error"}`
         : "Couldn't fetch that URL";
   $("#od-cors-msg").textContent =
     kind === "parse"
-      ? "The download succeeded, but the file isn't a valid DXF drawing."
+      ? "The download succeeded, but no format we support could read the file."
       : kind === "http"
         ? "The request reached the server, but it didn't return the file."
         : "The server blocked the request (no CORS header) or the file wasn't reachable. Browsers can only load remote files a server explicitly allows.";
@@ -1266,29 +1267,31 @@ function cancelDialogLoad(): void {
   renderDialog();
 }
 
-/** Pasting a .dxf link anywhere (dialog closed) offers to open it. */
-/** A pasted string that looks like a remote DXF link. */
-function looksLikeDxfUrl(text: string): boolean {
+/** Pasting a drawing link anywhere (dialog closed) offers to open it. */
+/** A pasted string that looks like a remote drawing link, in any format the
+ *  app opens. The extension only decides whether to offer the link — what the
+ *  bytes actually are is settled by the parsers on load (PARSE-13). */
+function looksLikeDrawingUrl(text: string): boolean {
   const trimmed = text.trim();
-  return isHttpUrl(trimmed) && /\.dxf(\?|#|$)/i.test(trimmed);
+  return isHttpUrl(trimmed) && /\.(dxf|pdf)(\?|#|$)/i.test(trimmed);
 }
 
 function maybeShowPasteConfirm(text: string): void {
-  if (dialogOpen || !looksLikeDxfUrl(text)) return;
+  if (dialogOpen || !looksLikeDrawingUrl(text)) return;
   const trimmed = text.trim();
   pastedUrl = trimmed;
   $("#paste-url").textContent = trimmed;
   $("#paste-toast").hidden = false;
 }
 
-/** With the dialog already open, a pasted DXF link drops straight into the URL
+/** With the dialog already open, a pasted drawing link drops straight into the URL
  *  field instead of raising the confirm toast (the field is the toast's
  *  purpose here). Skipped while the user is typing into the field — native
  *  paste wins there — and while a fetch is in flight. Returns whether it
  *  consumed the paste, so the caller can suppress the browser's own insert. */
 function fillUrlFromPaste(text: string): boolean {
   if (document.activeElement === urlInput || dialogPhase === "loading") return false;
-  if (!looksLikeDxfUrl(text)) return false;
+  if (!looksLikeDrawingUrl(text)) return false;
   urlInput.value = text.trim();
   dialogPhase = "idle"; // reveal the form if a cors/invalid card was up
   renderDialog();
@@ -1415,7 +1418,7 @@ function download(data: Blob | string, filename: string): void {
   a.remove();
   if (typeof data !== "string") URL.revokeObjectURL(url);
 }
-const exportBaseName = (): string => currentName.replace(/\.dxf$/i, "") || "drawing";
+const exportBaseName = (): string => currentName.replace(/\.(dxf|pdf)$/i, "") || "drawing";
 
 $("#export-btn").addEventListener("click", (e) => {
   e.stopPropagation();

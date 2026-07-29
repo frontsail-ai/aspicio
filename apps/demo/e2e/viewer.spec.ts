@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }) => {
 
 test("starts in the empty state with canvas chrome hidden", async ({ page }) => {
   await expect(page.locator("#empty-state")).toBeVisible();
-  await expect(page.locator("#empty-state")).toContainText("Open a DXF to view it");
+  await expect(page.locator("#empty-state")).toContainText("Open a drawing to view it");
   await expect(page.locator("#controls")).toBeHidden();
   await expect(page.locator("#readout")).toBeHidden();
   await expect(page.locator("#file-status")).toBeHidden();
@@ -963,7 +963,7 @@ test("canvas resizes with the window without breaking rendering", async ({ page 
 
 // DEMO-15 / DEMO-16
 test("empty state exposes an h1 title, project links, and crawl files", async ({ page }) => {
-  await expect(page.locator("#empty-state h1.empty-title")).toHaveText("Open a DXF to view it");
+  await expect(page.locator("#empty-state h1.empty-title")).toHaveText("Open a drawing to view it");
 
   const links = page.locator("#empty-state .empty-links a");
   await expect(links.filter({ hasText: "Docs" })).toBeVisible();
@@ -1075,4 +1075,27 @@ test("loads a binary DXF file (AutoCAD Binary DXF)", async ({ page }) => {
   // It actually renders — the green WALLS geometry reaches the canvas.
   const colors = await canvasColors(page);
   expect(colors.green).toBeGreaterThan(10);
+});
+
+// The renderer is verified end-to-end (INV-7), so PDF rendering needs browser
+// proof rather than unit coverage alone.
+test("opens a PDF and renders its vector content", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#file").setInputFiles(fixture("sample.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("sample.pdf");
+
+  const probe = await probeViewer(page);
+  // PDF-7: everything lands on one "Content" layer.
+  expect(probe.layers.map((l) => l.name)).toContain("Content");
+  // PDF-3/PDF-4: strokes, a fill, and text all became entities.
+  expect(probe.entityCount).toBeGreaterThan(2);
+  expect(probe.segmentCount).toBeGreaterThan(2);
+});
+
+test("a PDF reports points as its unit in the measure readout", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#file").setInputFiles(fixture("sample.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("sample.pdf");
+  // PDF-6: pt, carried through unchanged.
+  await expect(page.locator("#scale-label")).toContainText("pt");
 });
