@@ -31,7 +31,9 @@ export async function checkStrictGate(doc: PdfDocument): Promise<void> {
   const seenForms = new Set<number>();
   for (const page of await doc.pages()) {
     const resources = await doc.dict(page.get("Resources"));
-    await checkContent(doc, await doc.pageContent(page), resources, seenForms, 0);
+    // A page's own content can live in another file too, not just an XObject's.
+    for (const stream of await doc.contentStreams(page)) assertLocal(stream);
+    await checkContent(doc, await doc.pageContent(page), resources, seenForms, 0, undefined);
   }
 }
 
@@ -45,6 +47,7 @@ async function checkContent(
   resources: PdfDict | undefined,
   seenForms: Set<number>,
   depth: number,
+  inheritedFont: string | undefined,
 ): Promise<void> {
   if (depth > MAX_FORM_DEPTH) return;
 
@@ -55,7 +58,10 @@ async function checkContent(
   let operands: PdfValue[] = [];
   // Tracked exactly as an interpreter would: the gate cares which font was
   // selected when text is actually shown, not which fonts were declared.
-  let currentFont: string | undefined;
+  // A form inherits the graphics state of whatever invoked it, so text drawn
+  // inside a form can be set in a font selected on the page. Starting each
+  // form at `undefined` would silently accept exactly that construction.
+  let currentFont: string | undefined = inheritedFont;
   const checkedFonts = new Set<string>();
 
   while (!lexer.atEnd) {
@@ -87,7 +93,7 @@ async function checkContent(
       const name = operands[operands.length - 1];
       if (isName(name)) {
         const ref = xobjects?.get(name.name);
-        await checkXObject(doc, ref, seenForms, depth);
+        await checkXObject(doc, ref, resources, seenForms, depth, currentFont);
       }
     } else if (op === "BI") {
       // An inline image's binary data is not PDF syntax; skip to `EI` so it
@@ -126,8 +132,10 @@ async function checkFont(doc: PdfDocument, fontRef: PdfValue | undefined): Promi
 async function checkXObject(
   doc: PdfDocument,
   ref: PdfValue | undefined,
+  parentResources: PdfDict | undefined,
   seenForms: Set<number>,
   depth: number,
+  inheritedFont: string | undefined,
 ): Promise<void> {
   const object = isRef(ref) ? await doc.getObject(ref.num) : undefined;
   if (!isStream(object)) return;
@@ -142,12 +150,14 @@ async function checkXObject(
   }
   const decoded = await doc.readStream(object);
   if (decoded instanceof Uint8Array)
+    // A form without its own /Resources uses the invoking context's.
     await checkContent(
       doc,
       decoded,
-      await doc.dict(object.dict.get("Resources")),
+      (await doc.dict(object.dict.get("Resources"))) ?? parentResources,
       seenForms,
       depth + 1,
+      inheritedFont,
     );
 }
 

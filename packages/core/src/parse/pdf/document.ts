@@ -55,6 +55,9 @@ export class PdfDocument {
   private readonly trailers: PdfDict[] = [];
   private readonly objects = new Map<number, PdfValue | PdfStream>();
   private readonly objectStreams = new Map<number, ObjectStreamIndex>();
+  // The gate reads every content stream, then the interpreter reads them
+  // again; without this the whole document inflates twice.
+  private readonly decoded = new WeakMap<PdfStream, Uint8Array | UndecodedStream>();
 
   private constructor(bytes: Uint8Array) {
     this.bytes = bytes;
@@ -118,7 +121,33 @@ export class PdfDocument {
 
   /** Decode a stream's bytes, or report the image codec that stopped us. */
   async readStream(stream: PdfStream): Promise<Uint8Array | UndecodedStream> {
-    return await decodeStream(stream.raw, stream.dict, (v) => this.resolveSync(v));
+    const cached = this.decoded.get(stream);
+    if (cached !== undefined) return cached;
+    const result = await decodeStream(stream.raw, stream.dict, (v) => this.resolveSync(v));
+    this.decoded.set(stream, result);
+    return result;
+  }
+
+  /**
+   * The stream objects backing a page's content, before decoding.
+   *
+   * Callers that need to inspect the stream dictionaries — rather than the
+   * bytes — use this; `pageContent` is the decoded form.
+   */
+  async contentStreams(page: PdfDict): Promise<PdfStream[]> {
+    const contents = page.get("Contents");
+    let refs: PdfValue[];
+    if (isRef(contents)) {
+      const target = await this.getObject(contents.num);
+      refs = isStream(target) ? [contents] : Array.isArray(target) ? target : [];
+    } else refs = Array.isArray(contents) ? contents : [];
+
+    const out: PdfStream[] = [];
+    for (const ref of refs) {
+      const object = isRef(ref) ? await this.getObject(ref.num) : undefined;
+      if (isStream(object)) out.push(object);
+    }
+    return out;
   }
 
   /* ---------- pages ---------- */
@@ -184,21 +213,9 @@ export class PdfDocument {
    * read as a single `00`.
    */
   async pageContent(page: PdfDict): Promise<Uint8Array> {
-    // Deliberately not `array()`: resolving a reference to a stream yields its
-    // dictionary, which would drop the bytes. The reference has to survive
-    // until we can ask for the stream itself.
-    const contents = page.get("Contents");
-    let refs: PdfValue[];
-    if (isRef(contents)) {
-      const target = await this.getObject(contents.num);
-      refs = isStream(target) ? [contents] : Array.isArray(target) ? target : [];
-    } else refs = Array.isArray(contents) ? contents : [];
-
     const parts: Uint8Array[] = [];
-    for (const ref of refs) {
-      const object = isRef(ref) ? await this.getObject(ref.num) : undefined;
-      if (!isStream(object)) continue;
-      const decoded = await this.readStream(object);
+    for (const stream of await this.contentStreams(page)) {
+      const decoded = await this.readStream(stream);
       if (isUndecoded(decoded)) continue;
       parts.push(decoded, NEWLINE);
     }
@@ -331,19 +348,44 @@ export class PdfDocument {
     return typeof prev === "number" ? prev : undefined;
   }
 
-  /** Last resort: index every `N G obj` header in the file. */
+  /**
+   * Last resort: index every `N G obj` header in the file.
+   *
+   * Scans bytes rather than decoding the file into a string — recovery is
+   * triggered by damage, and a damaged multi-megabyte upload is exactly where
+   * materializing a second copy of the file would hurt.
+   */
   private recoverByScan(): void {
-    const pattern = /(\d+)\s+(\d+)\s+obj\b/g;
-    const text = latin1(this.bytes);
-    for (let m = pattern.exec(text); m !== null; m = pattern.exec(text)) {
-      const num = parseInt(m[1] as string, 10);
-      // A later definition wins during recovery — the file order is all we have.
-      if (Number.isFinite(num)) this.xref.set(num, { kind: "offset", offset: m.index });
+    for (
+      let at = indexOfAscii(this.bytes, "obj");
+      at >= 0;
+      at = indexOfAscii(this.bytes, "obj", at + 3)
+    ) {
+      // Walk back over " G " and "N" to find the header's start.
+      let i = at - 1;
+      while (i >= 0 && isAsciiSpace(this.bytes[i] as number)) i--;
+      const genEnd = i;
+      while (i >= 0 && isAsciiDigit(this.bytes[i] as number)) i--;
+      if (i === genEnd) continue; // no generation number
+      while (i >= 0 && isAsciiSpace(this.bytes[i] as number)) i--;
+      const numEnd = i;
+      while (i >= 0 && isAsciiDigit(this.bytes[i] as number)) i--;
+      if (i === numEnd) continue; // no object number
+      const start = i + 1;
+      const num = parseInt(latin1(this.bytes, start, numEnd + 1), 10);
+      // Recovery deliberately lets a *later* definition win, which is the
+      // opposite of the newest-section-wins rule the cross-reference readers
+      // use. Without a cross-reference table there is no section order to
+      // trust — file order is the only signal, and an incremental update
+      // appends, so the last copy in the file is the newest.
+      if (Number.isFinite(num)) this.xref.set(num, { kind: "offset", offset: start });
     }
+    const text = latin1(this.bytes.subarray(Math.max(0, this.bytes.length - 4096)));
     if (this.trailers.length === 0) {
+      const tailStart = Math.max(0, this.bytes.length - 4096);
       const at = text.lastIndexOf("trailer");
       if (at >= 0) {
-        const lexer = new PdfLexer(this.bytes, at + "trailer".length);
+        const lexer = new PdfLexer(this.bytes, tailStart + at + "trailer".length);
         const trailer = lexer.parseObject();
         if (isDict(trailer)) this.trailers.push(trailer);
       }
@@ -455,6 +497,10 @@ export class PdfDocument {
     return isStream(object) ? object.dict : object;
   }
 }
+
+const isAsciiDigit = (b: number): boolean => b >= 0x30 && b <= 0x39;
+const isAsciiSpace = (b: number): boolean =>
+  b === 0x20 || b === 0x09 || b === 0x0a || b === 0x0d || b === 0x0c || b === 0x00;
 
 const NEWLINE = Uint8Array.of(0x0a);
 const INHERITABLE = ["Resources", "MediaBox", "CropBox", "Rotate"] as const;

@@ -1,0 +1,46 @@
+%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R /Resources << /XObject << /X1 5 0 R >> /Font << /F1 6 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 23 >>
+stream
+BT /F1 12 Tf ET
+/X1 Do
+
+endstream
+endobj
+5 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 20 20] /Length 21 >>
+stream
+BT 1 1 Td (hi) Tj ET
+
+endstream
+endobj
+6 0 obj
+<< /Type /Font /Subtype /TrueType /BaseFont /Arial /FontDescriptor 7 0 R >>
+endobj
+7 0 obj
+<< /Type /FontDescriptor /FontName /Arial /Flags 32 >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000266 00000 n 
+0000000339 00000 n 
+0000000458 00000 n 
+0000000549 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R  >>
+startxref
+619
+%%EOF

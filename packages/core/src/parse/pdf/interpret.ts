@@ -1,0 +1,536 @@
+/**
+ * The content-stream interpreter (PDF-3).
+ *
+ * Walks drawing operators and emits the same entity types DXF produces, so
+ * everything below parse stays format-blind. What it cannot draw it counts
+ * (PDF-8) — the interpreter never fails a file, it only ever draws less.
+ */
+
+import { sampleCubic } from "../../geom/bezier.ts";
+import { DEFAULT_CURVE_SEGMENTS } from "../../geom/arc.ts";
+import type {
+  Entity,
+  HatchEntity,
+  LineTypeDef,
+  Point2,
+  PolylineEntity,
+} from "../../model/types.ts";
+import { isStream } from "./document.ts";
+import type { PdfDocument } from "./document.ts";
+import { PdfLexer, isKeyword, isName, isRef, toNumber } from "./objects.ts";
+import type { PdfDict, PdfValue } from "./objects.ts";
+
+/** The single layer PDF content lands on until OCG support arrives (PDF-7). */
+export const CONTENT_LAYER = "Content";
+
+/** 1 pt = 25.4/72 mm, and lineweights are stored in 1/100 mm. */
+const POINTS_TO_LINEWEIGHT = 2540 / 72;
+
+/** Bound on form recursion; a cyclic form graph must not hang the parse. */
+const MAX_FORM_DEPTH = 12;
+
+/** A 2×3 affine matrix, PDF's `[a b c d e f]`. */
+export type Matrix = readonly [number, number, number, number, number, number];
+
+export const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
+
+/** `m × n` — apply `m` first, then `n`, matching PDF's `cm` semantics. */
+export function multiply(m: Matrix, n: Matrix): Matrix {
+  return [
+    m[0] * n[0] + m[1] * n[2],
+    m[0] * n[1] + m[1] * n[3],
+    m[2] * n[0] + m[3] * n[2],
+    m[2] * n[1] + m[3] * n[3],
+    m[4] * n[0] + m[5] * n[2] + n[4],
+    m[4] * n[1] + m[5] * n[3] + n[5],
+  ];
+}
+
+export const apply = (m: Matrix, x: number, y: number): Point2 => ({
+  x: m[0] * x + m[2] * y + m[4],
+  y: m[1] * x + m[3] * y + m[5],
+});
+
+/**
+ * The matrix's average scale factor.
+ *
+ * Line width is a scalar in user space but the transform may scale the axes
+ * differently; the geometric mean is the standard compromise and matches what
+ * a renderer shows for a uniformly scaled drawing exactly.
+ */
+export function matrixScale(m: Matrix): number {
+  const det = Math.abs(m[0] * m[3] - m[1] * m[2]);
+  return Math.sqrt(det) || Math.hypot(m[0], m[1]) || 1;
+}
+
+/* ---------- colour ---------- */
+
+const clamp255 = (v: number): number => Math.max(0, Math.min(255, Math.round(v * 255)));
+const rgb = (r: number, g: number, b: number): number =>
+  (clamp255(r) << 16) | (clamp255(g) << 8) | clamp255(b);
+
+/** Naive CMYK → RGB, which is what a viewer without colour management can do. */
+export const cmykToRgb = (c: number, m: number, y: number, k: number): number =>
+  rgb((1 - c) * (1 - k), (1 - m) * (1 - k), (1 - y) * (1 - k));
+
+export const grayToRgb = (g: number): number => rgb(g, g, g);
+
+/* ---------- graphics state ---------- */
+
+interface GraphicsState {
+  ctm: Matrix;
+  strokeColor: number;
+  fillColor: number;
+  lineWidth: number;
+  dash: number[];
+}
+
+const initialState = (ctm: Matrix): GraphicsState => ({
+  ctm,
+  strokeColor: 0x000000,
+  fillColor: 0x000000,
+  lineWidth: 1,
+  dash: [],
+});
+
+const cloneState = (s: GraphicsState): GraphicsState => ({ ...s, dash: [...s.dash] });
+
+/** What one page's interpretation produced. */
+export interface InterpretResult {
+  entities: Entity[];
+  /** Synthesized dash patterns, keyed by the name the entities reference. */
+  lineTypes: Map<string, LineTypeDef>;
+  /** Per-kind counts of what was skipped (PDF-8). */
+  unsupported: Record<string, number>;
+}
+
+export interface InterpretOptions {
+  /** Segments per full circle when flattening curves. */
+  curveSegments?: number;
+}
+
+/**
+ * Interpret one page's content into entities.
+ *
+ * `baseCtm` lets a caller place the page; the identity leaves content in PDF
+ * user space, which is already y-up like DXF (PDF-6).
+ */
+export async function interpretContent(
+  doc: PdfDocument,
+  content: Uint8Array,
+  resources: PdfDict | undefined,
+  options: InterpretOptions = {},
+  baseCtm: Matrix = IDENTITY,
+): Promise<InterpretResult> {
+  const run = new Interpreter(doc, options.curveSegments ?? DEFAULT_CURVE_SEGMENTS);
+  await run.execute(content, resources, baseCtm, 0);
+  return { entities: run.entities, lineTypes: run.lineTypes, unsupported: run.unsupported };
+}
+
+class Interpreter {
+  readonly entities: Entity[] = [];
+  readonly lineTypes = new Map<string, LineTypeDef>();
+  readonly unsupported: Record<string, number> = {};
+  private readonly dashNames = new Map<string, string>();
+
+  private readonly doc: PdfDocument;
+  private readonly curveSegments: number;
+
+  // Explicit fields rather than constructor parameter properties: the example
+  // apps compile core from source under `erasableSyntaxOnly`, which rejects
+  // the shorthand.
+  constructor(doc: PdfDocument, curveSegments: number) {
+    this.doc = doc;
+    this.curveSegments = curveSegments;
+  }
+
+  private count(kind: string): void {
+    this.unsupported[kind] = (this.unsupported[kind] ?? 0) + 1;
+  }
+
+  async execute(
+    content: Uint8Array,
+    resources: PdfDict | undefined,
+    ctm: Matrix,
+    depth: number,
+  ): Promise<void> {
+    if (depth > MAX_FORM_DEPTH) return;
+
+    const stack: GraphicsState[] = [];
+    let state = initialState(ctm);
+    let operands: PdfValue[] = [];
+
+    // Current path, in device space: each subpath is a run of points.
+    let subpaths: Point2[][] = [];
+    let current: Point2[] = [];
+    let startPoint: Point2 | undefined;
+    let cursor: Point2 = { x: 0, y: 0 };
+    let pendingClip = false;
+
+    const num = (i: number): number => toNumber(operands[operands.length - i]);
+    const flushSubpath = (): void => {
+      if (current.length > 1) subpaths.push(current);
+      current = [];
+    };
+    const resetPath = (): void => {
+      flushSubpath();
+      if (pendingClip) {
+        // Clipping is honored by counting, not by cropping: a fill may escape
+        // the region its producer intended (PDF-8).
+        this.count("Clip");
+        pendingClip = false;
+      }
+      subpaths = [];
+      startPoint = undefined;
+    };
+    const moveTo = (x: number, y: number): void => {
+      flushSubpath();
+      cursor = apply(state.ctm, x, y);
+      startPoint = cursor;
+      current = [cursor];
+    };
+    const lineTo = (x: number, y: number): void => {
+      cursor = apply(state.ctm, x, y);
+      if (current.length === 0) current.push(cursor);
+      else current.push(cursor);
+    };
+    const curveTo = (c1: Point2, c2: Point2, end: Point2): void => {
+      const p0 = cursor;
+      const a = apply(state.ctm, c1.x, c1.y);
+      const b = apply(state.ctm, c2.x, c2.y);
+      const p3 = apply(state.ctm, end.x, end.y);
+      if (current.length === 0) current.push(p0);
+      current.push(...sampleCubic(p0, a, b, p3, this.curveSegments));
+      cursor = p3;
+    };
+
+    const lexer = new PdfLexer(content);
+    while (!lexer.atEnd) {
+      lexer.skipSpace();
+      if (lexer.atEnd) break;
+      const before = lexer.pos;
+      const value = lexer.parseObject();
+      if (lexer.pos === before) {
+        lexer.pos++;
+        continue;
+      }
+      if (!isKeyword(value)) {
+        operands.push(value);
+        if (operands.length > 128) operands = operands.slice(-32);
+        continue;
+      }
+
+      switch (value.op) {
+        /* --- graphics state --- */
+        case "q":
+          stack.push(cloneState(state));
+          break;
+        case "Q":
+          state = stack.pop() ?? state;
+          break;
+        case "cm":
+          state.ctm = multiply([num(6), num(5), num(4), num(3), num(2), num(1)], state.ctm);
+          break;
+        case "w":
+          state.lineWidth = num(1);
+          break;
+        case "d": {
+          const pattern = operands[operands.length - 2];
+          state.dash = Array.isArray(pattern) ? pattern.map((v) => toNumber(v)) : [];
+          break;
+        }
+        case "gs":
+          await this.applyExtGState(operands[operands.length - 1], resources);
+          break;
+
+        /* --- colour --- */
+        case "RG":
+          state.strokeColor = rgb(num(3), num(2), num(1));
+          break;
+        case "rg":
+          state.fillColor = rgb(num(3), num(2), num(1));
+          break;
+        case "K":
+          state.strokeColor = cmykToRgb(num(4), num(3), num(2), num(1));
+          break;
+        case "k":
+          state.fillColor = cmykToRgb(num(4), num(3), num(2), num(1));
+          break;
+        case "G":
+          state.strokeColor = grayToRgb(num(1));
+          break;
+        case "g":
+          state.fillColor = grayToRgb(num(1));
+          break;
+        case "SC":
+        case "SCN":
+        case "sc":
+        case "scn": {
+          // Component counts identify the space well enough to colour with;
+          // a pattern operand names a pattern instead, which we count.
+          const stroking = value.op === "SC" || value.op === "SCN";
+          const nums = operands.filter((o) => typeof o === "number") as number[];
+          if (operands.some((o) => isName(o))) this.count("PatternFill");
+          else if (nums.length === 1) {
+            const c = grayToRgb(nums[0] as number);
+            if (stroking) state.strokeColor = c;
+            else state.fillColor = c;
+          } else if (nums.length === 3) {
+            const c = rgb(nums[0] as number, nums[1] as number, nums[2] as number);
+            if (stroking) state.strokeColor = c;
+            else state.fillColor = c;
+          } else if (nums.length === 4) {
+            const c = cmykToRgb(
+              nums[0] as number,
+              nums[1] as number,
+              nums[2] as number,
+              nums[3] as number,
+            );
+            if (stroking) state.strokeColor = c;
+            else state.fillColor = c;
+          }
+          break;
+        }
+
+        /* --- path construction --- */
+        case "m":
+          moveTo(num(2), num(1));
+          break;
+        case "l":
+          lineTo(num(2), num(1));
+          break;
+        case "c":
+          curveTo({ x: num(6), y: num(5) }, { x: num(4), y: num(3) }, { x: num(2), y: num(1) });
+          break;
+        case "v": {
+          // First control point is the current point.
+          const inv = this.inverse(state.ctm, cursor);
+          curveTo(inv, { x: num(4), y: num(3) }, { x: num(2), y: num(1) });
+          break;
+        }
+        case "y":
+          curveTo({ x: num(4), y: num(3) }, { x: num(2), y: num(1) }, { x: num(2), y: num(1) });
+          break;
+        case "re": {
+          const x = num(4);
+          const y = num(3);
+          const w = num(2);
+          const h = num(1);
+          flushSubpath();
+          const corners = [
+            apply(state.ctm, x, y),
+            apply(state.ctm, x + w, y),
+            apply(state.ctm, x + w, y + h),
+            apply(state.ctm, x, y + h),
+          ];
+          subpaths.push([...corners, corners[0] as Point2]);
+          cursor = corners[0] as Point2;
+          startPoint = cursor;
+          break;
+        }
+        case "h":
+          if (current.length > 1 && startPoint) current.push(startPoint);
+          break;
+
+        /* --- path painting --- */
+        case "S":
+        case "s": {
+          if (value.op === "s" && current.length > 1 && startPoint) current.push(startPoint);
+          flushSubpath();
+          this.emitStrokes(subpaths, state);
+          resetPath();
+          break;
+        }
+        case "f":
+        case "F":
+        case "f*":
+          flushSubpath();
+          this.emitFill(subpaths, state);
+          resetPath();
+          break;
+        case "B":
+        case "B*":
+        case "b":
+        case "b*": {
+          if ((value.op === "b" || value.op === "b*") && current.length > 1 && startPoint)
+            current.push(startPoint);
+          flushSubpath();
+          this.emitFill(subpaths, state);
+          this.emitStrokes(subpaths, state);
+          resetPath();
+          break;
+        }
+        case "n":
+          resetPath();
+          break;
+        case "W":
+        case "W*":
+          pendingClip = true;
+          break;
+
+        /* --- external objects --- */
+        case "Do":
+          await this.drawXObject(operands[operands.length - 1], resources, state, depth);
+          break;
+        case "sh":
+          this.count("Shading");
+          break;
+        case "BI":
+          this.count("Image");
+          lexer.pos = skipInlineImage(content, lexer.pos);
+          break;
+
+        /* --- text: 1.4 emits entities; here it only has to not derail --- */
+        case "BT":
+        case "ET":
+          break;
+
+        default:
+          break;
+      }
+      operands = [];
+    }
+  }
+
+  /** Map a device-space point back through the CTM, for `v`'s implicit control point. */
+  private inverse(m: Matrix, p: Point2): Point2 {
+    const det = m[0] * m[3] - m[1] * m[2];
+    if (Math.abs(det) < 1e-12) return { x: 0, y: 0 };
+    const dx = p.x - m[4];
+    const dy = p.y - m[5];
+    return { x: (dx * m[3] - dy * m[2]) / det, y: (dy * m[0] - dx * m[1]) / det };
+  }
+
+  private emitStrokes(subpaths: Point2[][], state: GraphicsState): void {
+    const scale = matrixScale(state.ctm);
+    // A zero width means "thinnest line the device can draw" — hairline, which
+    // is what an undefined lineWeight already means downstream.
+    const width = state.lineWidth * scale;
+    const lineWeight = width > 0 ? Math.round(width * POINTS_TO_LINEWEIGHT) : undefined;
+    const lineType = this.dashLineType(state.dash, scale);
+    for (const points of subpaths) {
+      if (points.length < 2) continue;
+      const entity: PolylineEntity = {
+        type: "POLYLINE",
+        layer: CONTENT_LAYER,
+        color: state.strokeColor,
+        points,
+        bulges: points.map(() => 0),
+        closed: false,
+        ...(lineWeight === undefined ? {} : { lineWeight }),
+        ...(lineType === undefined ? {} : { lineType }),
+      };
+      this.entities.push(entity);
+    }
+  }
+
+  private emitFill(subpaths: Point2[][], state: GraphicsState): void {
+    const loops = subpaths.filter((p) => p.length >= 3);
+    if (loops.length === 0) return;
+    const entity: HatchEntity = {
+      type: "HATCH",
+      layer: CONTENT_LAYER,
+      color: state.fillColor,
+      // The first subpath is the outer boundary and the rest are holes — the
+      // same convention DXF fills use, and an approximation of both of PDF's
+      // fill rules rather than an implementation of either (PDF-3).
+      loops,
+      solid: true,
+    };
+    this.entities.push(entity);
+  }
+
+  /**
+   * Turn a dash array into a named linetype the existing resolution machinery
+   * understands: positive runs draw, negative runs gap.
+   */
+  private dashLineType(dash: number[], scale: number): string | undefined {
+    const scaled = dash.map((d) => d * scale).filter((d) => Number.isFinite(d));
+    if (scaled.every((d) => d === 0)) return undefined; // also covers the empty array
+    const key = scaled.join(",");
+    const existing = this.dashNames.get(key);
+    if (existing) return existing;
+
+    const name = `__dash_${this.dashNames.size}`;
+    const pattern: number[] = [];
+    for (let i = 0; i < scaled.length; i++) {
+      const value = Math.abs(scaled[i] as number);
+      // PDF alternates on/off starting with on; DXF signs them.
+      pattern.push(i % 2 === 0 ? value : -value);
+    }
+    // An odd-length PDF array repeats with phase inverted; doubling it makes
+    // the pattern self-consistent for a renderer that just cycles.
+    if (pattern.length % 2 === 1) pattern.push(...pattern.map((p) => -p));
+    this.lineTypes.set(name, {
+      name,
+      pattern,
+      patternLength: pattern.reduce((sum, p) => sum + Math.abs(p), 0),
+    });
+    this.dashNames.set(key, name);
+    return name;
+  }
+
+  private async applyExtGState(
+    nameValue: PdfValue | undefined,
+    resources: PdfDict | undefined,
+  ): Promise<void> {
+    if (!isName(nameValue)) return;
+    const states = await this.doc.dict(resources?.get("ExtGState"));
+    const gs = await this.doc.dict(states?.get(nameValue.name));
+    if (!gs) return;
+    if (gs.has("SMask")) {
+      const mask = gs.get("SMask");
+      // /None turns masking off — only an actual mask is unsupported.
+      if (!(isName(mask) && mask.name === "None")) this.count("SoftMask");
+    }
+    const blend = gs.get("BM");
+    const blendName = isName(blend)
+      ? blend.name
+      : Array.isArray(blend) && isName(blend[0])
+        ? blend[0].name
+        : undefined;
+    if (blendName !== undefined && blendName !== "Normal" && blendName !== "Compatible")
+      this.count("BlendMode");
+  }
+
+  private async drawXObject(
+    nameValue: PdfValue | undefined,
+    resources: PdfDict | undefined,
+    state: GraphicsState,
+    depth: number,
+  ): Promise<void> {
+    if (!isName(nameValue)) return;
+    const xobjects = await this.doc.dict(resources?.get("XObject"));
+    const ref = xobjects?.get(nameValue.name);
+    const object = isRef(ref) ? await this.doc.getObject(ref.num) : undefined;
+    if (!isStream(object)) return;
+
+    const subtype = object.dict.get("Subtype");
+    if (isName(subtype) && subtype.name === "Image") {
+      this.count("Image");
+      return;
+    }
+    if (!isName(subtype) || subtype.name !== "Form") return;
+
+    const decoded = await this.doc.readStream(object);
+    if (!(decoded instanceof Uint8Array)) return;
+    // A form's own /Matrix places it inside its parent's space.
+    const matrixValue = await this.doc.array(object.dict.get("Matrix"));
+    const matrix: Matrix =
+      matrixValue.length === 6
+        ? (matrixValue.map((v) => toNumber(v)) as unknown as Matrix)
+        : IDENTITY;
+    const formResources = (await this.doc.dict(object.dict.get("Resources"))) ?? resources;
+    await this.execute(decoded, formResources, multiply(matrix, state.ctm), depth + 1);
+  }
+}
+
+/** Position after an inline image's `EI`, given the position after `BI`. */
+function skipInlineImage(content: Uint8Array, from: number): number {
+  for (let i = from; i < content.length - 1; i++) {
+    if (content[i] !== 0x45 || content[i + 1] !== 0x49) continue;
+    const after = content[i + 2];
+    if (after === undefined || after <= 0x20) return i + 2;
+  }
+  return content.length;
+}
