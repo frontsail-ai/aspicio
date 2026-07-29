@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }) => {
 
 test("starts in the empty state with canvas chrome hidden", async ({ page }) => {
   await expect(page.locator("#empty-state")).toBeVisible();
-  await expect(page.locator("#empty-state")).toContainText("Open a DXF to view it");
+  await expect(page.locator("#empty-state")).toContainText("Open a drawing to view it");
   await expect(page.locator("#controls")).toBeHidden();
   await expect(page.locator("#readout")).toBeHidden();
   await expect(page.locator("#file-status")).toBeHidden();
@@ -963,7 +963,7 @@ test("canvas resizes with the window without breaking rendering", async ({ page 
 
 // DEMO-15 / DEMO-16
 test("empty state exposes an h1 title, project links, and crawl files", async ({ page }) => {
-  await expect(page.locator("#empty-state h1.empty-title")).toHaveText("Open a DXF to view it");
+  await expect(page.locator("#empty-state h1.empty-title")).toHaveText("Open a drawing to view it");
 
   const links = page.locator("#empty-state .empty-links a");
   await expect(links.filter({ hasText: "Docs" })).toBeVisible();
