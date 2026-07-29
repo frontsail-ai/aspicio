@@ -82,3 +82,29 @@ test("follows forms when checking fonts", async () => {
   expect(error).toBeInstanceOf(DrawingParseError);
   expect((error as DrawingParseError).message).toBe("This PDF needs fonts it doesn't embed");
 });
+
+/* ---------- inheritance gaps found by review probes ---------- */
+
+// A form without its own /Resources uses the invoking context's, so the page's
+// non-embedded font is what this text is actually drawn in.
+test("follows a form that inherits the page's resources", async () => {
+  const error = await gate("form-inherits-resources.pdf");
+  expect(error).toBeInstanceOf(DrawingParseError);
+  expect((error as DrawingParseError).message).toBe("This PDF needs fonts it doesn't embed");
+});
+
+// A form inherits the graphics state of whatever invoked it: the font is
+// selected on the page and only used inside the form.
+test("follows a font selected before the form that draws with it", async () => {
+  const error = await gate("form-inherits-font.pdf");
+  expect(error).toBeInstanceOf(DrawingParseError);
+  expect((error as DrawingParseError).message).toBe("This PDF needs fonts it doesn't embed");
+});
+
+// PDF-1 says "content stored outside this document" without qualification, so
+// a page's own stream counts, not just an XObject's.
+test("refuses a page whose own content lives in another file", async () => {
+  const error = await gate("external-page-content.pdf");
+  expect(error).toBeInstanceOf(DrawingParseError);
+  expect((error as DrawingParseError).message).toBe("This PDF's content lives in another file");
+});

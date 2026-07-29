@@ -449,4 +449,97 @@ fontFixture("font-composite-embedded.pdf", [
   );
 }
 
-console.log("wrote strict-gate fixtures");
+/* ---------- gate gaps found by review probes ---------- */
+
+/* 17. A form with no /Resources, drawing text with the *page's* font.
+      Forms without their own resources fall back to the invoking context's. */
+{
+  const page = "/X1 Do\n";
+  const form = "BT /F1 12 Tf 1 1 Td (hi) Tj ET\n";
+  writeFileSync(
+    "form-inherits-resources.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R " +
+          "/Resources << /XObject << /X1 5 0 R >> /Font << /F1 6 0 R >> >> >>",
+      ],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${page.length} >>\nstream\n`),
+          enc(page),
+          enc("\nendstream"),
+        ]),
+      ],
+      [
+        5,
+        Buffer.concat([
+          enc(
+            `<< /Type /XObject /Subtype /Form /BBox [0 0 20 20] /Length ${form.length} >>\nstream\n`,
+          ),
+          enc(form),
+          enc("\nendstream"),
+        ]),
+      ],
+      [6, "<< /Type /Font /Subtype /TrueType /BaseFont /Arial /FontDescriptor 7 0 R >>"],
+      [7, "<< /Type /FontDescriptor /FontName /Arial /Flags 32 >>"],
+    ]),
+  );
+}
+
+/* 18. A form that inherits the *selected font*: Tf runs on the page, Tj runs
+      inside the form. Forms inherit the graphics state of their caller. */
+{
+  const page = "BT /F1 12 Tf ET\n/X1 Do\n";
+  const form = "BT 1 1 Td (hi) Tj ET\n";
+  writeFileSync(
+    "form-inherits-font.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R " +
+          "/Resources << /XObject << /X1 5 0 R >> /Font << /F1 6 0 R >> >> >>",
+      ],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${page.length} >>\nstream\n`),
+          enc(page),
+          enc("\nendstream"),
+        ]),
+      ],
+      [
+        5,
+        Buffer.concat([
+          enc(
+            `<< /Type /XObject /Subtype /Form /BBox [0 0 20 20] /Length ${form.length} >>\nstream\n`,
+          ),
+          enc(form),
+          enc("\nendstream"),
+        ]),
+      ],
+      [6, "<< /Type /Font /Subtype /TrueType /BaseFont /Arial /FontDescriptor 7 0 R >>"],
+      [7, "<< /Type /FontDescriptor /FontName /Arial /Flags 32 >>"],
+    ]),
+  );
+}
+
+/* 19. A page whose *own* content stream lives in another file. */
+{
+  writeFileSync(
+    "external-page-content.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R >>"],
+      [4, Buffer.concat([enc("<< /F (elsewhere.pdf) /Length 0 >>\nstream\n"), enc("\nendstream")])],
+    ]),
+  );
+}
+
+console.log("wrote review-probe fixtures");
