@@ -296,4 +296,157 @@ const pagesNode = (kids) => [
   writeFileSync("broken-xref.pdf", Buffer.from(broken, "latin1"));
 }
 
-console.log("wrote 9 fixtures");
+/* ---------- strict-gate fixtures (PDF-1) ---------- */
+
+/** A page whose content draws text with the named font resource. */
+function fontFixture(name, fontObj, { draws = true } = {}) {
+  const content = draws
+    ? "BT /F1 12 Tf 10 10 Td (hello) Tj ET\n"
+    : "BT /F1 12 Tf ET\n10 10 m 20 20 l S\n"; // selects the font, shows no text
+  writeFileSync(
+    name,
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R " +
+          "/Resources << /Font << /F1 5 0 R >> >> >>",
+      ],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${content.length} >>\nstream\n`),
+          enc(content),
+          enc("\nendstream"),
+        ]),
+      ],
+      ...fontObj,
+    ]),
+  );
+}
+
+/* 10. Text in a font the file does not carry — the gate's fatal case. */
+fontFixture("font-not-embedded.pdf", [
+  [5, "<< /Type /Font /Subtype /TrueType /BaseFont /Arial /FontDescriptor 6 0 R >>"],
+  [6, "<< /Type /FontDescriptor /FontName /Arial /Flags 32 >>"],
+]);
+
+/* 11. The same font, declared and selected but never drawn with — must load.
+      This is what makes the gate a usage check rather than a resource audit. */
+fontFixture(
+  "font-not-embedded-unused.pdf",
+  [
+    [5, "<< /Type /Font /Subtype /TrueType /BaseFont /Arial /FontDescriptor 6 0 R >>"],
+    [6, "<< /Type /FontDescriptor /FontName /Arial /Flags 32 >>"],
+  ],
+  { draws: false },
+);
+
+/* 12. An embedded font program — must load. */
+fontFixture("font-embedded.pdf", [
+  [5, "<< /Type /Font /Subtype /TrueType /BaseFont /ABCDEF+Arial /FontDescriptor 6 0 R >>"],
+  [6, "<< /Type /FontDescriptor /FontName /ABCDEF+Arial /Flags 32 /FontFile2 7 0 R >>"],
+  [7, Buffer.concat([enc("<< /Length 4 >>\nstream\n"), enc("fake"), enc("\nendstream")])],
+]);
+
+/* 13. A Type 3 font: glyphs are drawing procedures, so they count as present
+      (PDF-1). The Ghent X-4 suite uses these, so a false rejection here would
+      reject the acceptance corpus. */
+fontFixture("font-type3.pdf", [
+  [
+    5,
+    "<< /Type /Font /Subtype /Type3 /FontBBox [0 0 10 10] /FontMatrix [0.001 0 0 0.001 0 0] " +
+      "/CharProcs << /h 7 0 R >> /Encoding << /Differences [104 /h] >> /FirstChar 104 " +
+      "/LastChar 104 /Widths [500] >>",
+  ],
+  [6, "<< /Type /FontDescriptor /FontName /T3 /Flags 4 >>"],
+  [7, Buffer.concat([enc("<< /Length 12 >>\nstream\n"), enc("0 0 5 5 re f"), enc("\nendstream")])],
+]);
+
+/* 14. A composite font whose program hangs off the descendant — must load. */
+fontFixture("font-composite-embedded.pdf", [
+  [
+    5,
+    "<< /Type /Font /Subtype /Type0 /BaseFont /ABCDEF+Noto /Encoding /Identity-H /DescendantFonts [6 0 R] >>",
+  ],
+  [6, "<< /Type /Font /Subtype /CIDFontType2 /BaseFont /ABCDEF+Noto /FontDescriptor 7 0 R >>"],
+  [7, "<< /Type /FontDescriptor /FontName /ABCDEF+Noto /Flags 4 /FontFile2 8 0 R >>"],
+  [8, Buffer.concat([enc("<< /Length 4 >>\nstream\n"), enc("fake"), enc("\nendstream")])],
+]);
+
+/* 15. A form XObject whose bytes live in another file — the gate's third case. */
+{
+  const content = "/X1 Do\n";
+  writeFileSync(
+    "external-content.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R " +
+          "/Resources << /XObject << /X1 5 0 R >> >> >>",
+      ],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${content.length} >>\nstream\n`),
+          enc(content),
+          enc("\nendstream"),
+        ]),
+      ],
+      [
+        5,
+        Buffer.concat([
+          enc(
+            "<< /Type /XObject /Subtype /Form /BBox [0 0 10 10] /F (other.pdf) /Length 0 >>\nstream\n",
+          ),
+          enc("\nendstream"),
+        ]),
+      ],
+    ]),
+  );
+}
+
+/* 16. Text drawn inside a form, in a font the form does not carry — the gate
+      has to follow forms, where most real content lives. */
+{
+  const page = "/X1 Do\n";
+  const form = "BT /F1 12 Tf 1 1 Td (hi) Tj ET\n";
+  writeFileSync(
+    "form-font-not-embedded.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R " +
+          "/Resources << /XObject << /X1 5 0 R >> >> >>",
+      ],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${page.length} >>\nstream\n`),
+          enc(page),
+          enc("\nendstream"),
+        ]),
+      ],
+      [
+        5,
+        Buffer.concat([
+          enc(
+            `<< /Type /XObject /Subtype /Form /BBox [0 0 20 20] ` +
+              `/Resources << /Font << /F1 6 0 R >> >> /Length ${form.length} >>\nstream\n`,
+          ),
+          enc(form),
+          enc("\nendstream"),
+        ]),
+      ],
+      [6, "<< /Type /Font /Subtype /TrueType /BaseFont /Arial /FontDescriptor 7 0 R >>"],
+      [7, "<< /Type /FontDescriptor /FontName /Arial /Flags 32 >>"],
+    ]),
+  );
+}
+
+console.log("wrote strict-gate fixtures");
