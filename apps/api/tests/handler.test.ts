@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { expect, test } from "vite-plus/test";
 import { isPrivateHost } from "../src/fetch.ts";
 import { handleRequest } from "../src/handler.ts";
@@ -38,8 +40,17 @@ const SAMPLE = [
 
 const noPng = async (): Promise<Uint8Array> => new Uint8Array();
 const get = (path: string): Request => new Request(`http://api.test${path}`);
-const post = (path: string, body: string): Request =>
-  new Request(`http://api.test${path}`, { method: "POST", body });
+const post = (path: string, body: string | Uint8Array): Request =>
+  new Request(`http://api.test${path}`, { method: "POST", body: body as BodyInit });
+
+/** A real PDF: binary, so it is read from disk rather than written inline. */
+const PDF = new Uint8Array(
+  readFileSync(
+    fileURLToPath(
+      new URL("../../../packages/core/tests/fixtures/pdf/minimal.pdf", import.meta.url),
+    ),
+  ),
+);
 
 test("/health returns ok", async () => {
   const res = await handleRequest(get("/health"), noPng);
@@ -229,7 +240,15 @@ test("/openapi.json serves a valid 3.1 document that matches the routes", async 
   // Route coherence, both directions we can check: the documented path set
   // is pinned, and every documented path is actually served (non-404) —
   // deleting a route from the router while leaving it in the spec fails here.
-  expect(Object.keys(doc.paths).sort()).toEqual(["/describe", "/health", "/render"]);
+  expect(Object.keys(doc.paths).sort()).toEqual([
+    "/describe",
+    "/describe-doc",
+    "/describe-pdf",
+    "/health",
+    "/render",
+    "/render-doc",
+    "/render-pdf",
+  ]);
   for (const path of Object.keys(doc.paths)) {
     const served = await handleRequest(get(path), noPng);
     expect(served.status, `${path} is documented but not served`).not.toBe(404);
@@ -294,4 +313,55 @@ test("/mcp is rate-limited like the other work endpoints", async () => {
     async () => false,
   );
   expect(denied.status).toBe(429);
+});
+
+/* ---------- format-specific and agnostic endpoints (AGT-16) ---------- */
+
+test("/describe-pdf reads a PDF and reports its format", async () => {
+  const res = await handleRequest(post("/describe-pdf", PDF), noPng);
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { format: string; units: string };
+  expect(body.format).toBe("pdf");
+  expect(body.units).toBe("pt");
+});
+
+test("/describe-doc detects the format from the bytes", async () => {
+  const pdf = await handleRequest(post("/describe-doc", PDF), noPng);
+  expect(((await pdf.json()) as { format: string }).format).toBe("pdf");
+  const dxf = await handleRequest(post("/describe-doc", SAMPLE), noPng);
+  expect(((await dxf.json()) as { format: string }).format).toBe("dxf");
+});
+
+// A typed endpoint handed the wrong format names the one that works, rather
+// than reporting a parse failure about the file.
+test("/describe points at the PDF endpoint when given a PDF", async () => {
+  const res = await handleRequest(post("/describe", PDF), noPng);
+  expect(res.status).toBe(422);
+  expect(JSON.stringify(await res.json())).toMatch(/describe-pdf/);
+});
+
+test("a DXF still describes as DXF", async () => {
+  const res = await handleRequest(post("/describe", SAMPLE), noPng);
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as { format: string }).format).toBe("dxf");
+});
+
+test("the OpenAPI document lists all six endpoints and the format field", async () => {
+  const res = await handleRequest(get("/openapi.json"), noPng);
+  const doc = (await res.json()) as {
+    paths: Record<string, unknown>;
+    components: { schemas: Record<string, { required?: string[] }> };
+  };
+  for (const path of [
+    "/describe",
+    "/render",
+    "/describe-pdf",
+    "/render-pdf",
+    "/describe-doc",
+    "/render-doc",
+  ])
+    expect(doc.paths[path]).toBeDefined();
+  // The response shape gained `format`; the published document must say so.
+  const summary = Object.values(doc.components.schemas).find((v) => v.required?.includes("units"));
+  expect(summary?.required).toContain("format");
 });

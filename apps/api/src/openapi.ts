@@ -218,6 +218,7 @@ export const openapi = {
       DrawingSummary: {
         type: "object",
         required: [
+          "format",
           "units",
           "bounds",
           "size",
@@ -228,6 +229,10 @@ export const openapi = {
           "unsupported",
         ],
         properties: {
+          format: {
+            type: "string",
+            description: 'Which format was read ("dxf", "pdf")',
+          },
           units: {
             type: "string",
             description: 'Drawing unit label ("mm", "in", …) or "" when unitless',
@@ -283,3 +288,46 @@ export const openapi = {
     },
   },
 } as const;
+
+/**
+ * The format-specific and format-agnostic endpoints (AGT-16).
+ *
+ * Generated from the DXF operations so the six stay in step — the only
+ * differences are the path, the operation id, and which formats the wording
+ * names.
+ */
+type Operation = Record<string, unknown>;
+
+function retarget(path: Operation, suffix: string, noun: string): Operation {
+  const out: Operation = {};
+  for (const [method, op] of Object.entries(path)) {
+    const cloned = structuredClone(op) as Record<string, unknown>;
+    if (typeof cloned["operationId"] === "string")
+      cloned["operationId"] = `${cloned["operationId"]}${suffix}`;
+    for (const key of ["summary", "description"] as const) {
+      const text = cloned[key];
+      if (typeof text === "string")
+        cloned[key] = text
+          .replace(/\bDXF file\b/g, `${noun} file`)
+          .replace(/\ba DXF\b/g, noun === "PDF" ? "a PDF" : "a drawing")
+          .replace(/\bDXF\b/g, noun);
+    }
+    out[method] = cloned;
+  }
+  return out;
+}
+
+const describePath = openapi.paths["/describe"] as unknown as Operation;
+const renderPath = openapi.paths["/render"] as unknown as Operation;
+
+/** The published document, including the endpoints derived above. */
+export const openapiDocument = {
+  ...openapi,
+  paths: {
+    ...openapi.paths,
+    "/describe-pdf": retarget(describePath, "Pdf", "PDF"),
+    "/render-pdf": retarget(renderPath, "Pdf", "PDF"),
+    "/describe-doc": retarget(describePath, "Doc", "drawing (DXF or PDF, detected from the bytes)"),
+    "/render-doc": retarget(renderPath, "Doc", "drawing (DXF or PDF, detected from the bytes)"),
+  },
+};
