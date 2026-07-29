@@ -106,7 +106,7 @@ app.innerHTML = `
         </div>
       </div>
       <button id="load-sample" class="btn-ghost sample-btn" type="button">${icons.file} Sample</button>
-      <button id="open" class="btn-primary" type="button">${icons.filePlus} Open DXF</button>
+      <button id="open" class="btn-primary" type="button">${icons.filePlus} Open</button>
     </div>
     <div id="progress" class="progress" hidden><div class="progress-bar"></div></div>
     <div id="skipped-pop" class="skipped-pop" hidden>
@@ -143,7 +143,7 @@ app.innerHTML = `
           <h1 class="empty-title">Open a drawing to view it</h1>
           <div class="empty-body">Drop a file anywhere in the window, pick one from your machine, or load the bundled sample.</div>
           <div class="empty-actions">
-            <button id="empty-open" class="btn-primary" type="button">Open DXF</button>
+            <button id="empty-open" class="btn-primary" type="button">Open</button>
             <button id="empty-sample" class="btn-ghost" type="button">Load sample</button>
           </div>
           <div class="empty-supports">OPENS · DXF · PDF<br>DXF ENTITIES · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · SPLINE · TEXT · MTEXT · INSERT · DIMENSION · HATCH · SOLID · POINT</div>
@@ -217,7 +217,7 @@ app.innerHTML = `
   <div id="drop" class="drop-overlay" hidden>
     <div class="drop-frame">
       ${icons.drop}
-      <div class="drop-title">DROP DXF TO OPEN</div>
+      <div class="drop-title">DROP DRAWING TO OPEN</div>
       <div class="drop-sub">.dxf and .pdf · released anywhere</div>
     </div>
   </div>
@@ -235,7 +235,7 @@ app.innerHTML = `
   <div id="open-dialog" class="od-scrim" hidden>
     <div id="od-card" class="od-card">
       <div class="od-head">
-        <div class="od-head-title">${icons.filePlus}<span>OPEN DXF</span></div>
+        <div class="od-head-title">${icons.filePlus}<span>OPEN DRAWING</span></div>
         <button id="od-close" class="od-close" type="button">${icons.close(18)}</button>
       </div>
       <div class="od-body">
@@ -311,7 +311,7 @@ app.innerHTML = `
     <div class="paste-card">
       <span class="paste-icon">${icons.link(18)}</span>
       <div class="paste-content">
-        <div class="paste-title">Open this DXF link?</div>
+        <div class="paste-title">Open this drawing link?</div>
         <div id="paste-url" class="paste-url"></div>
         <div class="paste-actions">
           <button id="paste-open" class="paste-open" type="button">Open</button>
@@ -358,7 +358,7 @@ let restoringView = false;
 let hashWriteTimer: number | null = null;
 const layerRows = new Map<string, HTMLLIElement>();
 
-// Open-DXF dialog state. The dropzone and URL field live together in one form;
+// Open dialog state. The dropzone and URL field live together in one form;
 // `phase` overlays loading/cors/invalid onto it (see renderDialog).
 let dialogOpen = false;
 let dialogPhase: "idle" | "loading" | "cors" | "invalid" = "idle";
@@ -1065,7 +1065,7 @@ async function loadRemoteUrl(
   pushRecent({ url, name, size: buffer.byteLength, ts: Date.now() });
 }
 
-/* ---------- open-DXF dialog ---------- */
+/* ---------- open dialog ---------- */
 
 const fileInput = $<HTMLInputElement>("#file");
 const urlInput = $<HTMLInputElement>("#od-input");
@@ -1195,7 +1195,7 @@ function httpTip(status: number | undefined): string {
 
 /** Show the dialog's error state for a failed URL open, tailoring the title and
  *  the TRY-THIS tips to the cause: a network/CORS block, an HTTP status, or a
- *  file that downloaded fine but isn't a valid DXF. Keeps the user in the URL
+ *  file that downloaded fine but no parser claims. Keeps the user in the URL
  *  flow (Try again / Edit URL) instead of dropping them onto the file toast. */
 function showDialogError(url: string, kind: FetchErrorKind | "parse", status?: number): void {
   dialogOpen = true;
@@ -1207,13 +1207,13 @@ function showDialogError(url: string, kind: FetchErrorKind | "parse", status?: n
   // network copy stays honest; an HTTP status and a parse failure are specific.
   $("#od-cors-title").textContent =
     kind === "parse"
-      ? "That file isn't a valid DXF"
+      ? "That file isn't a drawing we can open"
       : kind === "http"
         ? `The server returned ${status ?? "an error"}`
         : "Couldn't fetch that URL";
   $("#od-cors-msg").textContent =
     kind === "parse"
-      ? "The download succeeded, but the file isn't a valid DXF drawing."
+      ? "The download succeeded, but no format we support could read the file."
       : kind === "http"
         ? "The request reached the server, but it didn't return the file."
         : "The server blocked the request (no CORS header) or the file wasn't reachable. Browsers can only load remote files a server explicitly allows.";
@@ -1268,28 +1268,30 @@ function cancelDialogLoad(): void {
 }
 
 /** Pasting a drawing link anywhere (dialog closed) offers to open it. */
-/** A pasted string that looks like a remote DXF link. */
-function looksLikeDxfUrl(text: string): boolean {
+/** A pasted string that looks like a remote drawing link, in any format the
+ *  app opens. The extension only decides whether to offer the link — what the
+ *  bytes actually are is settled by the parsers on load (PARSE-13). */
+function looksLikeDrawingUrl(text: string): boolean {
   const trimmed = text.trim();
   return isHttpUrl(trimmed) && /\.(dxf|pdf)(\?|#|$)/i.test(trimmed);
 }
 
 function maybeShowPasteConfirm(text: string): void {
-  if (dialogOpen || !looksLikeDxfUrl(text)) return;
+  if (dialogOpen || !looksLikeDrawingUrl(text)) return;
   const trimmed = text.trim();
   pastedUrl = trimmed;
   $("#paste-url").textContent = trimmed;
   $("#paste-toast").hidden = false;
 }
 
-/** With the dialog already open, a pasted DXF link drops straight into the URL
+/** With the dialog already open, a pasted drawing link drops straight into the URL
  *  field instead of raising the confirm toast (the field is the toast's
  *  purpose here). Skipped while the user is typing into the field — native
  *  paste wins there — and while a fetch is in flight. Returns whether it
  *  consumed the paste, so the caller can suppress the browser's own insert. */
 function fillUrlFromPaste(text: string): boolean {
   if (document.activeElement === urlInput || dialogPhase === "loading") return false;
-  if (!looksLikeDxfUrl(text)) return false;
+  if (!looksLikeDrawingUrl(text)) return false;
   urlInput.value = text.trim();
   dialogPhase = "idle"; // reveal the form if a cors/invalid card was up
   renderDialog();

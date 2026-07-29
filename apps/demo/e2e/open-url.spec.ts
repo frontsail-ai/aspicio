@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
 });
 
-test("Open-DXF dialog gates the URL submit on a valid http(s) URL", async ({ page }) => {
+test("Open dialog gates the URL submit on a valid http(s) URL", async ({ page }) => {
   await page.locator("#open").click();
   await expect(page.locator("#open-dialog")).toBeVisible();
 
@@ -159,14 +159,14 @@ test("a URL that returns non-DXF bytes stays in the URL flow", async ({ page }) 
   await expect(page.locator("#file-chip")).toHaveText("box.dxf");
   await expect.poll(() => page.evaluate(() => location.hash)).toContain(encodeURIComponent(REMOTE));
 
-  // Now open a URL that downloads fine but isn't a DXF.
+  // Now open a URL that downloads fine but no parser claims (PARSE-12).
   await page.locator("#open").click();
   await page.locator("#od-input").fill(BAD);
   await page.locator("#od-open").click();
 
   // Parse error is shown in the dialog (not the file toast), keeping URL context.
   await expect(page.locator("#od-cors")).toBeVisible();
-  await expect(page.locator("#od-cors-title")).toContainText("isn't a valid DXF");
+  await expect(page.locator("#od-cors-title")).toContainText("isn't a drawing we can open");
   await expect(page.locator("#error-toast")).toBeHidden();
 
   // The previous drawing and its share hash are untouched by the failed swap.
