@@ -146,3 +146,13 @@ test("a rotated page is rotated, not silently drawn straight", async () => {
   // is the whole observable difference.
   expect(Math.abs((end?.y ?? 0) - (start?.y ?? 0))).toBeGreaterThan(1);
 });
+
+// The gate reads page content before the interpreter does, so an undecodable
+// /Contents has two paths to failure. Both must cost the page, not the file.
+test("a page whose own content is undecodable costs the page", async () => {
+  const doc = await parse("bad-page-contents.pdf");
+  // Page 2 survived, which is the whole point.
+  expect(doc.layouts?.[0]?.entities.length).toBeGreaterThan(0);
+  // The unreadable page is reported, not silently absent.
+  expect(doc.unsupported["UnreadablePage"]).toBe(1);
+});

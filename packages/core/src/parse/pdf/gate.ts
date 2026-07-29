@@ -33,7 +33,19 @@ export async function checkStrictGate(doc: PdfDocument): Promise<void> {
     const resources = await doc.dict(page.get("Resources"));
     // A page's own content can live in another file too, not just an XObject's.
     for (const stream of await doc.contentStreams(page)) assertLocal(stream);
-    await checkContent(doc, await doc.pageContent(page), resources, seenForms, 0, undefined);
+
+    // A page whose own content will not decompress is *skipped and counted*
+    // downstream, not gate-approved: nothing here has read it, so nothing here
+    // can vouch for it. Letting the failure escape would take the whole
+    // document down — including pages that are perfectly readable — which is
+    // the opposite of what a per-page guard is for (PDF-8, INV-3).
+    let content: Uint8Array;
+    try {
+      content = await doc.pageContent(page);
+    } catch {
+      continue;
+    }
+    await checkContent(doc, content, resources, seenForms, 0, undefined);
   }
 }
 

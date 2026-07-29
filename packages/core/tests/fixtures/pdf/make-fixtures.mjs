@@ -665,4 +665,32 @@ writeFileSync("no-pages.pdf", classic([catalog, [2, "<< /Type /Pages /Kids [] /C
   );
 }
 
-console.log("wrote page-robustness fixtures");
+/* 25. Page 1's own /Contents is undecodable; page 2 is fine. The gate reads
+      page content before the interpreter does, so this is a second path to
+      the same "one page must not kill the document" guarantee. */
+{
+  const p2 = "0 0 1 RG 10 10 m 90 90 l S\n";
+  writeFileSync(
+    "bad-page-contents.pdf",
+    classic([
+      catalog,
+      [2, "<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 /MediaBox [0 0 100 100] >>"],
+      [3, "<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>"],
+      [
+        4,
+        Buffer.concat([
+          enc("<< /Filter /FlateDecode /Length 8 >>\nstream\n"),
+          Buffer.from([0xff, 0xff, 0xff, 0xff, 0x00, 0x01, 0x02, 0x03]),
+          enc("\nendstream"),
+        ]),
+      ],
+      [5, "<< /Type /Page /Parent 2 0 R /Contents 6 0 R >>"],
+      [
+        6,
+        Buffer.concat([enc(`<< /Length ${p2.length} >>\nstream\n`), enc(p2), enc("\nendstream")]),
+      ],
+    ]),
+  );
+}
+
+console.log("wrote gate-path fixtures");
