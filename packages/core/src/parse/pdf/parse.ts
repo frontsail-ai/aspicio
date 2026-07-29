@@ -9,8 +9,10 @@
 import type { DrawingDocument, Entity, LayerInfo, LineTypeDef, Layout } from "../../model/types.ts";
 import { PDF_FORMAT, PdfDocument, pdfError } from "./document.ts";
 import { checkStrictGate } from "./gate.ts";
-import { CONTENT_LAYER, interpretContent } from "./interpret.ts";
-import type { InterpretOptions } from "./interpret.ts";
+import { CONTENT_LAYER, IDENTITY, interpretContent, multiply } from "./interpret.ts";
+import type { InterpretOptions, Matrix } from "./interpret.ts";
+import { toNumber } from "./objects.ts";
+import type { PdfDict } from "./objects.ts";
 
 /** PDF measures in points, and nothing rescales it (PDF-6). */
 const PDF_UNITS = "pt";
@@ -43,9 +45,25 @@ export async function parsePdfBytes(
   const unsupported: Record<string, number> = {};
 
   for (const [index, page] of pages.entries()) {
-    const content = await doc.pageContent(page);
-    const resources = await doc.dict(page.get("Resources"));
-    const result = await interpretContent(doc, content, resources, options);
+    // A page that fails for any reason costs that page, never the document:
+    // one damaged form must not take a six-page drawing down with it, and this
+    // is the last place that guarantee can be made (PDF-8, INV-3).
+    let result: Awaited<ReturnType<typeof interpretContent>>;
+    try {
+      const content = await doc.pageContent(page);
+      const resources = await doc.dict(page.get("Resources"));
+      result = await interpretContent(
+        doc,
+        content,
+        resources,
+        options,
+        await pageMatrix(doc, page),
+      );
+    } catch {
+      unsupported["UnreadablePage"] = (unsupported["UnreadablePage"] ?? 0) + 1;
+      if (index > 0) layouts.push({ name: `Page ${index + 1}`, entities: [], viewports: [] });
+      continue;
+    }
 
     for (const [name, def] of result.lineTypes) {
       // Dash names are generated per page, so two pages can both produce
@@ -106,6 +124,36 @@ function uniqueName(existing: ReadonlyMap<string, LineTypeDef>, base: string): s
 
 function retarget(entities: Entity[], from: string, to: string): void {
   for (const entity of entities) if (entity.lineType === from) entity.lineType = to;
+}
+
+/**
+ * The base transform for a page, honouring `/Rotate`.
+ *
+ * A landscape or scanned page carries its orientation as a quarter-turn on the
+ * page rather than in its content. Ignoring it renders the drawing sideways
+ * while reporting nothing amiss — so it is applied, not counted. The rotation
+ * is about the page box's centre, so content stays where the producer put it.
+ */
+async function pageMatrix(doc: PdfDocument, page: PdfDict): Promise<Matrix> {
+  const raw = toNumber(await doc.resolve(page.get("Rotate")));
+  // Only quarter turns are legal, and negatives are permitted.
+  const angle = (((Math.round(raw / 90) * 90) % 360) + 360) % 360;
+  if (angle === 0) return IDENTITY;
+
+  const box = (await doc.array(page.get("MediaBox"))).map((v) => toNumber(v));
+  const [x0, y0, x1, y1] = box.length === 4 ? box : [0, 0, 0, 0];
+  const width = Math.abs((x1 as number) - (x0 as number));
+  const height = Math.abs((y1 as number) - (y0 as number));
+
+  // Rotate clockwise (PDF's positive direction) and translate the result back
+  // into the positive quadrant so bounds stay where a reader expects them.
+  const rotation: Matrix =
+    angle === 90
+      ? [0, -1, 1, 0, 0, width]
+      : angle === 180
+        ? [-1, 0, 0, -1, width, height]
+        : [0, 1, -1, 0, height, 0];
+  return multiply(IDENTITY, rotation);
 }
 
 /** True when the bytes start with a PDF header (PARSE-13's sniff). */

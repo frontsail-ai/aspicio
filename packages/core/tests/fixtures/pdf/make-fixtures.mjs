@@ -605,4 +605,64 @@ writeFileSync("no-pages.pdf", classic([catalog, [2, "<< /Type /Pages /Kids [] /C
   );
 }
 
-console.log("wrote hostile fixtures");
+/* 23. Two pages: page 1 invokes a form with garbage Flate, page 2 is fine.
+      A damaged page must cost that page, never the document. */
+{
+  const p1 = "1 0 0 RG 5 5 m 95 95 l S\n/X1 Do\n";
+  const p2 = "0 0 1 RG 10 10 m 90 90 l S\n";
+  writeFileSync(
+    "bad-page-good-page.pdf",
+    classic([
+      catalog,
+      [2, "<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 /MediaBox [0 0 100 100] >>"],
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /Contents 4 0 R " +
+          "/Resources << /XObject << /X1 5 0 R >> >> >>",
+      ],
+      [
+        4,
+        Buffer.concat([enc(`<< /Length ${p1.length} >>\nstream\n`), enc(p1), enc("\nendstream")]),
+      ],
+      [
+        5,
+        Buffer.concat([
+          enc(
+            "<< /Type /XObject /Subtype /Form /BBox [0 0 10 10] /Filter /FlateDecode /Length 8 >>\nstream\n",
+          ),
+          Buffer.from([0xff, 0xff, 0xff, 0xff, 0x00, 0x01, 0x02, 0x03]),
+          enc("\nendstream"),
+        ]),
+      ],
+      [6, "<< /Type /Page /Parent 2 0 R /Contents 7 0 R >>"],
+      [
+        7,
+        Buffer.concat([enc(`<< /Length ${p2.length} >>\nstream\n`), enc(p2), enc("\nendstream")]),
+      ],
+    ]),
+  );
+}
+
+/* 24. A page rotated a quarter turn — orientation lives on the page, not in
+      the content, so ignoring it renders the drawing sideways. */
+{
+  const content = "0 0 m 100 0 l S\n";
+  writeFileSync(
+    "rotated-page.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Rotate 90 /Contents 4 0 R >>"],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${content.length} >>\nstream\n`),
+          enc(content),
+          enc("\nendstream"),
+        ]),
+      ],
+    ]),
+  );
+}
+
+console.log("wrote page-robustness fixtures");

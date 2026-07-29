@@ -119,3 +119,30 @@ test("an undecodable form costs the form, not the page", async () => {
   // And the loss is reported rather than hidden (PDF-8).
   expect(doc.unsupported["UndecodableStream"]).toBe(1);
 });
+
+// A damaged page must cost that page, never the document — this is the last
+// place that guarantee can be made, and the entry point in 1.7 puts it behind
+// a public API (PDF-8, INV-3).
+test("a page that cannot be read costs the page, not the document", async () => {
+  const doc = await parse("bad-page-good-page.pdf");
+  // Page 1's own stroke survived, despite its form being undecodable.
+  expect(doc.entities.length).toBeGreaterThan(0);
+  // Page 2 is untouched.
+  expect(doc.layouts?.[0]?.entities.length).toBeGreaterThan(0);
+  expect(doc.unsupported["UndecodableStream"]).toBe(1);
+});
+
+// Orientation lives on the page, not in the content. Ignoring it renders a
+// landscape or scanned drawing sideways while reporting nothing amiss —
+// invisible wrongness, so it is applied rather than counted.
+test("a rotated page is rotated, not silently drawn straight", async () => {
+  const rotated = await parse("rotated-page.pdf");
+  const line = rotated.entities.find((e) => e.type === "POLYLINE");
+  expect(line?.type).toBe("POLYLINE");
+  if (line?.type !== "POLYLINE") return;
+  const start = line.points[0];
+  const end = line.points[line.points.length - 1];
+  // The content draws along +x; a quarter turn moves it off that axis, which
+  // is the whole observable difference.
+  expect(Math.abs((end?.y ?? 0) - (start?.y ?? 0))).toBeGreaterThan(1);
+});
