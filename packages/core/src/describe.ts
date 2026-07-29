@@ -16,6 +16,8 @@ export interface LayerSummary {
  * HTTP API returns to describe a DXF without rendering it.
  */
 export interface DrawingSummary {
+  /** Which format produced this drawing ("dxf", "pdf"), or "" if unknown. */
+  format: string;
   /** Drawing-unit label from `$INSUNITS` (e.g. "mm"), or "" when unitless. */
   units: string;
   /** World-space extents, or null for an empty drawing. */
@@ -104,6 +106,7 @@ export function describeDrawing(doc: DrawingDocument, tessellation: Tessellation
 
   const b = tessellation.bounds;
   return {
+    format: doc.format ?? "",
     units: doc.units ?? "",
     bounds: b ? { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY } : null,
     size: b ? { width: b.maxX - b.minX, height: b.maxY - b.minY } : null,

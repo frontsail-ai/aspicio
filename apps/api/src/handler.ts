@@ -1,8 +1,9 @@
 import { describeDrawing, parseWith, tessellate, tessellationToSvg } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
+import { pdfParser } from "@aspicio/core/pdf";
 import { fetchDxf, HttpError, MAX_BYTES } from "./fetch.ts";
 import { handleMcp } from "./mcp.ts";
-import { openapi } from "./openapi.ts";
+import { openapiDocument } from "./openapi.ts";
 
 const DEFAULT_BG = "#16181d";
 const DEFAULT_WIDTH = 1200;
@@ -16,7 +17,44 @@ export type RenderPng = (svg: string, width: number) => Promise<Uint8Array>;
 export type CheckRateLimit = (key: string) => Promise<boolean>;
 
 /** Endpoints that do real work (fetch/parse/rasterize) and get rate-limited. */
-const WORK_ENDPOINTS = new Set(["/describe", "/render", "/mcp"]);
+const WORK_ENDPOINTS = new Set([
+  "/describe",
+  "/render",
+  "/describe-pdf",
+  "/render-pdf",
+  "/describe-doc",
+  "/render-doc",
+  "/mcp",
+]);
+
+/**
+ * The parsers each endpoint family accepts (AGT-16).
+ *
+ * The typed endpoints let a caller state the format it believes it has; the
+ * agnostic ones let it decline to guess. Handing a typed endpoint the wrong
+ * format names the endpoint that would have worked.
+ */
+const DXF_ONLY = [dxfParser];
+const PDF_ONLY = [pdfParser];
+const ANY_FORMAT = [dxfParser, pdfParser];
+
+async function parseFor(
+  parsers: readonly (typeof dxfParser)[],
+  bytes: Uint8Array,
+  kind: "describe" | "render",
+): Promise<Awaited<ReturnType<typeof parseWith>>> {
+  try {
+    return await parseWith(parsers, bytes);
+  } catch (error) {
+    const other = ANY_FORMAT.find((p) => !parsers.includes(p) && p.sniff(bytes));
+    if (other)
+      throw new HttpError(
+        422,
+        `this is a ${other.format.toUpperCase()} — use /${kind}-${other.format}`,
+      );
+    throw error;
+  }
+}
 
 const CORS = { "access-control-allow-origin": "*" };
 
@@ -42,14 +80,20 @@ async function resolveDxf(req: Request, url: URL): Promise<Uint8Array> {
   return fetchDxf(src);
 }
 
-async function handleDescribe(bytes: Uint8Array): Promise<Response> {
-  // DXF-only endpoint: one parser in, so anything else is honestly
-  // reported as unsupported rather than mis-parsed (PARSE-13).
-  const doc = await parseWith([dxfParser], bytes);
+async function handleDescribe(
+  bytes: Uint8Array,
+  parsers: readonly (typeof dxfParser)[],
+): Promise<Response> {
+  const doc = await parseFor(parsers, bytes, "describe");
   return json(describeDrawing(doc, tessellate(doc, {})));
 }
 
-async function handleRender(bytes: Uint8Array, url: URL, renderPng: RenderPng): Promise<Response> {
+async function handleRender(
+  bytes: Uint8Array,
+  url: URL,
+  renderPng: RenderPng,
+  parsers: readonly (typeof dxfParser)[],
+): Promise<Response> {
   const format = (url.searchParams.get("format") ?? "png").toLowerCase();
   if (format !== "png" && format !== "svg") throw new HttpError(400, "format must be png or svg");
   const bgParam = url.searchParams.get("bg");
@@ -59,7 +103,7 @@ async function handleRender(bytes: Uint8Array, url: URL, renderPng: RenderPng): 
     throw new HttpError(400, "bg must be a hex color like %23rrggbb, or none");
   const background = bgParam === "none" ? undefined : (bgParam ?? DEFAULT_BG);
 
-  const doc = await parseWith([dxfParser], bytes);
+  const doc = await parseFor(parsers, bytes, "render");
   const svg = tessellationToSvg(tessellate(doc, {}), undefined, background ? { background } : {});
 
   if (format === "svg")
@@ -121,7 +165,7 @@ export async function handleRequest(
       case "/openapi.json":
         // Advertise whichever host served the doc — the API answers on more
         // than one domain, and a hardcoded URL lies on all but one of them.
-        return json({ ...openapi, servers: [{ url: url.origin }] });
+        return json({ ...openapiDocument, servers: [{ url: url.origin }] });
       case "/":
         return json({
           name: "aspicio-api",
@@ -129,6 +173,11 @@ export async function handleRequest(
           endpoints: {
             "GET|POST /describe": "structured JSON summary of a DXF (?src=<url> or POST body)",
             "GET|POST /render": "?format=png|svg&width=&bg=  — render a DXF to an image",
+            "GET|POST /describe-pdf": "the same, for a PDF",
+            "GET|POST /render-pdf": "the same, for a PDF",
+            "GET|POST /describe-doc":
+              "the same, for any supported format (detected from the bytes)",
+            "GET|POST /render-doc": "the same, for any supported format (detected from the bytes)",
           },
         });
       case "/mcp":
@@ -136,11 +185,19 @@ export async function handleRequest(
         // for Claude.ai and other web clients.
         return await handleMcp(req, renderPng, widgetHtml);
       case "/describe":
-        return await handleDescribe(await resolveDxf(req, url));
+        return await handleDescribe(await resolveDxf(req, url), DXF_ONLY);
+      case "/describe-pdf":
+        return await handleDescribe(await resolveDxf(req, url), PDF_ONLY);
+      case "/describe-doc":
+        return await handleDescribe(await resolveDxf(req, url), ANY_FORMAT);
       case "/render":
         // `await` matters: without it a rejection inside handleRender would
         // escape this try/catch and surface as an unhandled 500.
-        return await handleRender(await resolveDxf(req, url), url, renderPng);
+        return await handleRender(await resolveDxf(req, url), url, renderPng, DXF_ONLY);
+      case "/render-pdf":
+        return await handleRender(await resolveDxf(req, url), url, renderPng, PDF_ONLY);
+      case "/render-doc":
+        return await handleRender(await resolveDxf(req, url), url, renderPng, ANY_FORMAT);
       default:
         return json({ error: "not found" }, 404);
     }

@@ -1,0 +1,16 @@
+{
+  "name": "@aspicio/wiring-gate",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Proves every cross-workspace import is sanctioned by the target package's exports map, and that the shared agent-tool table stays dependency-free.",
+  "type": "module",
+  "scripts": {
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "~6.0.2",
+    "vite-plus": "catalog:"
+  }
+}

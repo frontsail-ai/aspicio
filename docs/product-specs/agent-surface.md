@@ -9,7 +9,7 @@ Prefix: `AGT`.
 
 ### AGT-1: Structured describe
 
-Describing a drawing returns JSON facts: unit label, bounds and size in
+Describing a drawing returns JSON facts: the format read, unit label, bounds and size in
 drawing units, entity and segment counts, per-layer entries (name, entity
 count, visibility, the color actually drawn — see INV-2), per-type entity
 counts, per-type skipped counts, and the drawing's text content — unique
@@ -25,9 +25,10 @@ else is rejected, never interpolated into the SVG.
 
 ### AGT-3: HTTP input forms
 
-`/describe` and `/render` accept the DXF either as a fetched `?src=` URL
-or as the raw POST body. A missing source, a non-http(s) URL, or an empty
-body is a 400.
+`/describe` and `/render` accept the drawing either as a fetched `?src=`
+URL or as the raw POST body; `/describe-pdf`, `/render-pdf`,
+`/describe-doc`, and `/render-doc` take the same input forms and guards
+(AGT-16). A missing source, a non-http(s) URL, or an empty body is a 400.
 
 ### AGT-4: HTTP fetch guards
 
@@ -40,7 +41,7 @@ index endpoints stay exempt.
 ### AGT-5: HTTP error contract
 
 Errors are JSON with meaningful statuses: 400 bad input, 413 too large,
-422 unparseable DXF, 429 rate-limited, 502 upstream fetch failure.
+422 unparseable drawing, 429 rate-limited, 502 upstream fetch failure.
 Unknown routes are 404; a health endpoint reports ok. A 429 may instead
 be emitted by the platform firewall in front of the API, with a
 platform-standard body.
@@ -54,7 +55,7 @@ The index endpoint links to it.
 
 ### AGT-6: MCP tools
 
-A local stdio MCP server exposes `describe_dxf` and `render_dxf`, whose
+A local stdio MCP server exposes the six tools of AGT-16, whose
 descriptions carry the when-to-use guidance so any MCP client uses them
 correctly without a bundled skill. Every tool (local and remote) declares
 all three behavior hints explicitly: read-only and non-destructive (none
@@ -144,3 +145,19 @@ local install commands, guardrails) and a docs page (packages, bindings,
 install, HTTP API at a glance). Both state only shipped behavior
 (INV-10), are listed in the sitemap, and are linked from the empty
 screen and llms.txt.
+
+### AGT-16: Format-specific and format-agnostic tools
+
+Every agent surface offers three pairs: `describe_dxf`/`render_dxf` read
+DXF only, `describe_pdf`/`render_pdf` read PDF only, and `describe_doc`/
+`render_doc` accept any supported format and detect it from the bytes. The
+typed pairs exist so an agent can state what it believes it has; the
+agnostic pair exists so it doesn't have to guess. Handing a format-specific
+tool the wrong format fails with a message naming the tool that would have
+worked, never a parse error about the file. The HTTP API mirrors the same
+six as `/describe`, `/render`, `/describe-pdf`, `/render-pdf`,
+`/describe-doc`, and `/render-doc`.
+
+Results report which format was read, so a caller never infers it from the
+shape of the answer. Both MCP surfaces offer the same six: they are
+declared once, so the local and hosted tool tables cannot drift apart.

@@ -1,12 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import {
   describeDrawing,
+  type DrawingDocument,
   type DrawingSummary,
   parseWith,
   tessellate,
   tessellationToSvg,
 } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
+import { pdfParser } from "@aspicio/core/pdf";
 import { Resvg } from "@resvg/resvg-js";
 
 const DEFAULT_BG = "#16181d";
@@ -90,15 +92,75 @@ export async function loadDxf(source: string): Promise<Uint8Array> {
   return new TextEncoder().encode(source);
 }
 
+/**
+ * The parsers each tool family accepts (AGT-16).
+ *
+ * The typed pairs let an agent state what it believes it has; the agnostic
+ * pair lets it decline to guess. Handing a typed tool the wrong format fails
+ * with a message naming the tool that would have worked.
+ */
+const DXF_ONLY = [dxfParser];
+const PDF_ONLY = [pdfParser];
+const ANY_FORMAT = [dxfParser, pdfParser];
+
+/**
+ * Parse for one tool family, improving the error when the bytes are a format
+ * some *other* tool handles.
+ */
+async function parseFor(
+  parsers: readonly (typeof dxfParser)[],
+  bytes: Uint8Array,
+  suffix: string,
+): Promise<DrawingDocument> {
+  try {
+    return await parseWith(parsers, bytes);
+  } catch (error) {
+    const other = ANY_FORMAT.find((p) => !parsers.includes(p) && p.sniff(bytes));
+    if (other)
+      throw new Error(
+        `This is a ${other.format.toUpperCase()} file. Use describe_${other.format} or render_${other.format}${suffix}.`,
+      );
+    throw error;
+  }
+}
+
 /** Structured JSON summary of DXF bytes. */
 export async function describeDxf(bytes: Uint8Array): Promise<DrawingSummary> {
-  const doc = await parseWith([dxfParser], bytes);
+  const doc = await parseFor(DXF_ONLY, bytes, "");
   return describeDrawing(doc, tessellate(doc, {}));
 }
 
 /** Render DXF bytes to a PNG (SVG → resvg). */
 export async function renderPng(bytes: Uint8Array, width = DEFAULT_WIDTH): Promise<Uint8Array> {
-  const doc = await parseWith([dxfParser], bytes);
+  const doc = await parseFor(DXF_ONLY, bytes, "");
+  return toPng(doc, width);
+}
+
+/** Structured JSON summary of PDF bytes. */
+export async function describePdf(bytes: Uint8Array): Promise<DrawingSummary> {
+  const doc = await parseFor(PDF_ONLY, bytes, "");
+  return describeDrawing(doc, tessellate(doc, {}));
+}
+
+/** Render PDF bytes to a PNG. */
+export async function renderPdfPng(bytes: Uint8Array, width = DEFAULT_WIDTH): Promise<Uint8Array> {
+  const doc = await parseFor(PDF_ONLY, bytes, "");
+  return toPng(doc, width);
+}
+
+/** Structured JSON summary of any supported drawing, detected from the bytes. */
+export async function describeDoc(bytes: Uint8Array): Promise<DrawingSummary> {
+  const doc = await parseWith(ANY_FORMAT, bytes);
+  return describeDrawing(doc, tessellate(doc, {}));
+}
+
+/** Render any supported drawing to a PNG, detected from the bytes. */
+export async function renderDocPng(bytes: Uint8Array, width = DEFAULT_WIDTH): Promise<Uint8Array> {
+  const doc = await parseWith(ANY_FORMAT, bytes);
+  return toPng(doc, width);
+}
+
+function toPng(doc: DrawingDocument, width: number): Uint8Array {
   const svg = tessellationToSvg(tessellate(doc, {}), undefined, { background: DEFAULT_BG });
   return new Resvg(svg, { fitTo: { mode: "width", value: width } }).render().asPng();
 }

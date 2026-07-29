@@ -29,13 +29,19 @@ Details: [docs/architecture.md](docs/architecture.md).
 
 ## Layout
 
+Everything under `packages/` publishes (INV-9) **except** where marked
+private; `apps/` and `tools/` never publish. A private member of
+`packages/` may point its `exports` at source, because no consumer
+outside this repo resolves it.
+
 ```
 packages/core     the library: parse → tessellate → render, camera, input
 packages/elements <aspicio-embed> / <aspicio-preview> / <aspicio-layer-panel> (Lit)
 packages/react    <AspicioEmbed> / <AspicioPreview> / <AspicioLayerPanel> — React veneer over elements
 packages/vue      the same three components as a Vue 3 veneer over elements
 packages/svelte   the same three components as Svelte 5 source (.svelte) over elements
-packages/mcp      stdio MCP server (describe_dxf, render_dxf)
+packages/mcp      stdio MCP server (the six describe_*/render_* tools)
+packages/agent-tools  the tool table both MCP surfaces implement (private)
 apps/demo         standalone demo + main Playwright e2e suite
 apps/api          hosted DXF API: /describe, /render, /mcp
 apps/widget       MCP Apps in-chat viewer widget, served by the api Worker

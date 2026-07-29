@@ -10,6 +10,7 @@
     "test": "vp test"
   },
   "dependencies": {
+    "@aspicio/agent-tools": "workspace:*",
     "@aspicio/core": "workspace:*",
     "@aspicio/widget": "workspace:*",
     "@modelcontextprotocol/ext-apps": "^1.7.4",
