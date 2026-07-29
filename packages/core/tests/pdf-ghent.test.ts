@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vite-plus/test";
 import { PdfDocument, isStream } from "../src/parse/pdf/document.ts";
 import { checkStrictGate } from "../src/parse/pdf/gate.ts";
+import { interpretContent } from "../src/parse/pdf/interpret.ts";
 import { isUndecoded } from "../src/parse/pdf/filters.ts";
 import { PdfLexer, isKeyword, isName, latin1 } from "../src/parse/pdf/objects.ts";
 
@@ -191,6 +192,31 @@ describe.skipIf(!available)("Ghent PDF Output Suite V5.0", () => {
     await expect(checkStrictGate(await open(X4))).resolves.toBeUndefined();
     await expect(checkStrictGate(await open(REFERENCE))).resolves.toBeUndefined();
   }, 180_000);
+
+  test("a real page yields geometry and readable text", async () => {
+    const doc = await open(X4);
+    const [page] = await doc.pages();
+    const content = await doc.pageContent(page as never);
+    const resources = await doc.dict(
+      (page as never as Map<string, unknown>).get("Resources") as never,
+    );
+    const { entities, unsupported } = await interpretContent(doc, content, resources);
+
+    const kinds = new Set(entities.map((e) => e.type));
+    expect(kinds.has("POLYLINE")).toBe(true);
+    expect(entities.length).toBeGreaterThan(50);
+
+    // Text comes out as text, decoded through the file's own character maps
+    // (PDF-4). This page carries the suite's copyright line.
+    const text = entities
+      .filter((e): e is Extract<typeof e, { type: "TEXT" }> => e.type === "TEXT")
+      .map((e) => e.text)
+      .join(" ");
+    expect(text.toLowerCase()).toContain("ghent");
+
+    // Images are counted, not drawn — an honest report about the page (PDF-8).
+    expect(Object.keys(unsupported).length).toBeGreaterThan(0);
+  }, 120_000);
 
   test("the reference render is pure raster — near-zero vector content", async () => {
     const doc = await open(REFERENCE);
