@@ -25,6 +25,7 @@ process — not necessarily testable in isolation.
 | ------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------- |
 | [invariants.md](invariants.md)       | `INV`    | System-wide properties                                                                                                 |
 | [parsing.md](parsing.md)             | `PARSE`  | Drawing input → normalized document: format registry, entity coverage, binary decoding, units, colors, blocks, layouts |
+| [parsing-pdf.md](parsing-pdf.md)     | `PDF`    | PDF input → normalized document: strict gate, file structure, vector and text mapping, pages, unsupported taxonomy     |
 | [viewer.md](viewer.md)               | `VIEW`   | Camera, layers, picking, snap/measure, shortcuts, view snapshots, exports, spaces                                      |
 | [demo.md](demo.md)                   | `DEMO`   | Demo app: load paths, deep links, panels, error recovery, mobile                                                       |
 | [elements.md](elements.md)           | `ELEM`   | Web components: one-tag embed, events, shadow-DOM theming, lifecycle                                                   |

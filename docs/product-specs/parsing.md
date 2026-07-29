@@ -100,4 +100,8 @@ fails a load with an error naming the fix (VIEW-15), and a source no
 parser claims fails per PARSE-12. Every parse failure is a
 `DrawingParseError`, whose optional `format` field names the parser that
 rejected the file when one claimed it — so callers report the culprit
-without matching on message text.
+without matching on message text. A parsed document records which format
+produced it, so every surface can report it without re-sniffing.
+
+A PDF's own acceptance and mapping rules live in
+[parsing-pdf.md](parsing-pdf.md).
