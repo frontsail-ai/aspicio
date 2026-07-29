@@ -153,6 +153,7 @@ class Interpreter {
   // Building a decoder parses a CMap, so one per font object rather than per
   // text run: the Ghent corpus has 101 of them across 3,438 text operators.
   private readonly decoders = new Map<string, FontDecoder>();
+  private readonly countedType3 = new Set<string>();
   private readonly decoderSalt = 0;
 
   private readonly doc: PdfDocument;
@@ -514,6 +515,16 @@ class Interpreter {
   ): Promise<Matrix> {
     const decoder = await this.fontDecoder(state.fontName, resources);
     const text = decoder ? decoder.decode(bytes) : "";
+    // A Type 3 font's glyphs are vector artwork this pipeline could interpret
+    // but deliberately doesn't in this phase. The text still extracts (PDF-4);
+    // the count records the drawing that was skipped, not text that was lost.
+    if (decoder?.type3 === true && state.fontName !== undefined) {
+      const seen = `${state.fontName}`;
+      if (!this.countedType3.has(seen)) {
+        this.countedType3.add(seen);
+        this.count("Type3Font");
+      }
+    }
 
     // The rendering matrix: text space scaled by font size, then placed.
     const scaled: Matrix = [

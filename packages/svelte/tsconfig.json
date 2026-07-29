@@ -15,8 +15,10 @@
     "isolatedModules": true,
     "paths": {
       "@aspicio/core/dxf": ["../core/src/dxf.ts"],
+      "@aspicio/core/pdf": ["../core/src/pdf.ts"],
       "@aspicio/core": ["../core/src/index.ts"],
       "@aspicio/elements/formats/dxf": ["../elements/src/formats/dxf.ts"],
+      "@aspicio/elements/formats/pdf": ["../elements/src/formats/pdf.ts"],
       "@aspicio/elements": ["../elements/src/index.ts"]
     },
     "verbatimModuleSyntax": true,
