@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vite-plus/test";
 import { isPrivateHost } from "../src/fetch.ts";
+import { TOOLS } from "../../../packages/mcp/src/tools-meta.ts";
 import { handleRequest } from "../src/handler.ts";
 
 // A tiny valid drawing: a WALLS layer with one LINE and one CIRCLE.
@@ -274,10 +275,15 @@ test("/mcp speaks Streamable-HTTP MCP: initialize, tools/list, tools/call", asyn
   await client.connect(transport);
 
   const { tools } = await client.listTools();
+  // The six-tool matrix (AGT-16) plus this surface's own viewer tools.
   expect(tools.map((t) => t.name).sort()).toEqual([
+    "describe_doc",
     "describe_dxf",
+    "describe_pdf",
     "load_dxf_for_viewer",
+    "render_doc",
     "render_dxf",
+    "render_pdf",
     "view_dxf",
   ]);
 
@@ -364,4 +370,29 @@ test("the OpenAPI document lists all six endpoints and the format field", async 
   // The response shape gained `format`; the published document must say so.
   const summary = Object.values(doc.components.schemas).find((v) => v.required?.includes("units"));
   expect(summary?.required).toContain("format");
+});
+
+// AGT-16 asserts both MCP surfaces offer the same six tools. They register
+// from one shared table; this is what proves the table is the source of this
+// surface rather than a third copy nobody reads.
+test("the hosted surface offers exactly the shared tool set", async () => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StreamableHTTPClientTransport } =
+    await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
+  const stubPng = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+  const transport = new StreamableHTTPClientTransport(new URL("http://api.test/mcp"), {
+    fetch: ((input: RequestInfo | URL, init?: RequestInit) =>
+      handleRequest(new Request(input, init), async () => stubPng)) as typeof fetch,
+  });
+  const client = new Client({ name: "shared-table", version: "0" });
+  await client.connect(transport);
+  const { tools } = await client.listTools();
+
+  for (const tool of TOOLS) {
+    const found = tools.find((t) => t.name === tool.name);
+    expect(found, `${tool.name} is missing from the hosted surface`).toBeDefined();
+    // Descriptions may carry this surface's own guidance appended, but the
+    // shared text is what both surfaces promise.
+    expect(found?.description?.startsWith(tool.description)).toBe(true);
+  }
 });

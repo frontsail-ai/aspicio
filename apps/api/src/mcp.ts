@@ -1,5 +1,12 @@
 import { describeDrawing, parseWith, tessellate, tessellationToSvg } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
+import { pdfParser } from "@aspicio/core/pdf";
+import {
+  DRAWING_SUMMARY_SHAPE as SHARED_SUMMARY_SHAPE,
+  READ_ONLY_HINTS,
+  TOOLS,
+  widthSchema,
+} from "@aspicio/mcp/tools-meta";
 import {
   registerAppResource,
   registerAppTool,
@@ -38,31 +45,7 @@ async function loadDxf(source: string): Promise<Uint8Array> {
 // schema of describe_dxf and view_dxf so models consume results reliably;
 // the contract tests round-trip real summaries through a validating client,
 // so drift from core fails CI.
-const DRAWING_SUMMARY_SHAPE = {
-  format: z.string().describe('Which format was read ("dxf", "pdf")'),
-  units: z.string().describe('Drawing-unit label (e.g. "mm"), "" when unitless'),
-  bounds: z
-    .object({ minX: z.number(), minY: z.number(), maxX: z.number(), maxY: z.number() })
-    .nullable()
-    .describe("World-space extents, null for an empty drawing"),
-  size: z
-    .object({ width: z.number(), height: z.number() })
-    .nullable()
-    .describe("Bounding-box size in drawing units, null when empty"),
-  entityCount: z.number().int(),
-  segmentCount: z.number().int(),
-  layers: z.array(
-    z.object({
-      name: z.string(),
-      entityCount: z.number().int(),
-      visible: z.boolean(),
-      color: z.string().describe("The color actually drawn (dominant), as #rrggbb"),
-    }),
-  ),
-  entityTypes: z.record(z.string(), z.number()).describe("Top-level entities per DXF type"),
-  unsupported: z.record(z.string(), z.number()).describe("Per-type counts of skipped entities"),
-  texts: z.array(z.string()).describe("Unique TEXT/MTEXT strings, blocks included"),
-};
+const DRAWING_SUMMARY_SHAPE = SHARED_SUMMARY_SHAPE;
 
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -83,6 +66,21 @@ export function renderLink(origin: string, source: string, width: number): strin
 /** Build the same describe/render tools as the local server, Worker-flavored,
  * plus the MCP Apps viewer (AGT-14). `widgetHtml` is the built widget bundle;
  * tests inject a stub so they never depend on the widget build. */
+async function parseFor(
+  parsers: readonly (typeof dxfParser)[],
+  bytes: Uint8Array,
+  kind: "describe" | "render",
+): Promise<Awaited<ReturnType<typeof parseWith>>> {
+  try {
+    return await parseWith(parsers, bytes);
+  } catch (error) {
+    const other = [dxfParser, pdfParser].find((p) => !parsers.includes(p) && p.sniff(bytes));
+    if (other)
+      throw new Error(`This is a ${other.format.toUpperCase()}. Use ${kind}_${other.format}.`);
+    throw error;
+  }
+}
+
 function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): McpServer {
   const server = new McpServer(
     // The Worker deploys from master, not from release tags; the honest
@@ -106,60 +104,76 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     },
   );
 
-  server.registerTool(
-    "describe_dxf",
-    {
-      title: "Describe a DXF drawing",
-      annotations: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
-      description:
-        "Return a structured JSON summary of a DXF drawing — units, bounding box, layers (with the color actually drawn), per-type entity counts, the drawing's text content (title blocks and dimension values included), and any skipped/unsupported types. Use this to answer structural questions (what layers exist, how many parts, what size, what does it say) without rendering an image.",
-      inputSchema: { source: z.string().describe(SOURCE_DESC) },
-      outputSchema: DRAWING_SUMMARY_SHAPE,
-    },
-    async ({ source }) => {
-      const doc = await parseWith([dxfParser], await loadDxf(source));
-      const summary = describeDrawing(doc, tessellate(doc, {}));
-      return {
-        content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
-        structuredContent: summary as unknown as Record<string, unknown>,
-      };
-    },
-  );
+  const parsersFor = { dxf: [dxfParser], pdf: [pdfParser], doc: [dxfParser, pdfParser] } as const;
 
-  server.registerTool(
-    "render_dxf",
-    {
-      title: "Render a DXF to an image",
-      // No outputSchema on purpose: the result IS the image, not data.
-      annotations: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
-      description:
-        "Render a DXF drawing to a PNG image you can look at. Use this to answer visual questions (what does it look like, where is a feature) — it returns an image, not text. For structural facts and measurements, prefer describe_dxf; never measure pixels. Some chat UIs do not display the returned image to the user: for URL sources the result also includes a direct image link — show it to the user (e.g. as a markdown image) when they need to see the render. When the user wants to see or explore the drawing themselves, prefer view_dxf (interactive viewer) — if your platform gates it behind user approval, offer it and ask rather than substituting a static render.",
-      inputSchema: {
-        source: z.string().describe(SOURCE_DESC),
-        width: z
-          .number()
-          .int()
-          .min(64)
-          .max(4000)
-          .optional()
-          .describe("PNG width in pixels (default 1200)"),
-      },
-    },
-    async ({ source, width }) => {
-      const doc = await parseWith([dxfParser], await loadDxf(source));
-      const svg = tessellationToSvg(tessellate(doc, {}), undefined, { background: DEFAULT_BG });
-      const png = await renderPng(svg, width ?? 1200);
-      const link = renderLink(origin, source, width ?? 1200);
-      return {
-        content: [
-          { type: "image", data: toBase64(png), mimeType: "image/png" },
-          ...(link
-            ? [{ type: "text" as const, text: `Direct image link (for the user): ${link}` }]
-            : []),
-        ],
-      };
-    },
-  );
+  /**
+   * The shared description plus this surface's own guidance.
+   *
+   * The tool set and its core meaning come from the shared table so the two
+   * MCP surfaces cannot drift (AGT-16). What is genuinely local stays local:
+   * only the hosted server has an interactive viewer to point at, and only it
+   * can hand back a direct image link.
+   */
+  const hostedDescription = (tool: (typeof TOOLS)[number]): string => {
+    const extra: string[] = [];
+    if (tool.kind === "render")
+      extra.push(
+        "Some chat UIs do not display the returned image to the user: for URL sources the result also includes a direct image link — show it (e.g. as a markdown image) when they need to see the render.",
+      );
+    if (tool.format !== "pdf")
+      extra.push(
+        "When the user wants to see or explore the drawing themselves, prefer view_dxf (interactive viewer) — if your platform gates it behind user approval, offer it and ask rather than substituting a static render.",
+      );
+    return [tool.description, ...extra].join(" ");
+  };
+
+  for (const tool of TOOLS) {
+    const parsers = parsersFor[tool.format];
+    if (tool.kind === "describe") {
+      server.registerTool(
+        tool.name,
+        {
+          title: tool.title,
+          annotations: READ_ONLY_HINTS,
+          description: hostedDescription(tool),
+          inputSchema: { source: z.string().describe(SOURCE_DESC) },
+          outputSchema: DRAWING_SUMMARY_SHAPE,
+        },
+        async ({ source }) => {
+          const doc = await parseFor(parsers, await loadDxf(source), "describe");
+          const summary = describeDrawing(doc, tessellate(doc, {}));
+          return {
+            content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
+            structuredContent: summary as unknown as Record<string, unknown>,
+          };
+        },
+      );
+    } else {
+      server.registerTool(
+        tool.name,
+        {
+          title: tool.title,
+          annotations: READ_ONLY_HINTS,
+          description: hostedDescription(tool),
+          inputSchema: { source: z.string().describe(SOURCE_DESC), width: widthSchema },
+        },
+        async ({ source, width }) => {
+          const doc = await parseFor(parsers, await loadDxf(source), "render");
+          const svg = tessellationToSvg(tessellate(doc, {}), undefined, { background: DEFAULT_BG });
+          const png = await renderPng(svg, width ?? 1200);
+          const link = renderLink(origin, source, width ?? 1200);
+          return {
+            content: [
+              { type: "image", data: toBase64(png), mimeType: "image/png" },
+              ...(link
+                ? [{ type: "text" as const, text: `Direct image link (for the user): ${link}` }]
+                : []),
+            ],
+          };
+        },
+      );
+    }
+  }
 
   // The in-chat interactive viewer (MCP Apps, AGT-14). Hosts without the
   // extension ignore the UI metadata and still get a usable text result.

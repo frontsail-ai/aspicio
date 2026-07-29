@@ -19,5 +19,5 @@
     },
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "../widget/src/meta.ts"]
+  "include": ["src/**/*.ts", "../widget/src/meta.ts", "../../packages/mcp/src/tools-meta.ts"]
 }
