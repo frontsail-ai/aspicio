@@ -88,8 +88,15 @@ const DRIFT_GUARD: Array<{ skill: string; source: string; names: string[] }> = [
   },
   {
     skill: "skills/aspicio-inspect-dxf/SKILL.md",
-    source: "packages/mcp/src/server.ts",
-    names: ["describe_dxf", "render_dxf"],
+    source: "packages/mcp/src/tools-meta.ts",
+    names: [
+      "describe_dxf",
+      "render_dxf",
+      "describe_pdf",
+      "render_pdf",
+      "describe_doc",
+      "render_doc",
+    ],
   },
 ];
 
