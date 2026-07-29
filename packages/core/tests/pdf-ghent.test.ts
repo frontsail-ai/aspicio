@@ -4,6 +4,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { PdfDocument, isStream } from "../src/parse/pdf/document.ts";
 import { checkStrictGate } from "../src/parse/pdf/gate.ts";
 import { interpretContent } from "../src/parse/pdf/interpret.ts";
+import { parsePdfBytes } from "../src/parse/pdf/parse.ts";
 import { isUndecoded } from "../src/parse/pdf/filters.ts";
 import { PdfLexer, isKeyword, isName, latin1 } from "../src/parse/pdf/objects.ts";
 
@@ -193,6 +194,24 @@ describe.skipIf(!available)("Ghent PDF Output Suite V5.0", () => {
     await expect(checkStrictGate(await open(REFERENCE))).resolves.toBeUndefined();
   }, 180_000);
 
+  // Every page, not just page 1. A malformed character map on page 3 failed
+  // that page entirely before this assertion existed — and CI cannot catch it,
+  // because the corpus is absent there and these tests skip.
+  test("every page interprets without failing", async () => {
+    const doc = await open(X4);
+    const pages = await doc.pages();
+    const counts: number[] = [];
+    for (const page of pages) {
+      const content = await doc.pageContent(page);
+      const resources = await doc.dict(page.get("Resources"));
+      const { entities } = await interpretContent(doc, content, resources);
+      counts.push(entities.length);
+    }
+    expect(counts).toHaveLength(6);
+    // Every page draws something; a zero would mean a page silently failed.
+    for (const count of counts) expect(count).toBeGreaterThan(0);
+  }, 300_000);
+
   test("a real page yields geometry and readable text", async () => {
     const doc = await open(X4);
     const [page] = await doc.pages();
@@ -216,6 +235,37 @@ describe.skipIf(!available)("Ghent PDF Output Suite V5.0", () => {
 
     // Images are counted, not drawn — an honest report about the page (PDF-8).
     expect(Object.keys(unsupported).length).toBeGreaterThan(0);
+  }, 120_000);
+
+  // The acceptance bar for this phase, on the file it was written for:
+  // parses, describes honestly, renders vector content.
+  test("the X-4 file parses end to end into a drawing document", async () => {
+    const doc = await parsePdfBytes(new Uint8Array(readFileSync(X4)));
+    expect(doc.format).toBe("pdf");
+    expect(doc.units).toBe("pt");
+    expect([...doc.layers.keys()]).toEqual(["Content"]);
+    // Six pages: page 1 is model space, the rest are named spaces (PDF-5).
+    expect(doc.layouts?.map((l) => l.name)).toEqual([
+      "Page 2",
+      "Page 3",
+      "Page 4",
+      "Page 5",
+      "Page 6",
+    ]);
+    expect(doc.entities.length).toBeGreaterThan(100);
+
+    // Honest about what it skipped, rather than quietly dropping it (PDF-8).
+    expect(Object.keys(doc.unsupported).length).toBeGreaterThan(0);
+    expect(doc.unsupported["Image"]).toBeGreaterThan(0);
+  }, 300_000);
+
+  // A pure-raster file yielding almost nothing is the correct report about
+  // that file, not a failure to fix.
+  test("the reference render parses to a nearly empty drawing", async () => {
+    const doc = await parsePdfBytes(new Uint8Array(readFileSync(REFERENCE)));
+    expect(doc.entities).toHaveLength(0);
+    expect(doc.unsupported["Image"]).toBeGreaterThan(0);
+    expect(doc.layouts).toHaveLength(6);
   }, 120_000);
 
   test("the reference render is pure raster — near-zero vector content", async () => {

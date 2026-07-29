@@ -30,6 +30,9 @@ dist-ssr
 # Scratch space: plans, corpora, throwaway probes
 tmp/
 
+# Throwaway review clones checked out inside the tree
+aspicio-*/
+
 # Playwright
 test-results/
 playwright-report/

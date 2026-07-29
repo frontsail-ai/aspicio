@@ -290,10 +290,15 @@ export async function buildFontDecoder(doc: PdfDocument, font: PdfDict): Promise
   let toUnicode: Map<number, string> | undefined;
   const toUnicodeRef = font.get("ToUnicode");
   if (toUnicodeRef !== undefined) {
-    const stream = await resolveStream(doc, toUnicodeRef);
-    if (stream) {
-      const data = await doc.readStream(stream);
-      if (data instanceof Uint8Array) toUnicode = parseToUnicode(data);
+    try {
+      const stream = await resolveStream(doc, toUnicodeRef);
+      if (stream) {
+        const data = await doc.readStream(stream);
+        if (data instanceof Uint8Array) toUnicode = parseToUnicode(data);
+      }
+    } catch {
+      // An unreadable character map costs accuracy for one font, not the
+      // document: fall through to the font's declared encoding (INV-3).
     }
   }
 

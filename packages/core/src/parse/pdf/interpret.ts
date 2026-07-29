@@ -218,8 +218,7 @@ class Interpreter {
     };
     const lineTo = (x: number, y: number): void => {
       cursor = apply(state.ctm, x, y);
-      if (current.length === 0) current.push(cursor);
-      else current.push(cursor);
+      current.push(cursor);
     };
     const curveTo = (c1: Point2, c2: Point2, end: Point2): void => {
       const p0 = cursor;
@@ -267,7 +266,7 @@ class Interpreter {
           break;
         }
         case "gs":
-          await this.applyExtGState(operands[operands.length - 1], resources);
+          await this.applyExtGState(operands[operands.length - 1], resources, state);
           break;
 
         /* --- colour --- */
@@ -532,8 +531,11 @@ class Interpreter {
       // Cap height, not em size: the stroke font draws caps at `height`, and
       // 0.7 em is the usual cap-height ratio for text faces.
       const height = Math.hypot(render[2], render[3]) * 0.7;
-      const rotation = Math.atan2(render[1], render[0]);
-      const widthFactor = state.horizontalScale === 0 ? 1 : 1;
+      // render[0] already carries the horizontal scale, so divide it back out
+      // or a stretched run would report a skewed angle.
+      const rotation = Math.atan2(render[1], render[0] / (state.horizontalScale || 1));
+      // Tz stretches glyphs horizontally; the stroke font honours it directly.
+      const widthFactor = state.horizontalScale > 0 ? state.horizontalScale : 1;
       if (height > 0) {
         const entity: TextEntity = {
           type: "TEXT",
@@ -604,16 +606,67 @@ class Interpreter {
     }
   }
 
+  /**
+   * Emit fills for one path's subpaths.
+   *
+   * A single paint operator can fill disjoint regions as easily as a shape
+   * with holes — `re re f` is everyday output. Treating the first subpath as
+   * the outer boundary and everything else as holes silently drops the second
+   * region, which is invisible wrongness rather than honest incompleteness.
+   * So rings are grouped by containment: every ring nobody contains becomes
+   * its own filled region, carrying the rings nested inside it as holes.
+   */
   private emitFill(subpaths: Point2[][], state: GraphicsState): void {
-    const loops = subpaths.filter((p) => p.length >= 3);
-    if (loops.length === 0) return;
+    const rings = subpaths.filter((points) => points.length >= 3);
+    if (rings.length === 0) return;
+    if (rings.length === 1) {
+      this.pushHatch(rings, state);
+      return;
+    }
+
+    const boxes = rings.map(boundingBox);
+    // The innermost ring containing each one — its parent in the nesting tree.
+    const parent = rings.map((_, i) => {
+      let best = -1;
+      for (let j = 0; j < rings.length; j++) {
+        if (j === i || !contains(boxes[j] as Box, boxes[i] as Box)) continue;
+        if (best < 0 || area(boxes[j] as Box) < area(boxes[best] as Box)) best = j;
+      }
+      return best;
+    });
+
+    // Depth decides role: a ring nested an odd number of levels deep is a hole
+    // in its parent; an even depth starts a new filled region.
+    const depth = rings.map((_, i) => {
+      let d = 0;
+      for (let at = parent[i] as number; at >= 0; at = parent[at] as number) {
+        d++;
+        if (d > rings.length) break; // containment cannot cycle, but be safe
+      }
+      return d;
+    });
+
+    const groups = new Map<number, Point2[][]>();
+    for (const [i, ring] of rings.entries()) {
+      if ((depth[i] as number) % 2 === 0) {
+        if (!groups.has(i)) groups.set(i, [ring]);
+      } else {
+        const owner = parent[i] as number;
+        const list = groups.get(owner);
+        if (list) list.push(ring);
+        else groups.set(owner, [rings[owner] as Point2[], ring]);
+      }
+    }
+    for (const loops of groups.values()) this.pushHatch(loops, state);
+  }
+
+  private pushHatch(loops: Point2[][], state: GraphicsState): void {
     const entity: HatchEntity = {
       type: "HATCH",
       layer: CONTENT_LAYER,
       color: state.fillColor,
-      // The first subpath is the outer boundary and the rest are holes — the
-      // same convention DXF fills use, and an approximation of both of PDF's
-      // fill rules rather than an implementation of either (PDF-3).
+      // First loop is the outer boundary, the rest are holes — the same
+      // convention DXF fills use (PDF-3).
       loops,
       solid: true,
     };
@@ -653,6 +706,7 @@ class Interpreter {
   private async applyExtGState(
     nameValue: PdfValue | undefined,
     resources: PdfDict | undefined,
+    state: GraphicsState,
   ): Promise<void> {
     if (!isName(nameValue)) return;
     const states = await this.doc.dict(resources?.get("ExtGState"));
@@ -662,6 +716,15 @@ class Interpreter {
       const mask = gs.get("SMask");
       // /None turns masking off — only an actual mask is unsupported.
       if (!(isName(mask) && mask.name === "None")) this.count("SoftMask");
+    }
+    // ExtGState can also set line width and dash; honour them rather than
+    // letting a file that styles strokes this way draw hairlines silently.
+    const lw = gs.get("LW");
+    if (typeof lw === "number") state.lineWidth = lw;
+    const dash = await this.doc.array(gs.get("D"));
+    if (dash.length > 0) {
+      const pattern = await this.doc.array(dash[0]);
+      state.dash = pattern.map((v) => toNumber(v));
     }
     const blend = gs.get("BM");
     const blendName = isName(blend)
@@ -704,6 +767,43 @@ class Interpreter {
     await this.execute(decoded, formResources, multiply(matrix, state.ctm), depth + 1);
   }
 }
+
+interface Box {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+}
+
+function boundingBox(points: readonly Point2[]): Box {
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/** True when `outer` encloses `inner`. Bounding boxes are enough here: a ring
+ * that is not box-contained cannot be geometrically contained either, and the
+ * false positives (interlocking L-shapes) are rarer than the disjoint case
+ * this exists to get right. */
+function contains(outer: Box, inner: Box): boolean {
+  return (
+    outer.minX <= inner.minX &&
+    outer.minY <= inner.minY &&
+    outer.maxX >= inner.maxX &&
+    outer.maxY >= inner.maxY &&
+    area(outer) > area(inner)
+  );
+}
+
+const area = (b: Box): number => Math.max(0, b.maxX - b.minX) * Math.max(0, b.maxY - b.minY);
 
 /** Count ASCII spaces, which are what word spacing applies to. */
 function countSpaces(bytes: Uint8Array): number {
