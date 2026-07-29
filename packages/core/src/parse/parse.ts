@@ -470,7 +470,7 @@ export function parseDxf(text: string): DrawingDocument {
   const insunits = (dxf.header as Record<string, unknown> | undefined)?.["$INSUNITS"];
   const units = unitLabel(typeof insunits === "number" ? insunits : undefined);
 
-  return { layers, entities, blocks, lineTypes, unsupported, units, layouts };
+  return { layers, entities, blocks, lineTypes, unsupported, units, layouts, format: DXF_FORMAT };
 }
 
 /**

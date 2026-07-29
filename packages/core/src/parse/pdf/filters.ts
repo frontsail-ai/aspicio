@@ -14,10 +14,20 @@
 import { isDict, isName, toNumber } from "./objects.ts";
 import type { PdfDict, PdfValue } from "./objects.ts";
 
-/** A stream this build cannot decode — an image codec, essentially. */
+/**
+ * A stream this build did not decode — an image codec, or data too damaged to
+ * inflate.
+ *
+ * Decoding never throws. Every caller already branches on this type for image
+ * codecs, so making damage take the same path means a caller cannot forget to
+ * handle it: a stream-level failure can no longer become a page- or
+ * document-level one by omission.
+ */
 export interface UndecodedStream {
   /** The filter that stopped us, e.g. "DCTDecode". */
   readonly unsupportedFilter: string;
+  /** True when the filter is one we support but the data would not decode. */
+  readonly damaged?: boolean;
 }
 
 export const isUndecoded = (v: Uint8Array | UndecodedStream): v is UndecodedStream =>
@@ -40,9 +50,16 @@ const IMAGE_FILTERS = new Set([
  * that falling back is cheaper than rejecting the file.
  */
 export async function inflate(bytes: Uint8Array): Promise<Uint8Array> {
+  return (await inflateReporting(bytes)).data;
+}
+
+/** Inflate, reporting whether the stream ended early (PDF-8). */
+export async function inflateReporting(
+  bytes: Uint8Array,
+): Promise<{ data: Uint8Array; truncated: boolean }> {
   for (const format of ["deflate", "deflate-raw"] as const) {
     const out = await inflatePartial(bytes, format);
-    if (out.length > 0) return out;
+    if (out.data.length > 0) return out;
   }
   throw new FlateError();
 }
@@ -59,8 +76,9 @@ export async function inflate(bytes: Uint8Array): Promise<Uint8Array> {
 async function inflatePartial(
   bytes: Uint8Array,
   format: "deflate" | "deflate-raw",
-): Promise<Uint8Array> {
+): Promise<{ data: Uint8Array; truncated: boolean }> {
   const chunks: Uint8Array[] = [];
+  let truncated = false;
   try {
     const stream = new DecompressionStream(format);
     const reader = stream.readable.getReader();
@@ -74,7 +92,9 @@ async function inflatePartial(
           if (value) chunks.push(value);
         }
       } catch {
-        /* truncated or trailing garbage — keep what decoded */
+        // Trailing garbage or a stream cut short: keep what decoded, but say
+        // so, because the drawing may be missing content (PDF-8).
+        truncated = true;
       }
     })();
     const writer = stream.writable.getWriter();
@@ -86,7 +106,7 @@ async function inflatePartial(
     }
     await drain;
   } catch {
-    return new Uint8Array();
+    return { data: new Uint8Array(), truncated: true };
   }
 
   const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -96,7 +116,7 @@ async function inflatePartial(
     out.set(chunk, offset);
     offset += chunk.length;
   }
-  return out;
+  return { data: out, truncated };
 }
 
 /** Thrown when neither zlib nor raw deflate can read a stream. */
@@ -207,6 +227,7 @@ export async function decodeStream(
   raw: Uint8Array,
   dict: PdfDict,
   resolve: Resolver,
+  onTruncated?: () => void,
 ): Promise<Uint8Array | UndecodedStream> {
   const filterValue = resolve(dict.get("Filter"));
   if (filterValue === undefined || filterValue === null) return raw;
@@ -222,7 +243,16 @@ export async function decodeStream(
     if (IMAGE_FILTERS.has(filter.name)) return { unsupportedFilter: filter.name };
     if (filter.name !== "FlateDecode" && filter.name !== "Fl")
       return { unsupportedFilter: filter.name };
-    data = await inflate(data);
+    let inflated: { data: Uint8Array; truncated: boolean };
+    try {
+      inflated = await inflateReporting(data);
+    } catch {
+      // Damaged beyond recovery: report it the same way an image codec is
+      // reported, so no caller has to guard against an exception.
+      return { unsupportedFilter: filter.name, damaged: true };
+    }
+    if (inflated.truncated) onTruncated?.();
+    data = inflated.data;
     const parm = resolve(parms[i]);
     if (isDict(parm)) data = undoPredictor(data, parm, resolve);
   }

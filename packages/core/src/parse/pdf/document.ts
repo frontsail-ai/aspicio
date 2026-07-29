@@ -58,6 +58,7 @@ export class PdfDocument {
   // The gate reads every content stream, then the interpreter reads them
   // again; without this the whole document inflates twice.
   private readonly decoded = new WeakMap<PdfStream, Uint8Array | UndecodedStream>();
+  private truncated = 0;
 
   private constructor(bytes: Uint8Array) {
     this.bytes = bytes;
@@ -74,6 +75,14 @@ export class PdfDocument {
     }
     if (doc.xref.size === 0) throw pdfError("Not a readable PDF file");
     return doc;
+  }
+
+  /**
+   * How many streams decoded only partially — a drawing built from them may be
+   * missing content, which PDF-8 requires reporting rather than hiding.
+   */
+  get truncatedStreams(): number {
+    return this.truncated;
   }
 
   /** Trailer entries, newest section first. */
@@ -123,7 +132,14 @@ export class PdfDocument {
   async readStream(stream: PdfStream): Promise<Uint8Array | UndecodedStream> {
     const cached = this.decoded.get(stream);
     if (cached !== undefined) return cached;
-    const result = await decodeStream(stream.raw, stream.dict, (v) => this.resolveSync(v));
+    const result = await decodeStream(
+      stream.raw,
+      stream.dict,
+      (v) => this.resolveSync(v),
+      () => {
+        this.truncated++;
+      },
+    );
     this.decoded.set(stream, result);
     return result;
   }

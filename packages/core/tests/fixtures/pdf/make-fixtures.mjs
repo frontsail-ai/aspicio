@@ -542,4 +542,155 @@ fontFixture("font-composite-embedded.pdf", [
   );
 }
 
-console.log("wrote review-probe fixtures");
+/* 20. Three pages, so page→space mapping has something to map (PDF-5). */
+{
+  const pageContent = (n) => `${n} ${n} m ${n * 10} ${n * 10} l S\n`;
+  const objs = [
+    catalog,
+    [2, "<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 /MediaBox [0 0 300 200] >>"],
+  ];
+  let obj = 3;
+  for (let i = 1; i <= 3; i++) {
+    const content = pageContent(i);
+    objs.push([obj, `<< /Type /Page /Parent 2 0 R /Contents ${obj + 1} 0 R >>`]);
+    objs.push([
+      obj + 1,
+      Buffer.concat([
+        enc(`<< /Length ${content.length} >>\nstream\n`),
+        enc(content),
+        enc("\nendstream"),
+      ]),
+    ]);
+    obj += 2;
+  }
+  writeFileSync("three-pages.pdf", classic(objs));
+}
+
+/* 21. A file with no pages at all. */
+writeFileSync("no-pages.pdf", classic([catalog, [2, "<< /Type /Pages /Kids [] /Count 0 >>"]]));
+
+/* 22. A form whose Flate data is garbage — hostile input, not a real file.
+      The page must still draw its own content and report the loss. */
+{
+  const page = "1 0 0 RG 5 5 m 95 95 l S\n/X1 Do\n";
+  writeFileSync(
+    "form-undecodable.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Contents 4 0 R " +
+          "/Resources << /XObject << /X1 5 0 R >> >> >>",
+      ],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${page.length} >>\nstream\n`),
+          enc(page),
+          enc("\nendstream"),
+        ]),
+      ],
+      [
+        5,
+        Buffer.concat([
+          enc(
+            "<< /Type /XObject /Subtype /Form /BBox [0 0 10 10] /Filter /FlateDecode /Length 8 >>\nstream\n",
+          ),
+          Buffer.from([0xff, 0xff, 0xff, 0xff, 0x00, 0x01, 0x02, 0x03]),
+          enc("\nendstream"),
+        ]),
+      ],
+    ]),
+  );
+}
+
+/* 23. Two pages: page 1 invokes a form with garbage Flate, page 2 is fine.
+      A damaged page must cost that page, never the document. */
+{
+  const p1 = "1 0 0 RG 5 5 m 95 95 l S\n/X1 Do\n";
+  const p2 = "0 0 1 RG 10 10 m 90 90 l S\n";
+  writeFileSync(
+    "bad-page-good-page.pdf",
+    classic([
+      catalog,
+      [2, "<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 /MediaBox [0 0 100 100] >>"],
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /Contents 4 0 R " +
+          "/Resources << /XObject << /X1 5 0 R >> >> >>",
+      ],
+      [
+        4,
+        Buffer.concat([enc(`<< /Length ${p1.length} >>\nstream\n`), enc(p1), enc("\nendstream")]),
+      ],
+      [
+        5,
+        Buffer.concat([
+          enc(
+            "<< /Type /XObject /Subtype /Form /BBox [0 0 10 10] /Filter /FlateDecode /Length 8 >>\nstream\n",
+          ),
+          Buffer.from([0xff, 0xff, 0xff, 0xff, 0x00, 0x01, 0x02, 0x03]),
+          enc("\nendstream"),
+        ]),
+      ],
+      [6, "<< /Type /Page /Parent 2 0 R /Contents 7 0 R >>"],
+      [
+        7,
+        Buffer.concat([enc(`<< /Length ${p2.length} >>\nstream\n`), enc(p2), enc("\nendstream")]),
+      ],
+    ]),
+  );
+}
+
+/* 24. A page rotated a quarter turn — orientation lives on the page, not in
+      the content, so ignoring it renders the drawing sideways. */
+{
+  const content = "0 0 m 100 0 l S\n";
+  writeFileSync(
+    "rotated-page.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Rotate 90 /Contents 4 0 R >>"],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${content.length} >>\nstream\n`),
+          enc(content),
+          enc("\nendstream"),
+        ]),
+      ],
+    ]),
+  );
+}
+
+/* 25. Page 1's own /Contents is undecodable; page 2 is fine. The gate reads
+      page content before the interpreter does, so this is a second path to
+      the same "one page must not kill the document" guarantee. */
+{
+  const p2 = "0 0 1 RG 10 10 m 90 90 l S\n";
+  writeFileSync(
+    "bad-page-contents.pdf",
+    classic([
+      catalog,
+      [2, "<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 /MediaBox [0 0 100 100] >>"],
+      [3, "<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>"],
+      [
+        4,
+        Buffer.concat([
+          enc("<< /Filter /FlateDecode /Length 8 >>\nstream\n"),
+          Buffer.from([0xff, 0xff, 0xff, 0xff, 0x00, 0x01, 0x02, 0x03]),
+          enc("\nendstream"),
+        ]),
+      ],
+      [5, "<< /Type /Page /Parent 2 0 R /Contents 6 0 R >>"],
+      [
+        6,
+        Buffer.concat([enc(`<< /Length ${p2.length} >>\nstream\n`), enc(p2), enc("\nendstream")]),
+      ],
+    ]),
+  );
+}
+
+console.log("wrote gate-path fixtures");
