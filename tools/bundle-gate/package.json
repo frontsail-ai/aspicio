@@ -1,0 +1,24 @@
+{
+  "name": "@aspicio/bundle-gate",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Proves a single-format consumer bundles no other format's code (INV-11).",
+  "type": "module",
+  "scripts": {
+    "build": "vp test",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "@aspicio/core": "workspace:*",
+    "@aspicio/elements": "workspace:*",
+    "@aspicio/react": "workspace:*",
+    "@aspicio/svelte": "workspace:*",
+    "@aspicio/vue": "workspace:*",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2",
+    "vite-plus": "catalog:"
+  }
+}

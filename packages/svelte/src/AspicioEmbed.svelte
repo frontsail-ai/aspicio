@@ -1,10 +1,15 @@
 <!--
-  Chrome-less embeddable DXF viewer — a thin Svelte veneer over the
-  framework-neutral <aspicio-preview> element from @aspicio/elements.
-  `bind:this` exposes `viewer()` — the full DxfViewer for camera control,
-  layer toggling, and hit-testing; pair with DxfLayerPanel for a
-  ready-made layer list. Providing `onhoverlayer` enables canvas
-  hover-picking (parity with the React and Vue bindings).
+  Batteries-included embed: layer list + interactive preview in one
+  component — a thin Svelte veneer over the framework-neutral
+  <aspicio-embed> element from @aspicio/elements, styled like the Aspicio
+  demo app (blueprint grid, dark panel) unless theme="none". Pass the DXF
+  as `src` (text, File, Blob, ArrayBuffer) or `srcUrl`; everything else
+  is optional.
+
+    <AspicioEmbed srcUrl="/drawing.dxf" style="height: 480px" onloaded={...} />
+
+  `bind:this` exposes `viewer()` — the full DrawingViewer for camera control;
+  use AspicioPreview + AspicioLayerPanel directly when you need a custom layout.
 -->
 <script>
   import "@aspicio/elements";
@@ -16,19 +21,23 @@
     srcUrl = null,
     /** Viewer options, applied at creation (changing them recreates the viewer). */
     options = undefined,
+    /** Where the layer list sits: "left" | "right" | "none". */
+    panel = "left",
+    /** Visual theme. Defaults to the Aspicio demo look. */
+    theme = "aspicio",
+    /** Inline styles applied to the inner layer panel (CSSOM values, e.g. "300px"). */
+    panelStyle = undefined,
     /** Show the built-in Download control (SVG / PNG export). */
     showDownload = true,
     /** Keyboard shortcuts on the focused viewer: F fit, +/- zoom, R reset, A show all. */
     shortcuts = false,
-    /** Force canvas hover-picking on/off; defaults to on when onhoverlayer is provided. */
-    hoverPick = undefined,
     /** ({ layers, stats }) after each successful load. */
     onloaded = undefined,
     /** (error) when a load fails. */
     onloaderror = undefined,
     /** (viewer | null) when the viewer is created or the element disconnects. */
     onviewerchange = undefined,
-    /** (layer | null) for the layer under the cursor; providing it enables picking. */
+    /** (layer | null) for the layer under the cursor. */
     onhoverlayer = undefined,
     /** Extra attributes (class, style, …) forwarded to the element. */
     ...rest
@@ -37,23 +46,30 @@
   // Assigned by bind:this (compiler-generated; linter can't see it).
   let el = null;
 
-  /** The live DxfViewer instance, or null before mount / after unmount. */
+  /** The live DrawingViewer instance, or null before mount / after unmount. */
   export function viewer() {
     return el?.viewer ?? null;
   }
+
+  // panelStyle is a property-only field on the element (rich object), and
+  // Svelte lowercases template attribute names — assign it imperatively.
+  $effect(() => {
+    if (el) el.panelStyle = panelStyle;
+  });
 </script>
 
-<aspicio-preview
+<aspicio-embed
   bind:this={el}
   {src}
   src-url={srcUrl}
   {options}
+  {panel}
+  {theme}
   no-download={!showDownload || undefined}
   {shortcuts}
-  hover-pick={(hoverPick ?? onhoverlayer != null) || undefined}
   onloaded={(e) => onloaded?.(e.detail)}
   onload-error={(e) => onloaderror?.(e.detail.error)}
   onviewer-change={(e) => onviewerchange?.(e.detail.viewer)}
   onhover-layer={(e) => onhoverlayer?.(e.detail.layer)}
   {...rest}
-></aspicio-preview>
+></aspicio-embed>

@@ -11,11 +11,16 @@ npm install @aspicio/core three   # three is a peer dependency (>=0.184)
 ```
 
 ```ts
-import { DxfViewer } from "@aspicio/core";
+import { DrawingViewer } from "@aspicio/core";
+import { dxfParser } from "@aspicio/core/dxf";
 
-const viewer = new DxfViewer(container, { background: 0x16181d });
+const viewer = new DrawingViewer(container, { background: 0x16181d, parsers: [dxfParser] });
 await viewer.load(file); // File | Blob | ArrayBuffer | DXF text
 ```
+
+Formats are opted into by import. The root entry ships no parser, so
+`parsers` is what teaches the viewer to read DXF — and what keeps a bundle
+free of formats it never asked for.
 
 That alone gives you an interactive preview inside `container`: drag to
 pan, wheel/pinch to zoom (cursor-anchored), Shift+drag or two-finger
@@ -30,13 +35,13 @@ its canvas, tracks container resizes, and renders on demand.
 | -------------- | -------------------------------------------------------------------------------------------------- |
 | `load(src)`    | `File \| Blob \| ArrayBuffer \| string` — ASCII **or** binary DXF (auto-detected from bytes)       |
 | `loadUrl(url)` | fetch + load; rejects on HTTP errors                                                               |
-| `document`     | the parsed, normalized `DxfDocument` (or `null`)                                                   |
+| `document`     | the parsed, normalized `DrawingDocument` (or `null`)                                               |
 | `stats`        | `{ entityCount, segmentCount, unsupported }` — unsupported is a per-type count of skipped entities |
 
 Both DXF encodings load transparently: text and "AutoCAD Binary DXF" (R12
 1-byte and R13+ 2-byte code variants). If you parse bytes yourself,
-`isBinaryDxf(bytes)` and `binaryDxfToText(bytes)` are exported to feed the
-binary form into `parseDxf`.
+`isBinaryDxf(bytes)` and `binaryDxfToText(bytes)` are exported from
+`@aspicio/core/dxf` to feed the binary form into `parseDxf`.
 
 ### Layers
 
@@ -114,7 +119,8 @@ viewer.dispose(); // release the WebGL context and listeners
 ### Options
 
 ```ts
-new DxfViewer(container, {
+new DrawingViewer(container, {
+  parsers: [dxfParser], // the formats this viewer accepts, tried in order
   background: 0x16181d, // 24-bit RGB, or null for a transparent canvas
   curveSegments: 72, // arc flattening resolution (segments per full circle)
 });
@@ -150,7 +156,7 @@ table blank-white.
 
 ## Extending
 
-The pipeline is `parseDxf → tessellate → render`, and each stage is
+The pipeline is `parse → tessellate → render`, and each stage is
 exported. Add or override an entity type with one handler — no pipeline
 surgery:
 
@@ -162,8 +168,9 @@ registerEntityHandler("ELLIPSE", (entity, ctx) => {
 });
 ```
 
-`parseDxf`, `tessellate`, `pickLayer`, `Camera2D`, and `attachGestures`
-are usable stand-alone for custom renderers.
+`parseWith`, `tessellate`, `pickLayer`, `Camera2D`, and `attachGestures`
+are usable stand-alone for custom renderers; `parseDxf` and `parseDxfBytes`
+come from `@aspicio/core/dxf` when you want the DXF parser directly.
 
 `attachShortcuts(target, viewer, handlers)` adds keyboard shortcuts to a
 window or element (returns a detach fn): `F` fit, `+`/`-` zoom, `R` reset
@@ -186,3 +193,11 @@ vp install   # dependencies
 vp test      # unit tests
 vp pack      # build dist/
 ```
+
+## Migrating from 0.x
+
+Two breaking changes ship together:
+
+1. **Formats are opted into by import.** Add `import "@aspicio/core/dxf";` once —
+   without it every load fails with an error saying exactly that.
+2. **Format-neutral names dropped their `Dxf` prefix**: `DxfViewer` → `DrawingViewer`, `DxfViewerOptions` → `DrawingViewerOptions`, `DxfDocument` → `DrawingDocument`, `DxfSource` → `DrawingSource`, `DxfParseError` → `DrawingParseError`. `parseDxf`, `parseDxfBytes`, `binaryDxfToText`, and `isBinaryDxf` keep their names and move to `@aspicio/core/dxf`.

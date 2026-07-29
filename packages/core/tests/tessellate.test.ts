@@ -1,8 +1,8 @@
 import { expect, test } from "vite-plus/test";
-import type { BlockDef, DxfDocument } from "../src/model/types.ts";
+import type { BlockDef, DrawingDocument } from "../src/model/types.ts";
 import { tessellate } from "../src/tessellate/tessellate.ts";
 
-function makeDoc(partial: Partial<DxfDocument>): DxfDocument {
+function makeDoc(partial: Partial<DrawingDocument>): DrawingDocument {
   return {
     layers: new Map([
       ["0", { name: "0", color: 0xff0000, visible: true, frozen: false, entityCount: 0 }],

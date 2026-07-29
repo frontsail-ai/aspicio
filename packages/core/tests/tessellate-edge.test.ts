@@ -1,12 +1,12 @@
 import { expect, test } from "vite-plus/test";
-import type { BlockDef, DxfDocument, Entity } from "../src/model/types.ts";
+import type { BlockDef, DrawingDocument, Entity } from "../src/model/types.ts";
 import { tessellate } from "../src/tessellate/tessellate.ts";
 
 function makeDoc(
   entities: Entity[],
   blocks: [string, BlockDef][] = [],
-  layers?: Map<string, DxfDocument["layers"] extends Map<string, infer V> ? V : never>,
-): DxfDocument {
+  layers?: Map<string, DrawingDocument["layers"] extends Map<string, infer V> ? V : never>,
+): DrawingDocument {
   return {
     layers:
       layers ??

@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 
 /** Visual theme for the ready-made components. */
-export type { DxfTheme } from "@aspicio/elements";
+export type { AspicioTheme } from "@aspicio/elements";
 
 /**
  * Design tokens lifted from the Aspicio demo app. The elements underneath
@@ -13,8 +13,8 @@ export { aspicioTokens } from "@aspicio/elements";
 
 /**
  * The demo app's blueprint grid, drawn behind a transparent canvas.
- * <DxfEmbed> paints this internally; the export remains for hosts
- * composing DxfPreview into their own themed layouts.
+ * <AspicioEmbed> paints this internally; the export remains for hosts
+ * composing AspicioPreview into their own themed layouts.
  */
 export const aspicioCanvasBackground: CSSProperties = {
   background: "#16181d",

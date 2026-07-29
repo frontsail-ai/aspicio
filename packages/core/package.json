@@ -17,6 +17,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./dist/index.mjs",
+    "./dxf": "./dist/dxf.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {

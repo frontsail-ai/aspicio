@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
+      "@aspicio/core/dxf": ["../core/src/dxf.ts"],
       "@aspicio/core": ["../core/src/index.ts"]
     },
     "resolveJsonModule": true

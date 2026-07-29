@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { beforeEach, expect, test, vi } from "vite-plus/test";
-import { DxfViewer } from "../src/viewer.ts";
+import { dxfParser } from "../src/dxf.ts";
+import type { DrawingParser } from "../src/parse/registry.ts";
+import { DrawingViewer } from "../src/viewer.ts";
 
 /* The real renderer needs WebGL; replace it with a spy double. */
 const rendererCalls = vi.hoisted(() => ({
@@ -66,10 +68,12 @@ const SAMPLE = [
   "EOF",
 ].join("\n");
 
-function makeViewer(): { viewer: DxfViewer; container: HTMLElement } {
+function makeViewer(): { viewer: DrawingViewer; container: HTMLElement } {
   const container = document.createElement("div");
   document.body.appendChild(container);
-  const viewer = new DxfViewer(container);
+  // Formats are opted into by import — the viewer parses nothing on its
+  // own (VIEW-15).
+  const viewer = new DrawingViewer(container, { parsers: [dxfParser] });
   return { viewer, container };
 }
 
@@ -537,4 +541,27 @@ test("dispose removes the canvas and detaches everything", () => {
   viewer.dispose();
   expect(container.querySelector("canvas")).toBeNull();
   expect(rendererCalls.dispose).toHaveBeenCalledTimes(1);
+});
+
+// VIEW-15: a viewer with no configured parser refuses the load and says how
+// to fix it, rather than opening a silently blank canvas.
+test("a viewer without parsers refuses to load and names the fix", async () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const viewer = new DrawingViewer(container);
+  await expect(viewer.load(SAMPLE)).rejects.toThrow(/no format parsers configured/i);
+  expect(viewer.document).toBeNull();
+});
+
+// PARSE-13: the parser list is read when a load starts, so a format
+// registered after construction still counts (ELEM-9's read-at-load rule).
+test("a parser registered after construction is picked up by the next load", async () => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const parsers: DrawingParser[] = [];
+  const viewer = new DrawingViewer(container, { parsers });
+  await expect(viewer.load(SAMPLE)).rejects.toThrow();
+  parsers.push(dxfParser);
+  await viewer.load(SAMPLE);
+  expect(viewer.document?.entities.length).toBeGreaterThan(0);
 });

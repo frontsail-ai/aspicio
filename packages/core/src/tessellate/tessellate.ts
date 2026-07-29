@@ -8,7 +8,7 @@ import type { Rect } from "../geom/viewport.ts";
 import type {
   Affine2D,
   Bounds,
-  DxfDocument,
+  DrawingDocument,
   Entity,
   EntityType,
   Layout,
@@ -250,7 +250,7 @@ interface Tessellator {
   finalize(): Tessellation;
 }
 
-function createTessellator(doc: DxfDocument, options: TessellateOptions): Tessellator {
+function createTessellator(doc: DrawingDocument, options: TessellateOptions): Tessellator {
   const curveSegments = options.curveSegments ?? DEFAULT_CURVE_SEGMENTS;
   const accumulators = new Map<string, Accumulator>();
   const layerColors = new Map<string, Map<number, number>>();
@@ -474,7 +474,7 @@ function createTessellator(doc: DxfDocument, options: TessellateOptions): Tessel
 }
 
 /** Tessellate a document's model space into per-layer batched geometry. */
-export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): Tessellation {
+export function tessellate(doc: DrawingDocument, options: TessellateOptions = {}): Tessellation {
   const t = createTessellator(doc, options);
   t.walk(doc.entities, IDENTITY, null, null, 0, null, null, null);
   return t.finalize();
@@ -487,7 +487,7 @@ export function tessellate(doc: DxfDocument, options: TessellateOptions = {}): T
  * tessellation, so the renderer needs no viewport awareness.
  */
 export function tessellateLayout(
-  doc: DxfDocument,
+  doc: DrawingDocument,
   layout: Layout,
   options: TessellateOptions = {},
 ): Tessellation {

@@ -3,10 +3,10 @@
  * test file, so mutating the global handler registry cannot leak elsewhere.
  */
 import { expect, test, vi } from "vite-plus/test";
-import type { DxfDocument, Entity } from "../src/model/types.ts";
+import type { DrawingDocument, Entity } from "../src/model/types.ts";
 import { registerEntityHandler, tessellate } from "../src/tessellate/tessellate.ts";
 
-function makeDoc(entities: Entity[]): DxfDocument {
+function makeDoc(entities: Entity[]): DrawingDocument {
   return {
     layers: new Map([
       ["0", { name: "0", color: 0xffffff, visible: true, frozen: false, entityCount: 0 }],

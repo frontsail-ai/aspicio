@@ -10,10 +10,9 @@
 import pkg from "../package.json";
 export const VERSION: string = pkg.version;
 
-export { DxfViewer } from "./viewer.ts";
+export { DrawingViewer } from "./viewer.ts";
 export type {
-  DxfViewerOptions,
-  DxfSource,
+  DrawingViewerOptions,
   FitViewOptions,
   PickedEntity,
   ViewerEvent,
@@ -30,8 +29,11 @@ export type { SnapKind, SnapResult } from "./snap/snap.ts";
 export { unitLabel, niceLength } from "./units.ts";
 export { tessellationToSvg } from "./export.ts";
 export type { SvgExportOptions } from "./export.ts";
-export { DxfParseError, parseDxf, parseDxfBytes } from "./parse/parse.ts";
-export { binaryDxfToText, isBinaryDxf } from "./parse/binary.ts";
+// No parser is exported here on purpose: formats live behind their own entry
+// point (INV-11), e.g. `import { dxfParser } from "@aspicio/core/dxf"`.
+export { DrawingParseError } from "./parse/errors.ts";
+export { parseWith, toBytes } from "./parse/registry.ts";
+export type { DrawingParser, DrawingSource } from "./parse/registry.ts";
 export { describeDrawing } from "./describe.ts";
 export type { DrawingSummary, LayerSummary } from "./describe.ts";
 export { isEmptyLayer, partitionLayers } from "./layers.ts";
@@ -59,7 +61,7 @@ export type { TextLayoutOptions } from "./text/layout.ts";
 export type {
   Bounds,
   BlockDef,
-  DxfDocument,
+  DrawingDocument,
   Entity,
   EntityType,
   LayerInfo,

@@ -17,8 +17,8 @@ test("the shared corpus is present", () => {
   expect(files.length).toBeGreaterThanOrEqual(23);
 });
 
-test.each(files)("%s renders to PNG", (file) => {
-  const png = renderPng(new Uint8Array(readFileSync(join(DIR, file))), 400);
+test.each(files)("%s renders to PNG", async (file) => {
+  const png = await renderPng(new Uint8Array(readFileSync(join(DIR, file))), 400);
   expect(Buffer.from(png.subarray(0, 4)).toString("hex")).toBe(PNG_MAGIC);
   expect(png.length).toBeGreaterThan(100);
 });

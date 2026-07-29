@@ -1,4 +1,4 @@
-import type { DxfDocument, Point2 } from "../model/types.ts";
+import type { DrawingDocument, Point2 } from "../model/types.ts";
 import type { Tessellation } from "../tessellate/tessellate.ts";
 
 /** Kinds of object snap, in the order they win ties (endpoint first). */
@@ -98,7 +98,7 @@ export class SnapIndex {
  * centers, and POINT nodes), and index them. Pre-sized typed arrays keep the
  * build allocation-light even for very large drawings.
  */
-export function buildSnapIndex(tessellation: Tessellation, document: DxfDocument): SnapIndex {
+export function buildSnapIndex(tessellation: Tessellation, document: DrawingDocument): SnapIndex {
   const { offset, bounds } = tessellation;
 
   // Pre-count so the typed arrays are allocated once (3 per segment).

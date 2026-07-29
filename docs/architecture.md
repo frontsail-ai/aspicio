@@ -3,10 +3,13 @@
 ## The pipeline in 30 seconds
 
 ```
-DXF bytes ──parse──▶ DxfDocument ──tessellate──▶ Tessellation ──┬─▶ WebGL renderer (viewer)
-              (normalized model)      (batched geometry)        ├─▶ SVG string (export / API / MCP)
-                                                                └─▶ DrawingSummary (describe)
+drawing bytes ──parse──▶ DrawingDocument ──tessellate──▶ Tessellation ──┬─▶ WebGL renderer (viewer)
+   (registered parsers)  (normalized model)  (batched geometry)         ├─▶ SVG string (export / API / MCP)
+                                                                        └─▶ DrawingSummary (describe)
 ```
+
+Parse is the only format-aware step, and each format's parser is injected
+rather than imported (INV-11) — everything below it is format-blind.
 
 Every consumer — browser viewer, demo, React embed, HTTP API, MCP server —
 sits on the same parse → tessellate core. The pipeline through SVG and
@@ -15,16 +18,16 @@ serverless runtimes alike. Only the WebGL renderer needs a browser.
 
 ## Layers
 
-| Layer           | Lives in                                                                                   | Why it exists                                                                                                                                                                             |
-| --------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Parse           | `packages/core/src/parse/`                                                                 | Turn messy DXF into one normalized document (layers, entities, blocks, layouts, units); count what it can't handle (INV-3)                                                                |
-| Tessellate      | `packages/core/src/tessellate/`                                                            | Flatten entities into batched line/fill geometry, one accumulator per layer — one draw call per layer keeps huge drawings interactive. Extensible via the entity-handler registry (INV-6) |
-| Render          | `packages/core/src/render/`                                                                | Three.js/WebGL presentation of tessellation; render-on-demand only (INV-4)                                                                                                                |
-| Viewer facade   | `packages/core/src/viewer.ts`                                                              | The one public object: load, camera, layers, picking, snap, export, events                                                                                                                |
-| Input           | `packages/core/src/input/`                                                                 | Attachable, framework-free gesture + keyboard routers                                                                                                                                     |
-| Bindings & apps | `packages/elements/`, `packages/react/`, `packages/vue/`, `packages/svelte/`, `apps/demo/` | UI opinion lives here, never in core (INV-1). The Lit web components are the one implementation of embed UI; the React, Vue, and Svelte packages are thin veneers over them               |
-| Agent surface   | `apps/api/` (hosted API), `packages/mcp/` (stdio), `apps/widget/`                          | The same headless pipeline exposed over HTTP and MCP; shared guard semantics (INV-5). The widget is the viewer repackaged as an MCP Apps resource the api server serves in-chat (AGT-14)  |
-| Packaging       | `skills/`, `.claude-plugin/`, `.codex-plugin/`, `.mcp.json`                                | One skills source consumed by both Claude Code and Codex plugin wrappers                                                                                                                  |
+| Layer           | Lives in                                                                                   | Why it exists                                                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parse           | `packages/core/src/parse/`                                                                 | Turn messy drawing input into one normalized document (layers, entities, blocks, layouts, units); count what it can't handle (INV-3). One parser per format, each behind its own entry point (INV-11) |
+| Tessellate      | `packages/core/src/tessellate/`                                                            | Flatten entities into batched line/fill geometry, one accumulator per layer — one draw call per layer keeps huge drawings interactive. Extensible via the entity-handler registry (INV-6)             |
+| Render          | `packages/core/src/render/`                                                                | Three.js/WebGL presentation of tessellation; render-on-demand only (INV-4)                                                                                                                            |
+| Viewer facade   | `packages/core/src/viewer.ts`                                                              | The one public object: load, camera, layers, picking, snap, export, events                                                                                                                            |
+| Input           | `packages/core/src/input/`                                                                 | Attachable, framework-free gesture + keyboard routers                                                                                                                                                 |
+| Bindings & apps | `packages/elements/`, `packages/react/`, `packages/vue/`, `packages/svelte/`, `apps/demo/` | UI opinion lives here, never in core (INV-1). The Lit web components are the one implementation of embed UI; the React, Vue, and Svelte packages are thin veneers over them                           |
+| Agent surface   | `apps/api/` (hosted API), `packages/mcp/` (stdio), `apps/widget/`                          | The same headless pipeline exposed over HTTP and MCP; shared guard semantics (INV-5). The widget is the viewer repackaged as an MCP Apps resource the api server serves in-chat (AGT-14)              |
+| Packaging       | `skills/`, `.claude-plugin/`, `.codex-plugin/`, `.mcp.json`                                | One skills source consumed by both Claude Code and Codex plugin wrappers                                                                                                                              |
 
 ## Key technical assumptions
 

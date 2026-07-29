@@ -14,8 +14,15 @@
     "dist"
   ],
   "type": "module",
+  "sideEffects": [
+    "./dist/index.mjs",
+    "./dist/formats/*",
+    "./src/index.ts",
+    "./src/formats/*"
+  ],
   "exports": {
     ".": "./dist/index.mjs",
+    "./formats/dxf": "./dist/formats/dxf.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {

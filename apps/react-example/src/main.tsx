@@ -1,17 +1,18 @@
-import type { DxfViewer, LayerInfo, ViewerStats } from "@aspicio/core";
-import { DxfEmbed } from "@aspicio/react";
+import type { DrawingViewer, LayerInfo, ViewerStats } from "@aspicio/core";
+import { AspicioEmbed } from "@aspicio/react";
+import "@aspicio/react/formats/dxf";
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 declare global {
   interface Window {
     /** The live viewer instance, exposed for the browser console (and tests). */
-    __viewer?: DxfViewer | null;
+    __viewer?: DrawingViewer | null;
   }
 }
 
 /**
- * Minimal real-world usage of the React bindings: <DxfEmbed> renders the
+ * Minimal real-world usage of the React bindings: <AspicioEmbed> renders the
  * layer panel + interactive viewer from a URL, with keyboard shortcuts on.
  * Doubles as the browser test harness for the embed.
  */
@@ -47,7 +48,7 @@ function App(): React.JSX.Element {
         </span>
       </header>
       <main style={{ flex: 1, minHeight: 0, padding: 16 }}>
-        <DxfEmbed
+        <AspicioEmbed
           srcUrl="/sample.dxf"
           shortcuts
           style={{ height: "100%", borderRadius: 8 }}

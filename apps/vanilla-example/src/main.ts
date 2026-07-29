@@ -4,12 +4,13 @@
  * layer list + fit button from the public surface. Doubles as the browser
  * test harness for the core-direct consumption path.
  */
-import { DxfViewer } from "@aspicio/core";
+import { DrawingViewer } from "@aspicio/core";
+import { dxfParser } from "@aspicio/core/dxf";
 
 declare global {
   interface Window {
     /** The live viewer instance, exposed for the browser console (and tests). */
-    __viewer?: DxfViewer;
+    __viewer?: DrawingViewer;
   }
 }
 
@@ -18,7 +19,7 @@ const layersHost = document.getElementById("layers");
 const statsHost = document.getElementById("stats");
 if (!stage || !layersHost || !statsHost) throw new Error("missing page structure");
 
-const viewer = new DxfViewer(stage, { background: 0x101318 });
+const viewer = new DrawingViewer(stage, { background: 0x101318, parsers: [dxfParser] });
 window.__viewer = viewer;
 
 function renderLayerList(): void {

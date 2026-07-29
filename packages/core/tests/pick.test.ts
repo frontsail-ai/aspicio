@@ -1,9 +1,9 @@
 import { expect, test } from "vite-plus/test";
-import type { DxfDocument, Entity } from "../src/model/types.ts";
+import type { DrawingDocument, Entity } from "../src/model/types.ts";
 import { pickLayer } from "../src/pick/pick.ts";
 import { tessellate } from "../src/tessellate/tessellate.ts";
 
-function makeDoc(entities: Entity[]): DxfDocument {
+function makeDoc(entities: Entity[]): DrawingDocument {
   return {
     layers: new Map([
       ["A", { name: "A", color: 0xff0000, visible: true, frozen: false, entityCount: 0 }],

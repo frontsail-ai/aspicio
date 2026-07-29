@@ -10,7 +10,7 @@ Prefix: `REACT`.
 
 ### REACT-1: One-component embed
 
-`<DxfEmbed>` renders a complete integration — layer panel plus interactive
+`<AspicioEmbed>` renders a complete integration — layer panel plus interactive
 preview — from a single `src` (text/File/Blob/ArrayBuffer) or `srcUrl`
 prop, with the panel dockable left/right or hidden.
 
@@ -59,6 +59,15 @@ effect invocation under StrictMode leaks nothing.
 
 ### REACT-9: Layer panel parity
 
-`<DxfLayerPanel>` reproduces the demo's layer semantics — visibility
+`<AspicioLayerPanel>` reproduces the demo's layer semantics — visibility
 checkboxes, effective-color swatches (see INV-2), entity counts,
 hover-to-highlight, double-click solo with banner.
+
+### REACT-10: Formats are opted into by import
+
+Importing the package brings the components but no file format. A host
+imports the formats it wants — `@aspicio/react/formats/dxf` — and a host
+that imports none gets a clear load error rather than a silent blank
+canvas (VIEW-15). Format modules are read when a load starts, not when a
+component mounts, so import order never matters and importing a format
+never recreates a live viewer.

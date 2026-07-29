@@ -1,4 +1,5 @@
-import { describeDrawing, parseDxfBytes, tessellate, tessellationToSvg } from "@aspicio/core";
+import { describeDrawing, parseWith, tessellate, tessellationToSvg } from "@aspicio/core";
+import { dxfParser } from "@aspicio/core/dxf";
 import {
   registerAppResource,
   registerAppTool,
@@ -115,7 +116,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
       outputSchema: DRAWING_SUMMARY_SHAPE,
     },
     async ({ source }) => {
-      const doc = parseDxfBytes(await loadDxf(source));
+      const doc = await parseWith([dxfParser], await loadDxf(source));
       const summary = describeDrawing(doc, tessellate(doc, {}));
       return {
         content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
@@ -144,7 +145,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
       },
     },
     async ({ source, width }) => {
-      const doc = parseDxfBytes(await loadDxf(source));
+      const doc = await parseWith([dxfParser], await loadDxf(source));
       const svg = tessellationToSvg(tessellate(doc, {}), undefined, { background: DEFAULT_BG });
       const png = await renderPng(svg, width ?? 1200);
       const link = renderLink(origin, source, width ?? 1200);
@@ -204,7 +205,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     },
     async ({ source, allow_file_open }) => {
       const bytes = await loadDxf(source);
-      const doc = parseDxfBytes(bytes);
+      const doc = await parseWith([dxfParser], bytes);
       const summary = describeDrawing(doc, tessellate(doc, {}));
       const allowFilePicker = allow_file_open === true;
       const trimmed = source.trim();

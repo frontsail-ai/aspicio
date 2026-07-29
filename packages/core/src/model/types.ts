@@ -234,7 +234,7 @@ export interface Layout {
   viewports: Viewport[];
 }
 
-export interface DxfDocument {
+export interface DrawingDocument {
   layers: Map<string, LayerInfo>;
   entities: Entity[];
   blocks: Map<string, BlockDef>;

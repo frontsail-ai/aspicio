@@ -66,7 +66,8 @@ const mock = vi.hoisted(() => {
 });
 
 vi.mock("@aspicio/core", () => ({
-  DxfViewer: mock.MockViewer,
+  DrawingViewer: mock.MockViewer,
+  DrawingParseError: class extends Error {},
   // A faithful attachShortcuts so the shortcuts wiring can be exercised.
   attachShortcuts: (target: EventTarget, viewer: MockShortcutViewer) => {
     const onKey = (ev: Event): void => {
@@ -88,6 +89,9 @@ interface MockShortcutViewer {
 
 import type { AspicioEmbed, AspicioLayerPanel, AspicioPreview } from "../src/index.ts";
 import "../src/index.ts";
+// Hosts opt into formats by import (ELEM-9); these tests act as one.
+import "../src/formats/dxf.ts";
+import { registerFormat, registeredFormats } from "../src/formats.ts";
 
 /* ---------- helpers ---------- */
 
@@ -574,3 +578,37 @@ test("all three elements are registered exactly once", () => {
 /* Type-level sanity: LayerInfo flows through the panel's viewer property. */
 const _typecheck = (panel: AspicioLayerPanel): LayerInfo[] | undefined => panel.viewer?.getLayers();
 void _typecheck;
+
+/* ---------- formats (ELEM-9) ---------- */
+
+test("the viewer is handed the live format registry, not a copy", async () => {
+  mount("aspicio-preview", { src: "dxf-data" });
+  await flush();
+  expect(lastViewer().options?.["parsers"]).toBe(registeredFormats());
+});
+
+test("registering a format does not recreate a live viewer", async () => {
+  const el = mount("aspicio-preview", { src: "dxf-data" });
+  await flush();
+  const before = mock.instances.length;
+  const viewer = lastViewer();
+
+  // A second format module imported later must not count as an options
+  // change: recreating the viewer would drop the WebGL context mid-session.
+  registerFormat({ format: "stub", sniff: () => false, parse: () => ({}) as never });
+  el.requestUpdate();
+  await flush();
+
+  expect(mock.instances.length).toBe(before);
+  expect(lastViewer()).toBe(viewer);
+  expect(viewer.disposed).toBe(false);
+});
+
+test("a format registered after construction is visible to the next load", async () => {
+  mount("aspicio-preview", { src: "dxf-data" });
+  await flush();
+  // Same array identity means the viewer reads registrations that land after
+  // it was built — import order never matters.
+  expect(registeredFormats().some((p) => p.format === "stub")).toBe(true);
+  expect(lastViewer().options?.["parsers"]).toBe(registeredFormats());
+});

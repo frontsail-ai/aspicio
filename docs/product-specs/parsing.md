@@ -1,6 +1,7 @@
 # Parsing & document model
 
-Behavior of turning DXF input into the normalized drawing document.
+Behavior of turning drawing input into the normalized document. DXF's own
+rules are below; how a format gets chosen is PARSE-13.
 
 Prefix: `PARSE`.
 
@@ -8,8 +9,9 @@ Prefix: `PARSE`.
 
 ### PARSE-1: Accepted input forms
 
-A drawing loads from DXF text, a `File`/`Blob`, or an `ArrayBuffer`; bytes
-are decoded as UTF-8.
+A drawing loads from text, a `File`/`Blob`, an `ArrayBuffer`, or raw bytes;
+every form normalizes to bytes before a format is chosen (PARSE-13). DXF
+text is decoded as UTF-8.
 
 ### PARSE-2: Binary DXF is decoded
 
@@ -77,8 +79,25 @@ coerced to 0/1 instead of failing the whole parse.
 
 ### PARSE-12: Invalid input yields a clean, honest error
 
-A source that isn't parseable DXF fails with a `DxfParseError` phrased for
-a person — "The file is empty" for empty or whitespace-only input, "Not a
-valid DXF file" otherwise. The underlying parser's internal messages
-("Empty file", which fires for any single-line non-empty file; "Unexpected
-end of input …") never reach a user surface.
+Input that no parser claims fails with a `DrawingParseError` phrased for a
+person: "The file is empty" for empty or whitespace-only input, "Not a
+supported drawing file" otherwise. Input a parser does claim but cannot
+read reports that format's own message — "Not a valid DXF file" — with
+`format` set. The underlying parser's internal messages ("Empty file",
+which fires for any single-line non-empty file; "Unexpected end of input
+…") never reach a user surface.
+
+### PARSE-13: Formats are parsed through a registry of injected parsers
+
+A parser declares its format name, a byte sniff, and a parse function; the
+viewer and the headless surfaces take a list of parsers and try their
+sniffs in the order given, parsing with the first match. Input is
+normalized to bytes first (PARSE-1), so sniffing sees the same bytes on
+every input form.
+
+Nothing is registered implicitly: a viewer configured with no parsers
+fails a load with an error naming the fix (VIEW-15), and a source no
+parser claims fails per PARSE-12. Every parse failure is a
+`DrawingParseError`, whose optional `format` field names the parser that
+rejected the file when one claimed it — so callers report the culprit
+without matching on message text.

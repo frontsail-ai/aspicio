@@ -12,7 +12,7 @@
   import "@aspicio/elements";
 
   let {
-    /** The viewer to control — from DxfPreview's viewer() or onviewerchange. */
+    /** The viewer to control — from AspicioPreview's viewer() or onviewerchange. */
     viewer = null,
     /** Visual theme. Defaults to the Aspicio demo look; "none" renders a minimal list. */
     theme = "aspicio",

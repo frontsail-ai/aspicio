@@ -61,3 +61,20 @@ renders minimal structure for host styling through those same hooks.
 Removing an element from the document disposes its viewer (WebGL
 context, observers, listeners); re-inserting it creates a fresh viewer
 and reloads the current source.
+
+### ELEM-9: Formats are opted into by import
+
+Importing the package registers the components but no file format. A host
+imports the formats it wants — `@aspicio/elements/formats/dxf` — and a
+host that imports none gets a clear load error rather than a silent blank
+canvas (VIEW-15). Format modules are read when a load starts, not when a
+component is constructed, so import order never matters and importing a
+format never recreates a live viewer. The `options` property stays plain
+data; parsers are not passed through it.
+
+The registry is closed by design: the components accept only the formats
+this package's own `formats/*` entries register. A third-party parser
+still reaches the viewer through its `parsers` option (VIEW-15) and can
+drive the layer panel bound to that viewer (ELEM-2), but it cannot teach
+the preview or embed a new format. Opening the registry is additive and
+waits for a real use case.

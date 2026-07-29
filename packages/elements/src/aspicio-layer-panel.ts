@@ -1,7 +1,7 @@
-import type { DxfViewer, LayerInfo } from "@aspicio/core";
+import type { DrawingViewer, LayerInfo } from "@aspicio/core";
 import { LitElement, css, html, nothing } from "lit";
 import type { PropertyValues, TemplateResult } from "lit";
-import type { DxfTheme } from "./theme.ts";
+import type { AspicioTheme } from "./theme.ts";
 import { tokenStyles } from "./theme.ts";
 
 const DESKTOP_HINTS: [string, string][] = [
@@ -58,15 +58,15 @@ export class AspicioLayerPanel extends LitElement {
     _hoveredRow: { state: true },
   };
 
-  declare viewer: DxfViewer | null;
-  declare theme: DxfTheme;
+  declare viewer: DrawingViewer | null;
+  declare theme: AspicioTheme;
   declare reverseHighlightLayer: string | null;
   declare noHints: boolean;
   declare _layers: LayerInfo[];
   declare _soloLayer: string | null;
   declare _hoveredRow: string | null;
 
-  #subscribedViewer: DxfViewer | null = null;
+  #subscribedViewer: DrawingViewer | null = null;
   #sync = (): void => {
     this._soloLayer = null;
     this._layers = this.viewer?.getLayers() ?? [];

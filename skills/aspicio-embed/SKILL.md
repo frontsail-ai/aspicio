@@ -17,12 +17,26 @@ npm install @aspicio/core three          # vanilla JS, hand-rolled UI
 
 `react` 18/19 and `three` are **peer dependencies** — forgetting `three` is the most common install failure.
 
+## Formats are opted into by import
+
+No package implies a file format. Alongside the package import, import the
+format entry once, anywhere in the app — otherwise a load fails with an error
+telling you exactly this:
+
+```ts
+import "@aspicio/react/formats/dxf"; // or /vue, /svelte, /elements
+import { dxfParser } from "@aspicio/core/dxf"; // vanilla: pass it to the viewer
+```
+
+That indirection is what keeps a DXF app from shipping other formats' parsers.
+
 ## React: one component
 
 ```tsx
-import { DxfEmbed } from "@aspicio/react";
+import { AspicioEmbed } from "@aspicio/react";
+import "@aspicio/react/formats/dxf";
 
-<DxfEmbed srcUrl="/drawing.dxf" style={{ height: 480 }} />;
+<AspicioEmbed srcUrl="/drawing.dxf" style={{ height: 480 }} />;
 ```
 
 Key props (all optional):
@@ -31,10 +45,10 @@ Key props (all optional):
 - `panel="left" | "right" | "none"` — the built-in layer panel
 - `shortcuts` — opt-in keyboard control (F fit, +/- zoom, R rotation reset, A show-all); scoped to the **focused** embed, click to focus
 - `showDownload={false}` — hide the built-in SVG/PNG export control
-- `onLoaded({ layers, stats })`, `onError`, `onViewer(viewer)` — `onViewer`/`ref` expose the full `DxfViewer` API (`fitView`, `zoomBy`, `setLayerVisible`, `pickLayer`, `view`, `setView`, `toSVG`, `toPNG`)
+- `onLoaded({ layers, stats })`, `onError`, `onViewer(viewer)` — `onViewer`/`ref` expose the full `DrawingViewer` API (`fitView`, `zoomBy`, `setLayerVisible`, `pickLayer`, `view`, `setView`, `toSVG`, `toPNG`)
 - `theme="none"` — drop the built-in dark theme for a minimal structure
 
-For custom layouts compose `DxfPreview` (canvas only) + `DxfLayerPanel` yourself.
+For custom layouts compose `AspicioPreview` (canvas only) + `AspicioLayerPanel` yourself.
 
 The components are veneers over the `@aspicio/elements` web components: internals live in shadow DOM, and theming goes through `--aspicio-*` CSS custom properties and `::part(...)` hooks (not page CSS cascade).
 
@@ -42,10 +56,11 @@ The components are veneers over the `@aspicio/elements` web components: internal
 
 ```vue
 <script setup>
-import { DxfEmbed } from "@aspicio/vue";
+import { AspicioEmbed } from "@aspicio/vue";
+import "@aspicio/vue/formats/dxf";
 </script>
 <template>
-  <DxfEmbed
+  <AspicioEmbed
     src-url="/drawing.dxf"
     style="height: 480px"
     @loaded="({ stats }) => console.log(stats)"
@@ -53,46 +68,54 @@ import { DxfEmbed } from "@aspicio/vue";
 </template>
 ```
 
-Same props/behavior as the React `<DxfEmbed>`; emits `loaded`, `load-error`, `viewer-change`, `hover-layer` with unwrapped payloads; the template ref exposes `viewer` (the full `DxfViewer`). Binding `@hover-layer` enables canvas hover-picking.
+Same props/behavior as the React `<AspicioEmbed>`; emits `loaded`, `load-error`, `viewer-change`, `hover-layer` with unwrapped payloads; the template ref exposes `viewer` (the full `DrawingViewer`). Binding `@hover-layer` enables canvas hover-picking.
 
 ## Svelte: the same component, Svelte-flavored
 
 ```svelte
 <script>
-  import { DxfEmbed } from "@aspicio/svelte";
+  import { AspicioEmbed } from "@aspicio/svelte";
+  import "@aspicio/svelte/formats/dxf";
 </script>
-<DxfEmbed srcUrl="/drawing.dxf" style="height: 480px" onloaded={({ stats }) => console.log(stats)} />
+<AspicioEmbed srcUrl="/drawing.dxf" style="height: 480px" onloaded={({ stats }) => console.log(stats)} />
 ```
 
-Same props/behavior; callback props `onloaded`, `onloaderror`, `onviewerchange`, `onhoverlayer` (providing `onhoverlayer` enables hover-picking); `bind:this` exposes `viewer()` (the full `DxfViewer`). Ships raw `.svelte` source via the `svelte` export condition — the consumer's bundler compiles it.
+Same props/behavior; callback props `onloaded`, `onloaderror`, `onviewerchange`, `onhoverlayer` (providing `onhoverlayer` enables hover-picking); `bind:this` exposes `viewer()` (the full `DrawingViewer`). Ships raw `.svelte` source via the `svelte` export condition — the consumer's bundler compiles it.
 
 ## Web components: any framework or none
 
 ```html
 <script type="module">
   import "@aspicio/elements";
+  import "@aspicio/elements/formats/dxf";
 </script>
 <aspicio-embed src-url="/drawing.dxf" style="height: 480px"></aspicio-embed>
 ```
 
-Same behavior as `<DxfEmbed>`, attribute/property/event flavored: attributes `src-url`, `panel`, `theme`, `no-download`, `shortcuts`; properties `src`, `options`, `viewer` (the full `DxfViewer`) — between `src` and `src-url` the most recently set source wins; events `loaded`, `load-error`, `viewer-change`, `hover-layer` (CustomEvents, payload in `detail`). In Vue set `compilerOptions.isCustomElement` for `aspicio-` tags; Svelte consumes them natively.
+Same behavior as `<AspicioEmbed>`, attribute/property/event flavored: attributes `src-url`, `panel`, `theme`, `no-download`, `shortcuts`; properties `src`, `options`, `viewer` (the full `DrawingViewer`) — between `src` and `src-url` the most recently set source wins; events `loaded`, `load-error`, `viewer-change`, `hover-layer` (CustomEvents, payload in `detail`). In Vue set `compilerOptions.isCustomElement` for `aspicio-` tags; Svelte consumes them natively.
 
 ## Vanilla JS
 
 ```ts
-import { DxfViewer } from "@aspicio/core";
-const viewer = new DxfViewer(container, { background: 0x16181d });
+import { DrawingViewer } from "@aspicio/core";
+import { dxfParser } from "@aspicio/core/dxf";
+const viewer = new DrawingViewer(container, { background: 0x16181d, parsers: [dxfParser] });
 await viewer.load(file); // File | Blob | ArrayBuffer | DXF text
 await viewer.loadUrl("/drawing.dxf"); // for URLs — don't pass a URL to load()
 ```
 
 ## Headless (no browser)
 
-`parseDxf` / `parseDxfBytes`, `tessellate`, `tessellationToSvg`, and `describeDrawing` are pure and run in Node or Workers — parse and render SVG server-side without a canvas.
+`parseWith([dxfParser], bytes)` (or `parseDxf` / `parseDxfBytes` from
+`@aspicio/core/dxf` directly), `tessellate`, `tessellationToSvg`, and
+`describeDrawing` are pure and run in Node or Workers — parse and render SVG
+server-side without a canvas.
 
 ## Pitfalls
 
 - **Missing `three` peer** → install error or runtime "Cannot find module 'three'".
-- **Monorepo/workspace dev**: tsconfig `paths` fix types only; Vite needs a `resolve.alias` mapping `@aspicio/core` → its source, or the app runs stale built `dist`.
+- **No format imported** → every load fails with "No formats imported — add
+  `import "@aspicio/elements/formats/dxf"`". Import the format entry once.
+- **Monorepo/workspace dev**: tsconfig `paths` fix types only; Vite needs `resolve.alias` entries mapping `@aspicio/core` → its source (list subpaths like `@aspicio/core/dxf` **first** — a string alias matches prefixes and the first match wins), or the app runs stale built `dist`.
 - **Deep links**: camera state round-trips via `viewer.view` / `viewer.setView(state)`; the library never touches `location` — wire your own router (the demo's `viewurl.ts` is the reference).
-- **SSR**: the viewer touches the DOM only after mount; `DxfEmbed` is StrictMode- and SSR-safe as shipped — don't `new DxfViewer()` during render.
+- **SSR**: the viewer touches the DOM only after mount; `AspicioEmbed` is StrictMode- and SSR-safe as shipped — don't `new DrawingViewer()` during render.

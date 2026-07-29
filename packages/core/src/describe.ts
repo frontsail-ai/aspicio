@@ -1,4 +1,4 @@
-import type { DxfDocument, Entity } from "./model/types.ts";
+import type { DrawingDocument, Entity } from "./model/types.ts";
 import { MAX_INSERT_DEPTH } from "./tessellate/tessellate.ts";
 import type { Tessellation } from "./tessellate/tessellate.ts";
 
@@ -55,7 +55,7 @@ function effectiveColor(name: string, fallback: number, tessellation: Tessellati
 }
 
 /** Collect unique text strings from entities and reachable blocks. */
-function collectTexts(doc: DxfDocument): string[] {
+function collectTexts(doc: DrawingDocument): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   const visitedBlocks = new Set<string>();
@@ -89,7 +89,7 @@ function collectTexts(doc: DxfDocument): string[] {
  * Cloudflare Workers. Layer colors reflect what is actually drawn (entity
  * overrides included), matching the viewer.
  */
-export function describeDrawing(doc: DxfDocument, tessellation: Tessellation): DrawingSummary {
+export function describeDrawing(doc: DrawingDocument, tessellation: Tessellation): DrawingSummary {
   const entityTypes: Record<string, number> = {};
   for (const entity of doc.entities) {
     entityTypes[entity.type] = (entityTypes[entity.type] ?? 0) + 1;

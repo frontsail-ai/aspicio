@@ -16,8 +16,11 @@
     "noEmit": true,
     "esModuleInterop": true,
     "paths": {
+      "@aspicio/core/dxf": ["../../packages/core/src/dxf.ts"],
       "@aspicio/core": ["../../packages/core/src/index.ts"],
+      "@aspicio/elements/formats/dxf": ["../../packages/elements/src/formats/dxf.ts"],
       "@aspicio/elements": ["../../packages/elements/src/index.ts"],
+      "@aspicio/react/formats/dxf": ["../../packages/react/src/formats/dxf.ts"],
       "@aspicio/react": ["../../packages/react/src/index.ts"]
     },
 

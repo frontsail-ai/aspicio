@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { describeDrawing, parseDxf, parseDxfBytes } from "../src/index.ts";
+import { describeDrawing } from "../src/index.ts";
+import { parseDxf, parseDxfBytes } from "../src/dxf.ts";
 import { tessellate } from "../src/tessellate/tessellate.ts";
 
 // A tiny drawing: mm units, one WALLS layer (ACI 3 = green), a LINE and a CIRCLE.
