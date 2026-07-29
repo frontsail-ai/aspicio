@@ -18,6 +18,7 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./dxf": "./dist/dxf.mjs",
+    "./pdf": "./dist/pdf.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {

@@ -17,6 +17,13 @@ import { expect, test } from "vite-plus/test";
  */
 const DXF_MARKER = "AutoCAD Binary DXF";
 
+/**
+ * The PDF probe: a message its strict gate cannot work without. Same reasoning
+ * as the DXF marker — a string the parser must carry, so its absence means the
+ * code is genuinely gone rather than merely renamed.
+ */
+const PDF_MARKER = "Encrypted PDFs are not supported";
+
 const fixture = (name: string): string =>
   fileURLToPath(new URL(`../fixtures/${name}.ts`, import.meta.url));
 
@@ -33,12 +40,17 @@ const fixture = (name: string): string =>
  */
 const SOURCE_ALIAS = {
   "@aspicio/core/dxf": pkgSrc("core/src/dxf.ts"),
+  "@aspicio/core/pdf": pkgSrc("core/src/pdf.ts"),
   "@aspicio/core": pkgSrc("core/src/index.ts"),
   "@aspicio/elements/formats/dxf": pkgSrc("elements/src/formats/dxf.ts"),
+  "@aspicio/elements/formats/pdf": pkgSrc("elements/src/formats/pdf.ts"),
   "@aspicio/elements": pkgSrc("elements/src/index.ts"),
   "@aspicio/react/formats/dxf": pkgSrc("react/src/formats/dxf.ts"),
+  "@aspicio/react/formats/pdf": pkgSrc("react/src/formats/pdf.ts"),
   "@aspicio/vue/formats/dxf": pkgSrc("vue/src/formats/dxf.ts"),
+  "@aspicio/vue/formats/pdf": pkgSrc("vue/src/formats/pdf.ts"),
   "@aspicio/svelte/formats/dxf": pkgSrc("svelte/src/formats/dxf.js"),
+  "@aspicio/svelte/formats/pdf": pkgSrc("svelte/src/formats/pdf.js"),
 };
 
 function pkgSrc(rel: string): string {
@@ -110,12 +122,24 @@ test.each([
   "@aspicio/vue",
   "@aspicio/svelte",
 ])("the published %s root entry reaches no format code", (pkg) => {
-  expect(entryGraph(pkg)).not.toContain(DXF_MARKER);
+  const graph = entryGraph(pkg);
+  expect(graph).not.toContain(DXF_MARKER);
+  expect(graph).not.toContain(PDF_MARKER);
 });
 
-test("the published format entries do reach it", () => {
+test("the published format entries do reach their own format", () => {
   expect(entryGraph("@aspicio/core/dxf")).toContain(DXF_MARKER);
   expect(entryGraph("@aspicio/elements/formats/dxf")).toContain(DXF_MARKER);
+  expect(entryGraph("@aspicio/core/pdf")).toContain(PDF_MARKER);
+  expect(entryGraph("@aspicio/elements/formats/pdf")).toContain(PDF_MARKER);
+});
+
+// The point of INV-11: one format's entry must not drag in another's.
+test("a format entry reaches no other format's code", () => {
+  expect(entryGraph("@aspicio/core/dxf")).not.toContain(PDF_MARKER);
+  expect(entryGraph("@aspicio/core/pdf")).not.toContain(DXF_MARKER);
+  expect(entryGraph("@aspicio/elements/formats/dxf")).not.toContain(PDF_MARKER);
+  expect(entryGraph("@aspicio/elements/formats/pdf")).not.toContain(DXF_MARKER);
 });
 
 test(
@@ -130,8 +154,36 @@ test(
 test(
   "importing the components implies no format; the format entry adds it",
   async () => {
-    expect(await bundle("elements-bare")).not.toContain(DXF_MARKER);
+    const bare = await bundle("elements-bare");
+    expect(bare).not.toContain(DXF_MARKER);
+    expect(bare).not.toContain(PDF_MARKER);
     expect(await bundle("elements-dxf")).toContain(DXF_MARKER);
+  },
+  TIMEOUT,
+);
+
+// The reverse direction, which is the whole reason the seam exists: a DXF-only
+// app must not ship the PDF parser, and a PDF-only app must not ship the DXF
+// one.
+test(
+  "a single-format bundle carries only that format",
+  async () => {
+    const dxfOnly = await bundle("core-dxf");
+    const pdfOnly = await bundle("core-pdf");
+    expect(dxfOnly).toContain(DXF_MARKER);
+    expect(dxfOnly).not.toContain(PDF_MARKER);
+    expect(pdfOnly).toContain(PDF_MARKER);
+    expect(pdfOnly).not.toContain(DXF_MARKER);
+  },
+  TIMEOUT,
+);
+
+test(
+  "the components carry only the format that was imported",
+  async () => {
+    const pdf = await bundle("elements-pdf");
+    expect(pdf).toContain(PDF_MARKER);
+    expect(pdf).not.toContain(DXF_MARKER);
   },
   TIMEOUT,
 );
@@ -140,9 +192,14 @@ test(
 // would let a bundler drop their side-effect-only re-export, and this is the
 // only place that failure surfaces.
 test.each(["react", "vue", "svelte"])(
-  "the @aspicio/%s format entry survives bundling",
+  "the @aspicio/%s format entries survive bundling, each alone",
   async (veneer) => {
-    expect(await bundle(`${veneer}-dxf`)).toContain(DXF_MARKER);
+    const dxf = await bundle(`${veneer}-dxf`);
+    expect(dxf).toContain(DXF_MARKER);
+    expect(dxf).not.toContain(PDF_MARKER);
+    const pdf = await bundle(`${veneer}-pdf`);
+    expect(pdf).toContain(PDF_MARKER);
+    expect(pdf).not.toContain(DXF_MARKER);
   },
   TIMEOUT,
 );
@@ -151,9 +208,10 @@ test.each(["react", "vue", "svelte"])(
 // packages two ways. The published layout is covered above; this is the
 // source-aliased path every example app and the demo actually use.
 test.each(["elements", "react", "vue", "svelte"])(
-  "the %s format entry survives bundling from source too",
+  "the %s format entries survive bundling from source too",
   async (pkg) => {
     expect(await bundle(`${pkg}-dxf`, SOURCE_ALIAS)).toContain(DXF_MARKER);
+    expect(await bundle(`${pkg}-pdf`, SOURCE_ALIAS)).toContain(PDF_MARKER);
   },
   TIMEOUT,
 );

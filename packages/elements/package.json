@@ -23,6 +23,7 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./formats/dxf": "./dist/formats/dxf.mjs",
+    "./formats/pdf": "./dist/formats/pdf.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {

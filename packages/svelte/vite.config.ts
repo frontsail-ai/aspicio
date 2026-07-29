@@ -10,8 +10,12 @@ export default defineConfig({
     // Subpaths first: a string alias matches prefixes and the first match
     // wins, so a bare entry would otherwise swallow "@aspicio/core/dxf".
     alias: {
+      "@aspicio/core/pdf": fileURLToPath(new URL("../core/src/pdf.ts", import.meta.url)),
       "@aspicio/core/dxf": fileURLToPath(new URL("../core/src/dxf.ts", import.meta.url)),
       "@aspicio/core": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)),
+      "@aspicio/elements/formats/pdf": fileURLToPath(
+        new URL("../elements/src/formats/pdf.ts", import.meta.url),
+      ),
       "@aspicio/elements/formats/dxf": fileURLToPath(
         new URL("../elements/src/formats/dxf.ts", import.meta.url),
       ),

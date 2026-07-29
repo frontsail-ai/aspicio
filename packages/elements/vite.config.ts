@@ -5,7 +5,7 @@ export default defineConfig({
   pack: {
     tsconfig: "./tsconfig.build.json",
     // One entry per format, so a page bundles only what it imports (INV-11).
-    entry: ["src/index.ts", "src/formats/dxf.ts"],
+    entry: ["src/index.ts", "src/formats/dxf.ts", "src/formats/pdf.ts"],
     dts: {
       tsgo: true,
     },
@@ -17,6 +17,10 @@ export default defineConfig({
     // Subpaths first: a string alias matches prefixes and the first match
     // wins, so the bare entry would otherwise swallow "@aspicio/core/dxf".
     alias: [
+      {
+        find: "@aspicio/core/pdf",
+        replacement: fileURLToPath(new URL("../core/src/pdf.ts", import.meta.url)),
+      },
       {
         find: "@aspicio/core/dxf",
         replacement: fileURLToPath(new URL("../core/src/dxf.ts", import.meta.url)),

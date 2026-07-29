@@ -25,6 +25,11 @@ export interface FontDecoder {
   decode(bytes: Uint8Array): string;
   /** True when codes are two bytes wide (composite fonts). */
   readonly twoByte: boolean;
+  /**
+   * True when the font's glyphs are drawing procedures rather than an embedded
+   * program. Their artwork is counted as skipped, never drawn (PDF-8).
+   */
+  readonly type3: boolean;
 }
 
 /* ---------- encodings ---------- */
@@ -316,6 +321,7 @@ export async function buildFontDecoder(doc: PdfDocument, font: PdfDict): Promise
 
   return {
     twoByte,
+    type3: subtypeName === "Type3",
     decode(bytes: Uint8Array): string {
       let out = "";
       const step = twoByte ? 2 : 1;

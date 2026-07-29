@@ -29,6 +29,11 @@
       "svelte": "./src/formats/dxf.js",
       "default": "./src/formats/dxf.js"
     },
+    "./formats/pdf": {
+      "types": "./src/formats/pdf.d.ts",
+      "svelte": "./src/formats/pdf.js",
+      "default": "./src/formats/pdf.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
