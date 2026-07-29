@@ -45,12 +45,18 @@ export async function parsePdfBytes(
   const unsupported: Record<string, number> = {};
 
   for (const [index, page] of pages.entries()) {
-    // A page that fails for any reason costs that page, never the document:
-    // one damaged form must not take a six-page drawing down with it, and this
-    // is the last place that guarantee can be made (PDF-8, INV-3).
+    const content = await doc.pageContent(page);
+    // Decoding reports rather than throws, so a page whose content would not
+    // decode arrives as empty bytes. That is indistinguishable from a blank
+    // page by content alone — but a page that *had* streams and yielded
+    // nothing is one we failed to read, and PDF-8 requires saying so.
+    if (content.length === 0 && (await doc.contentStreams(page)).length > 0)
+      unsupported["UnreadablePage"] = (unsupported["UnreadablePage"] ?? 0) + 1;
+
+    // Interpretation itself still gets a page-level boundary: a page that
+    // fails for any *other* reason costs that page, never the document.
     let result: Awaited<ReturnType<typeof interpretContent>>;
     try {
-      const content = await doc.pageContent(page);
       const resources = await doc.dict(page.get("Resources"));
       result = await interpretContent(
         doc,

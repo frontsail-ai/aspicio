@@ -34,18 +34,11 @@ export async function checkStrictGate(doc: PdfDocument): Promise<void> {
     // A page's own content can live in another file too, not just an XObject's.
     for (const stream of await doc.contentStreams(page)) assertLocal(stream);
 
-    // A page whose own content will not decompress is *skipped and counted*
-    // downstream, not gate-approved: nothing here has read it, so nothing here
-    // can vouch for it. Letting the failure escape would take the whole
-    // document down — including pages that are perfectly readable — which is
-    // the opposite of what a per-page guard is for (PDF-8, INV-3).
-    let content: Uint8Array;
-    try {
-      content = await doc.pageContent(page);
-    } catch {
-      continue;
-    }
-    await checkContent(doc, content, resources, seenForms, 0, undefined);
+    // Content that would not decode arrives here as empty rather than as an
+    // exception, so an unreadable page is *skipped and counted* downstream,
+    // never gate-approved: nothing here has read it, so nothing here can vouch
+    // for it.
+    await checkContent(doc, await doc.pageContent(page), resources, seenForms, 0, undefined);
   }
 }
 
@@ -160,15 +153,10 @@ async function checkXObject(
     if (seenForms.has(ref.num)) return;
     seenForms.add(ref.num);
   }
-  // A form whose bytes will not decompress cannot be inspected for fonts —
-  // that is a gap in what we can check, not grounds to refuse the file. The
+  // A form whose bytes will not decode cannot be inspected for fonts — that is
+  // a gap in what we can check, not grounds to refuse the file. The
   // interpreter counts the same stream as undecodable (PDF-8).
-  let decoded: Awaited<ReturnType<typeof doc.readStream>>;
-  try {
-    decoded = await doc.readStream(object);
-  } catch {
-    return;
-  }
+  const decoded = await doc.readStream(object);
   if (decoded instanceof Uint8Array)
     // A form without its own /Resources uses the invoking context's.
     await checkContent(

@@ -14,10 +14,20 @@
 import { isDict, isName, toNumber } from "./objects.ts";
 import type { PdfDict, PdfValue } from "./objects.ts";
 
-/** A stream this build cannot decode — an image codec, essentially. */
+/**
+ * A stream this build did not decode — an image codec, or data too damaged to
+ * inflate.
+ *
+ * Decoding never throws. Every caller already branches on this type for image
+ * codecs, so making damage take the same path means a caller cannot forget to
+ * handle it: a stream-level failure can no longer become a page- or
+ * document-level one by omission.
+ */
 export interface UndecodedStream {
   /** The filter that stopped us, e.g. "DCTDecode". */
   readonly unsupportedFilter: string;
+  /** True when the filter is one we support but the data would not decode. */
+  readonly damaged?: boolean;
 }
 
 export const isUndecoded = (v: Uint8Array | UndecodedStream): v is UndecodedStream =>
@@ -233,7 +243,14 @@ export async function decodeStream(
     if (IMAGE_FILTERS.has(filter.name)) return { unsupportedFilter: filter.name };
     if (filter.name !== "FlateDecode" && filter.name !== "Fl")
       return { unsupportedFilter: filter.name };
-    const inflated = await inflateReporting(data);
+    let inflated: { data: Uint8Array; truncated: boolean };
+    try {
+      inflated = await inflateReporting(data);
+    } catch {
+      // Damaged beyond recovery: report it the same way an image codec is
+      // reported, so no caller has to guard against an exception.
+      return { unsupportedFilter: filter.name, damaged: true };
+    }
     if (inflated.truncated) onTruncated?.();
     data = inflated.data;
     const parm = resolve(parms[i]);

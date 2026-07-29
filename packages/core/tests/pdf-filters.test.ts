@@ -179,3 +179,31 @@ test("decodeStream stops at an image codec that follows Flate", async () => {
   expect(isUndecoded(out)).toBe(true);
   expect((out as { unsupportedFilter: string }).unsupportedFilter).toBe("DCTDecode");
 });
+
+/**
+ * Decoding never throws (review finding).
+ *
+ * Three separate call sites once turned a stream-level failure into a page- or
+ * document-level one, each found only after fixing the last. Reporting damage
+ * through the same type callers already handle for image codecs makes a fourth
+ * such site impossible to write by accident.
+ */
+test("damaged Flate data is reported, never thrown", async () => {
+  const garbage = bytes(0xff, 0xff, 0xff, 0xff, 0x00, 0x01, 0x02, 0x03);
+  const out = await decodeStream(garbage, dict([["Filter", { name: "FlateDecode" }]]), passthrough);
+  expect(isUndecoded(out)).toBe(true);
+  const undecoded = out as { unsupportedFilter: string; damaged?: boolean };
+  expect(undecoded.unsupportedFilter).toBe("FlateDecode");
+  // Distinguishable from an image codec: this is a filter we support, on data
+  // that would not decode.
+  expect(undecoded.damaged).toBe(true);
+});
+
+test("an image codec is reported as unsupported, not as damage", async () => {
+  const out = await decodeStream(
+    bytes(1, 2, 3),
+    dict([["Filter", { name: "DCTDecode" }]]),
+    passthrough,
+  );
+  expect((out as { damaged?: boolean }).damaged).toBeUndefined();
+});
