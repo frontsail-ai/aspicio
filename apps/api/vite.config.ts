@@ -12,6 +12,9 @@ export default defineConfig({
         new URL("../../packages/core/src/dxf.ts", import.meta.url),
       ),
       "@aspicio/core": fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
+      "@aspicio/mcp/tools-meta": fileURLToPath(
+        new URL("../../packages/mcp/src/tools-meta.ts", import.meta.url),
+      ),
       "@aspicio/widget/meta": fileURLToPath(new URL("../widget/src/meta.ts", import.meta.url)),
     },
   },
