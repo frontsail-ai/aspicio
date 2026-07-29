@@ -569,4 +569,40 @@ fontFixture("font-composite-embedded.pdf", [
 /* 21. A file with no pages at all. */
 writeFileSync("no-pages.pdf", classic([catalog, [2, "<< /Type /Pages /Kids [] /Count 0 >>"]]));
 
-console.log("wrote page fixtures");
+/* 22. A form whose Flate data is garbage — hostile input, not a real file.
+      The page must still draw its own content and report the loss. */
+{
+  const page = "1 0 0 RG 5 5 m 95 95 l S\n/X1 Do\n";
+  writeFileSync(
+    "form-undecodable.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Contents 4 0 R " +
+          "/Resources << /XObject << /X1 5 0 R >> >> >>",
+      ],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${page.length} >>\nstream\n`),
+          enc(page),
+          enc("\nendstream"),
+        ]),
+      ],
+      [
+        5,
+        Buffer.concat([
+          enc(
+            "<< /Type /XObject /Subtype /Form /BBox [0 0 10 10] /Filter /FlateDecode /Length 8 >>\nstream\n",
+          ),
+          Buffer.from([0xff, 0xff, 0xff, 0xff, 0x00, 0x01, 0x02, 0x03]),
+          enc("\nendstream"),
+        ]),
+      ],
+    ]),
+  );
+}
+
+console.log("wrote hostile fixtures");

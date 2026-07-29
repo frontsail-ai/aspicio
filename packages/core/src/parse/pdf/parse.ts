@@ -65,6 +65,10 @@ export async function parsePdfBytes(
     else layouts.push({ name: `Page ${index + 1}`, entities: result.entities, viewports: [] });
   }
 
+  // A partially decoded stream drew partial content; say so rather than let a
+  // describe imply the drawing is complete (PDF-8).
+  if (doc.truncatedStreams > 0) unsupported["TruncatedStream"] = doc.truncatedStreams;
+
   const layers = new Map<string, LayerInfo>([
     [
       CONTENT_LAYER,

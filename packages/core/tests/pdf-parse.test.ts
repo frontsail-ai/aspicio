@@ -108,3 +108,14 @@ test("a document parses to entities that reference only known linetypes", async 
   for (const entity of all)
     if (entity.lineType !== undefined) expect(doc.lineTypes.has(entity.lineType)).toBe(true);
 });
+
+// A stream this build cannot decompress at all must cost that stream, not the
+// page. Reachable by hostile input once PDF is exposed to the API, which the
+// acceptance corpus never exercises — its damaged streams are all salvageable.
+test("an undecodable form costs the form, not the page", async () => {
+  const doc = await parse("form-undecodable.pdf");
+  // The page's own stroke still drew.
+  expect(doc.entities.length).toBeGreaterThan(0);
+  // And the loss is reported rather than hidden (PDF-8).
+  expect(doc.unsupported["UndecodableStream"]).toBe(1);
+});

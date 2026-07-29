@@ -148,7 +148,15 @@ async function checkXObject(
     if (seenForms.has(ref.num)) return;
     seenForms.add(ref.num);
   }
-  const decoded = await doc.readStream(object);
+  // A form whose bytes will not decompress cannot be inspected for fonts —
+  // that is a gap in what we can check, not grounds to refuse the file. The
+  // interpreter counts the same stream as undecodable (PDF-8).
+  let decoded: Awaited<ReturnType<typeof doc.readStream>>;
+  try {
+    decoded = await doc.readStream(object);
+  } catch {
+    return;
+  }
   if (decoded instanceof Uint8Array)
     // A form without its own /Resources uses the invoking context's.
     await checkContent(

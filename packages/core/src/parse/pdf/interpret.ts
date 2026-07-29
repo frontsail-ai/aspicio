@@ -755,7 +755,16 @@ class Interpreter {
     }
     if (!isName(subtype) || subtype.name !== "Form") return;
 
-    const decoded = await this.doc.readStream(object);
+    // A form whose bytes cannot be decompressed at all must cost that form,
+    // not the page: the interpreter never fails a file, it only draws less
+    // (PDF-8, INV-3). Reachable by hostile input, which the corpus is not.
+    let decoded: Awaited<ReturnType<typeof this.doc.readStream>>;
+    try {
+      decoded = await this.doc.readStream(object);
+    } catch {
+      this.count("UndecodableStream");
+      return;
+    }
     if (!(decoded instanceof Uint8Array)) return;
     // A form's own /Matrix places it inside its parent's space.
     const matrixValue = await this.doc.array(object.dict.get("Matrix"));
