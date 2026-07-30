@@ -1,7 +1,7 @@
 {
   "name": "@aspicio/react",
   "version": "0.0.0",
-  "description": "React bindings for the Aspicio DXF viewer.",
+  "description": "React bindings for the Aspicio DXF and PDF viewer.",
   "homepage": "https://github.com/frontsail-ai/aspicio/tree/master/packages/react#readme",
   "license": "MIT",
   "author": "Dmitri Kochelorov <dmitri@frontsail.ai>",

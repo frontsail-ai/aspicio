@@ -1,6 +1,7 @@
 {
   "name": "@aspicio/mcp",
   "version": "0.0.0",
+  "description": "MCP server exposing DXF and PDF drawings to AI agents: facts, renders, in-chat viewer.",
   "license": "MIT",
   "author": "Dmitri Kochelorov <dmitri@frontsail.ai>",
   "bin": {

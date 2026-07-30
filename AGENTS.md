@@ -1,6 +1,7 @@
 # Aspicio — agent guide
 
-_Aspicio_ (Latin: "I look at") — a TypeScript-first 2D DXF viewer for the
+_Aspicio_ (Latin: "I look at") — a TypeScript-first 2D drawing viewer
+(DXF and vector PDF) for the
 web, with a headless pipeline that also serves AI agents: an HTTP API, an
 MCP server, and installable skills/plugins. Live demo:
 <https://aspicio.frontsail.app>.
@@ -12,7 +13,7 @@ MCP server, and installable skills/plugins. Live demo:
 | Language / runtime | TypeScript; bun (package manager + runtime backend)                                        |
 | Toolchain          | Vite+ (`vp`) — dev, build, test (vitest), lint/format (oxlint/oxfmt), pack (tsdown)        |
 | Rendering          | Three.js WebGL (viewer); resvg WASM/native for headless PNG                                |
-| Parsing            | dxf-parser + custom entity handlers                                                        |
+| Parsing            | DXF: dxf-parser + custom entity handlers; PDF: own zero-dependency parser                  |
 | E2E                | Playwright e2e suites: demo + every example app (react/elements/vue/svelte/vanilla/widget) |
 | Hosting / deploy   | Vercel (custom domains on frontsail.app), prebuilt artifacts deployed from GitHub Actions  |
 | Agent protocol     | MCP (official SDK; stdio + Streamable HTTP) + MCP Apps in-chat viewer                      |
@@ -43,7 +44,7 @@ packages/svelte   the same three components as Svelte 5 source (.svelte) over el
 packages/mcp      stdio MCP server (the six describe_*/render_* tools)
 packages/agent-tools  the tool table both MCP surfaces implement (private)
 apps/demo         standalone demo + main Playwright e2e suite
-apps/api          hosted DXF API: /describe, /render, /mcp
+apps/api          hosted drawing API: /describe, /render, the PDF/doc pairs, /mcp
 apps/widget       MCP Apps in-chat viewer widget, served by the api Worker
 apps/react-example  real React embed integration + its e2e suite
 apps/elements-example  plain-HTML embed integration + its e2e suite
@@ -103,6 +104,17 @@ docs/             architecture, guidelines, product specs, releasing
   **both** layouts (`./dist/formats/*` and `./src/formats/*`): published
   consumers resolve through `dist`, in-repo apps through source aliases,
   and a dist-only glob silently drops side-effect modules in the latter.
+- **Verifying a test by breaking the code: bypass the task cache.**
+  `vp run <pkg>#build` can report a cache hit and replay its logs **without
+  restoring `dist/`**, leaving the previous artifact on disk. So an e2e
+  suite reruns against a stale bundle and passes, which reads as "the test
+  proves nothing" when the truth is "the test never ran against your
+  change". This has cost two people two debugging detours. Use
+  `rm -rf dist && vp build`, and confirm the artifact — a size delta or a
+  grep for a string only the changed code contains (removing the PDF
+  parser from the widget takes `dist/widget.html` from 1,020,287 to
+  990,341 bytes). Same family as `vp run e2e` cache-missing silently, but
+  worse: this one looks like a passing verification.
 - Specs lead. Cite spec IDs (`VIEW-3`, `INV-2`) in plans, tests, and PRs;
   surface conflicts instead of silently editing either side. Full rules:
   [docs/guidelines.md](docs/guidelines.md).

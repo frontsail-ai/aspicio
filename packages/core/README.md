@@ -1,7 +1,8 @@
 # @aspicio/core
 
-A TypeScript-first 2D DXF viewer for the web: WebGL rendering, layers,
-and mobile-grade gestures behind one small facade. Framework-agnostic —
+A TypeScript-first 2D drawing viewer for the web — DXF and vector PDF:
+WebGL rendering, layers, and mobile-grade gestures behind one small
+facade. Framework-agnostic —
 React bindings live in
 [`@aspicio/react`](https://github.com/frontsail-ai/aspicio/tree/master/packages/react#readme).
 Try the viewer live at [aspicio.frontsail.app](https://aspicio.frontsail.app/).

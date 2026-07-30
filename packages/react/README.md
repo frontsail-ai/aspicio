@@ -1,7 +1,8 @@
 # @aspicio/react
 
 React bindings for the
-[Aspicio](https://github.com/frontsail-ai/aspicio#readme) DXF viewer —
+[Aspicio](https://github.com/frontsail-ai/aspicio#readme) DXF and PDF
+viewer —
 thin, API-stable veneers over the framework-neutral
 [`@aspicio/elements`](../elements) web components, so React, Vue,
 Svelte, and plain-HTML embeds share one implementation and one look.
