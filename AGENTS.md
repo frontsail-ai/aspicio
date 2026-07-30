@@ -104,6 +104,17 @@ docs/             architecture, guidelines, product specs, releasing
   **both** layouts (`./dist/formats/*` and `./src/formats/*`): published
   consumers resolve through `dist`, in-repo apps through source aliases,
   and a dist-only glob silently drops side-effect modules in the latter.
+- **Verifying a test by breaking the code: bypass the task cache.**
+  `vp run <pkg>#build` can report a cache hit and replay its logs **without
+  restoring `dist/`**, leaving the previous artifact on disk. So an e2e
+  suite reruns against a stale bundle and passes, which reads as "the test
+  proves nothing" when the truth is "the test never ran against your
+  change". This has cost two people two debugging detours. Use
+  `rm -rf dist && vp build`, and confirm the artifact — a size delta or a
+  grep for a string only the changed code contains (removing the PDF
+  parser from the widget takes `dist/widget.html` from 1,020,287 to
+  990,341 bytes). Same family as `vp run e2e` cache-missing silently, but
+  worse: this one looks like a passing verification.
 - Specs lead. Cite spec IDs (`VIEW-3`, `INV-2`) in plans, tests, and PRs;
   surface conflicts instead of silently editing either side. Full rules:
   [docs/guidelines.md](docs/guidelines.md).
