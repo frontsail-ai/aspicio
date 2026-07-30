@@ -1,7 +1,7 @@
 <div align="center">
   <img src="apps/demo/public/favicon.svg" width="72" height="72" alt="Aspicio logo" />
   <h1>Aspicio</h1>
-  <p><strong>DXF understanding for people, applications, and AI agents.</strong></p>
+  <p><strong>Drawing understanding for people, applications, and AI agents — DXF and vector PDF.</strong></p>
   <p><em>Aspicio</em> (Latin: "I look at")</p>
   <p>
     <a href="https://github.com/frontsail-ai/aspicio/actions/workflows/ci.yml"><img src="https://github.com/frontsail-ai/aspicio/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -16,19 +16,21 @@
   <p><a href="https://aspicio.frontsail.app"><strong>▶ Live demo</strong></a></p>
 </div>
 
-Aspicio is an open-source (MIT), TypeScript-first DXF engine: one
+Aspicio is an open-source (MIT), TypeScript-first drawing engine: one
 framework-free `parse → tessellate` pipeline that runs in the browser, in
-Node, and in serverless runtimes. A person gets an interactive WebGL viewer
-of a CAD drawing; an AI agent gets structured JSON facts and a rendered
-PNG of the same file. Every surface — the browser viewer, the web
-components and their React, Vue, and Svelte bindings, the headless
-renderer, the HTTP API, and the MCP server — is a thin adapter over the same engine,
-so a drawing is equally readable everywhere.
+Node, and in serverless runtimes. It reads DXF and the vector content of
+PDF — the kind of PDF that carries artwork and dielines rather than a
+scan. A person gets an interactive WebGL viewer of a CAD drawing; an AI
+agent gets structured JSON facts and a rendered PNG of the same file.
+Every surface — the browser viewer, the web components and their React,
+Vue, and Svelte bindings, the headless renderer, the HTTP API, and the MCP
+server — is a thin adapter over the same engine, so a drawing is equally
+readable everywhere.
 
 ```
-DXF bytes ──parse──▶ DrawingDocument ──tessellate──▶ Tessellation ──┬─▶ WebGL renderer (viewer)
-              (normalized model)      (batched geometry)        ├─▶ SVG string (export / API / MCP)
-                                                                └─▶ DrawingSummary (describe)
+DXF / PDF bytes ─parse─▶ DrawingDocument ─tessellate─▶ Tessellation ──┬─▶ WebGL renderer (viewer)
+                        (normalized model)   (batched geometry)       ├─▶ SVG string (export / API / MCP)
+                                                                      └─▶ DrawingSummary (describe)
 ```
 
 How it's built: [docs/architecture.md](docs/architecture.md) · behavior

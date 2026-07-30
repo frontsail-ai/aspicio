@@ -65,7 +65,7 @@ new logic ships with unit tests (INV-7).
 
 CI runs the same gates on every PR, plus a smoke suite against the
 production build ([ci.yml](.github/workflows/ci.yml)). Pushes to `master`
-deploy the demo and the DXF API to Vercel (the canonical
+deploy the demo and the drawing API to Vercel (the canonical
 aspicio.frontsail.app / aspicio-api.frontsail.app hosts, smoke-tested
 post-deploy); every PR gets a preview deploy with its URL posted back
 as a comment (behind Vercel SSO)

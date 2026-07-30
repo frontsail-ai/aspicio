@@ -1,7 +1,8 @@
 # @aspicio/elements
 
 Framework-neutral web components for the
-[Aspicio](https://github.com/frontsail-ai/aspicio#readme) DXF viewer.
+[Aspicio](https://github.com/frontsail-ai/aspicio#readme) DXF and PDF
+viewer.
 One implementation of the embed UI, consumable from plain HTML, Vue,
 Svelte — with React, Vue, and Svelte veneers ([`@aspicio/react`](../react),
 [`@aspicio/vue`](../vue), [`@aspicio/svelte`](../svelte)) layered on top.

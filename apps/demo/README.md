@@ -1,6 +1,7 @@
 # @aspicio/demo
 
-The standalone Aspicio viewer app — and the reference integration of
+The standalone Aspicio viewer app — DXF and vector PDF — and the
+reference integration of
 [`@aspicio/core`](../../packages/core): everything in this UI is built on
 the public API, no private hooks.
 

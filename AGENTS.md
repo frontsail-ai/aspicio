@@ -1,6 +1,7 @@
 # Aspicio — agent guide
 
-_Aspicio_ (Latin: "I look at") — a TypeScript-first 2D DXF viewer for the
+_Aspicio_ (Latin: "I look at") — a TypeScript-first 2D drawing viewer
+(DXF and vector PDF) for the
 web, with a headless pipeline that also serves AI agents: an HTTP API, an
 MCP server, and installable skills/plugins. Live demo:
 <https://aspicio.frontsail.app>.
@@ -12,7 +13,7 @@ MCP server, and installable skills/plugins. Live demo:
 | Language / runtime | TypeScript; bun (package manager + runtime backend)                                        |
 | Toolchain          | Vite+ (`vp`) — dev, build, test (vitest), lint/format (oxlint/oxfmt), pack (tsdown)        |
 | Rendering          | Three.js WebGL (viewer); resvg WASM/native for headless PNG                                |
-| Parsing            | dxf-parser + custom entity handlers                                                        |
+| Parsing            | DXF: dxf-parser + custom entity handlers; PDF: own zero-dependency parser                  |
 | E2E                | Playwright e2e suites: demo + every example app (react/elements/vue/svelte/vanilla/widget) |
 | Hosting / deploy   | Vercel (custom domains on frontsail.app), prebuilt artifacts deployed from GitHub Actions  |
 | Agent protocol     | MCP (official SDK; stdio + Streamable HTTP) + MCP Apps in-chat viewer                      |
@@ -43,7 +44,7 @@ packages/svelte   the same three components as Svelte 5 source (.svelte) over el
 packages/mcp      stdio MCP server (the six describe_*/render_* tools)
 packages/agent-tools  the tool table both MCP surfaces implement (private)
 apps/demo         standalone demo + main Playwright e2e suite
-apps/api          hosted DXF API: /describe, /render, /mcp
+apps/api          hosted drawing API: /describe, /render, the PDF/doc pairs, /mcp
 apps/widget       MCP Apps in-chat viewer widget, served by the api Worker
 apps/react-example  real React embed integration + its e2e suite
 apps/elements-example  plain-HTML embed integration + its e2e suite
