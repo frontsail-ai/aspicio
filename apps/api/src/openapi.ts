@@ -374,12 +374,30 @@ function rewriteProse(node: unknown, phrases: readonly (readonly [RegExp, string
   }
 }
 
-function retarget(path: Operation, suffix: string, target: "PDF" | "drawing"): Operation {
+/**
+ * Derive the operation id by replacing the format segment, not appending to it.
+ *
+ * Appending produced `describeDxfPdf` and `renderDxfUploadDoc` — and an
+ * `operationId` is what OpenAPI-speaking platforms name the callable function,
+ * so those were the most agent-visible DXF-only names we shipped, more so than
+ * any description string.
+ *
+ * Renaming them is safe in a way renaming an MCP tool is not: `view_dxf` is
+ * enumerated in the registry files we publish (INV-12's external-contract
+ * exemption), while an `operationId` appears nowhere outside this module and
+ * reaches importers only through a document they re-fetch. INV-12 applies
+ * normally here — a name carries `Dxf` iff the thing is DXF-specific.
+ */
+function retargetId(id: string, token: "Pdf" | "Doc"): string {
+  return id.includes("Dxf") ? id.replace("Dxf", token) : `${id}${token}`;
+}
+
+function retarget(path: Operation, token: "Pdf" | "Doc", target: "PDF" | "drawing"): Operation {
   const out: Operation = {};
   for (const [method, op] of Object.entries(path)) {
     const cloned = structuredClone(op) as Record<string, unknown>;
     if (typeof cloned["operationId"] === "string")
-      cloned["operationId"] = `${cloned["operationId"]}${suffix}`;
+      cloned["operationId"] = retargetId(cloned["operationId"], token);
     // `$ref`d components are shared by every endpoint, so they are never
     // rewritten — only the inline prose this operation owns.
     rewriteProse(cloned, PHRASES[target]);

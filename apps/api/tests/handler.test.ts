@@ -445,4 +445,19 @@ test("no PDF-only endpoint mentions DXF anywhere in its prose (AGT-16)", async (
   for (const path of ["/describe", "/render"]) {
     expect(prose(doc.paths[path]).join(" "), path).toMatch(/\bDXF\b/);
   }
+
+  // operationIds are the most agent-visible names in the document — an
+  // OpenAPI platform turns each into a callable function — so they follow
+  // INV-12 too. Appending the suffix used to yield `describeDxfPdf`.
+  const ids = (path: string): string[] =>
+    Object.values(doc.paths[path] as Record<string, { operationId?: string }>)
+      .map((op) => op.operationId ?? "")
+      .filter(Boolean);
+  for (const path of ["/describe-pdf", "/render-pdf", "/describe-doc", "/render-doc"]) {
+    for (const id of ids(path)) expect(id, `${path} operationId`).not.toMatch(/Dxf/);
+  }
+  // OpenAPI requires operationIds to be unique document-wide; a rename that
+  // collided would generate two functions with one name.
+  const all = Object.keys(doc.paths).flatMap(ids);
+  expect(new Set(all).size, `duplicate operationId in ${all.join(", ")}`).toBe(all.length);
 });

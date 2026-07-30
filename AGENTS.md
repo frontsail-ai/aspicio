@@ -73,6 +73,7 @@ docs/             architecture, guidelines, product specs, releasing
 | [docs/product-specs/README.md](docs/product-specs/README.md)               | Spec format + index of all feature specs                   | before changing product behavior                                   |
 | [docs/product-specs/invariants.md](docs/product-specs/invariants.md)       | System-wide properties (`INV-*`)                           | always worth knowing; check before architectural moves             |
 | [docs/product-specs/parsing.md](docs/product-specs/parsing.md)             | `PARSE-*` — DXF input → document                           | touching parse/ or entity support                                  |
+| [docs/product-specs/parsing-pdf.md](docs/product-specs/parsing-pdf.md)     | `PDF-*` — PDF input → document, and what is skipped        | touching parse/pdf/ or any PDF claim                               |
 | [docs/product-specs/viewer.md](docs/product-specs/viewer.md)               | `VIEW-*` — camera, layers, picking, measure, export        | touching core viewer behavior                                      |
 | [docs/product-specs/demo.md](docs/product-specs/demo.md)                   | `DEMO-*` — demo app UX incl. deep links                    | touching apps/demo                                                 |
 | [docs/product-specs/elements.md](docs/product-specs/elements.md)           | `ELEM-*` — web component behaviors                         | touching packages/elements                                         |
@@ -115,6 +116,20 @@ docs/             architecture, guidelines, product specs, releasing
   parser from the widget takes `dist/widget.html` from 1,020,287 to
   990,341 bytes). Same family as `vp run e2e` cache-missing silently, but
   worse: this one looks like a passing verification.
+- **Centralizing a contract: enumerate what it contains, not just its
+  top-level fields.** Three bugs in one week shared this shape — shared
+  machinery covered the obvious strings while something one level down
+  stayed hand-maintained, and each looked correct until someone read the
+  generated output. The shared MCP tool table left each server's
+  `source` description hand-written, so `describe_pdf` told callers to
+  send DXF. The OpenAPI generator rewrote each operation's own `summary`
+  and `description` but not the strings nested in `parameters` and
+  `responses`, so `/describe-pdf` documented "a .dxf file" and answered
+  422 with "could not be parsed as DXF". The same generator left
+  `operationId` appended rather than substituted, yielding
+  `describeDxfPdf` — the most agent-visible name in the document. When
+  you centralize, list every field the contract spans and assert the
+  invariant over the _generated_ artifact, not the source literal.
 - Specs lead. Cite spec IDs (`VIEW-3`, `INV-2`) in plans, tests, and PRs;
   surface conflicts instead of silently editing either side. Full rules:
   [docs/guidelines.md](docs/guidelines.md).
