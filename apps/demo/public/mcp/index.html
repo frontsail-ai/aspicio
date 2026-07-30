@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DXF MCP Server · Aspicio</title>
+    <title>DXF and PDF MCP Server · Aspicio</title>
     <meta
       name="description"
-      content="Aspicio's MCP server gives AI agents DXF tools: describe_dxf for structured facts, render_dxf for PNG renders, and an in-chat viewer. Hosted endpoint or one-command local install."
+      content="Aspicio's MCP server gives AI agents drawing tools: describe_dxf and describe_pdf for structured facts, render_dxf and render_pdf for PNG renders, describe_doc and render_doc when the format is unknown, plus an in-chat viewer. Hosted endpoint or one-command local install."
     />
     <link rel="canonical" href="https://aspicio.frontsail.app/mcp/" />
     <style>
@@ -87,7 +87,7 @@
   </head>
   <body>
     <main>
-      <h1>DXF MCP Server</h1>
+      <h1>DXF and PDF MCP Server</h1>
       <p class="meta">
         Aspicio · <a href="/">demo</a> · <a href="/docs/">docs</a> ·
         <a href="https://github.com/frontsail-ai/aspicio">GitHub</a>
@@ -95,9 +95,9 @@
 
       <p>
         Aspicio ships an <a href="https://modelcontextprotocol.io">MCP</a> server that lets AI
-        agents open, inspect, and render DXF/CAD drawings — built on the same open-source
-        parse&nbsp;→&nbsp;tessellate pipeline as the <a href="/">interactive viewer</a>. Use the
-        hosted endpoint with zero install, or run it locally for private files.
+        agents open, inspect, and render DXF/CAD drawings and vector PDFs — built on the same
+        open-source parse&nbsp;→&nbsp;tessellate pipeline as the <a href="/">interactive viewer</a>.
+        Use the hosted endpoint with zero install, or run it locally for private files.
       </p>
 
       <h2>Tools</h2>
@@ -133,7 +133,8 @@
       <h2>Hosted endpoint — no install</h2>
       <p>
         Remote MCP over Streamable HTTP, stateless, no accounts, rate-limited per IP. Sources:
-        http(s) URLs or inline DXF text.
+        http(s) URLs, or inline DXF text. A PDF must be a URL — the inline form is text, which
+        binary PDF bytes do not survive; the local server below also reads files from disk.
       </p>
       <pre><code>https://aspicio-api.frontsail.app/mcp</code></pre>
 

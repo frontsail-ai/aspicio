@@ -1,7 +1,8 @@
 # Aspicio
 
-> Aspicio (Latin: "I look at") is an open-source, TypeScript-first DXF
-> engine: one framework-free parse → tessellate pipeline that serves
+> Aspicio (Latin: "I look at") is an open-source, TypeScript-first
+> drawing engine for DXF and vector PDF: one framework-free
+> parse → tessellate pipeline that serves
 > people (an interactive WebGL viewer), applications (React components
 > and a headless renderer), and AI agents (structured facts, PNG
 > renders, and an interactive in-chat viewer over HTTP and MCP).
@@ -17,23 +18,31 @@ released under the MIT license.
   the same parse → tessellate core, so a drawing reads identically
   everywhere — no drift between what a person sees and what an agent
   is told.
-- Built for AI agents, not retrofitted: `describe_dxf` returns
-  structured JSON facts (units, bounds, layers with the colors actually
-  drawn, entity counts, and the drawing's text content), so an agent
-  reads a title block or a dimension value directly — no OCR, no
-  vision round-trip. The structured tools declare MCP output schemas,
-  so clients validate and parse results mechanically instead of
-  guessing at shapes.
+- Built for AI agents, not retrofitted: `describe_dxf`, `describe_pdf`,
+  and `describe_doc` return structured JSON facts (the format read,
+  units, bounds, layers with the colors actually drawn, entity counts,
+  and the drawing's text content), so an agent reads a title block or a
+  dimension value directly — no OCR, no vision round-trip. Their
+  `render_*` counterparts return PNGs. The structured tools declare MCP
+  output schemas, so clients validate and parse results mechanically
+  instead of guessing at shapes.
 - An interactive in-chat viewer via the open MCP Apps extension:
   `view_dxf` puts a pannable, zoomable, layer-toggling WebGL viewer
-  directly in ChatGPT or Claude conversations. The widget is locked to
+  directly in ChatGPT or Claude conversations, for either format. The widget is locked to
   the drawing the tool call delivered and makes no network requests.
 - Broad entity coverage that never fails hard: lines, arcs, circles,
   ellipses, polylines with bulges, splines, TEXT/MTEXT, DIMENSION,
   SOLID/HATCH fills, nested INSERT blocks — anything unsupported is
   counted and reported, never fatal.
-- Runs anywhere TypeScript runs: browser, Node, and Cloudflare
-  Workers. WebGL rendering is batched to one draw call per layer, so
+- PDF is read as vector line work and text — the paths, strokes, fills,
+  and glyphs a PDF/X-4 artwork or dieline carries. Images, shadings, and
+  transparency are counted as skipped rather than drawn, so a render
+  shows line work rather than a page facsimile, and a scanned PDF
+  reports nearly nothing (accurately). Pages become spaces; content
+  arrives on a single "Content" layer; measurements are in points,
+  because a PDF carries no drawing scale.
+- Runs anywhere TypeScript runs: browser, Node, and serverless
+  runtimes. WebGL rendering is batched to one draw call per layer, so
   large drawings stay interactive.
 - Privacy-first hosted services: no accounts, no stored drawings, and
   guarded URL fetches (private-network blocking, size caps, redirect
@@ -41,16 +50,21 @@ released under the MIT license.
 
 ## Use it
 
-- [Live demo](https://aspicio.frontsail.app/): drop in a DXF
-  and explore it — layer panel, measuring, picking, export.
+- [Live demo](https://aspicio.frontsail.app/): drop in a DXF or a
+  vector PDF and explore it — layer panel, measuring, picking, export.
 - [Hosted MCP server](https://aspicio-api.frontsail.app/mcp):
-  remote MCP over Streamable HTTP — `describe_dxf`, `render_dxf`, and
-  the `view_dxf` in-chat viewer. No install.
+  remote MCP over Streamable HTTP — three describe/render pairs
+  (`describe_dxf`/`render_dxf` for DXF, `describe_pdf`/`render_pdf` for
+  PDF, `describe_doc`/`render_doc` detecting the format from the bytes)
+  plus the `view_dxf` in-chat viewer. No install. A PDF must be given as
+  a URL: the inline source form is text, which binary PDF bytes do not
+  survive.
 - Local MCP server: `npx -y @aspicio/mcp` — adds local-file support,
   reads drawings in-process, never uploads them.
 - [HTTP API](https://aspicio-api.frontsail.app/openapi.json):
-  `GET /describe?src=<dxf-url>` and
-  `GET /render?src=<dxf-url>&format=png|svg`, self-described via
+  `GET /describe?src=<url>` and `GET /render?src=<url>&format=png|svg`
+  for DXF, the same two as `/describe-pdf` and `/render-pdf` for PDF,
+  and `/describe-doc` and `/render-doc` for either — self-described via
   OpenAPI 3.1.
 - npm packages: `@aspicio/core` (viewer + headless pipeline),
   `@aspicio/elements` (framework-neutral web components:
