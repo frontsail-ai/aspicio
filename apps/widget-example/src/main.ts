@@ -18,6 +18,8 @@ interface ShowcaseConfig {
   theme: "dark" | "light";
   displayMode: "inline" | "fullscreen";
   meta: (sample: Uint8Array) => ViewerMeta;
+  /** Drawing served to this config; defaults to the DXF sample. */
+  sampleUrl?: string;
   /** When set, the fake host serves load_dxf_for_viewer from these bytes. */
   pullBytes?: (sample: Uint8Array) => Uint8Array;
 }
@@ -39,7 +41,7 @@ const CONFIGS: ShowcaseConfig[] = [
     theme: "dark",
     displayMode: "inline",
     meta: (sample) => ({
-      dxfBase64: bytesToBase64(sample),
+      bytesBase64: bytesToBase64(sample),
       byteLength: sample.byteLength,
       allowFilePicker: false,
     }),
@@ -52,7 +54,7 @@ const CONFIGS: ShowcaseConfig[] = [
     theme: "light",
     displayMode: "inline",
     meta: (sample) => ({
-      dxfBase64: bytesToBase64(sample),
+      bytesBase64: bytesToBase64(sample),
       byteLength: sample.byteLength,
       allowFilePicker: false,
     }),
@@ -65,7 +67,7 @@ const CONFIGS: ShowcaseConfig[] = [
     theme: "dark",
     displayMode: "fullscreen",
     meta: (sample) => ({
-      dxfBase64: bytesToBase64(sample),
+      bytesBase64: bytesToBase64(sample),
       byteLength: sample.byteLength,
       allowFilePicker: false,
     }),
@@ -80,7 +82,7 @@ const CONFIGS: ShowcaseConfig[] = [
     theme: "light",
     displayMode: "fullscreen",
     meta: (sample) => ({
-      dxfBase64: bytesToBase64(sample),
+      bytesBase64: bytesToBase64(sample),
       byteLength: sample.byteLength,
       allowFilePicker: false,
     }),
@@ -95,7 +97,7 @@ const CONFIGS: ShowcaseConfig[] = [
     meta: () => {
       const bytes = new TextEncoder().encode(EMPTY_DXF);
       return {
-        dxfBase64: bytesToBase64(bytes),
+        bytesBase64: bytesToBase64(bytes),
         byteLength: bytes.byteLength,
         allowFilePicker: false,
       };
@@ -109,6 +111,20 @@ const CONFIGS: ShowcaseConfig[] = [
     theme: "dark",
     displayMode: "inline",
     meta: () => ({ tooLarge: true, byteLength: 48_000_000, allowFilePicker: false }),
+  },
+  {
+    id: "inline-pdf",
+    label: "Inline · PDF (vector content)",
+    width: 920,
+    height: 540,
+    theme: "dark",
+    displayMode: "inline",
+    sampleUrl: "/sample.pdf",
+    meta: (sample) => ({
+      bytesBase64: bytesToBase64(sample),
+      byteLength: sample.byteLength,
+      allowFilePicker: false,
+    }),
   },
   {
     id: "pull-chunked",
@@ -188,7 +204,7 @@ async function show(config: ShowcaseConfig, sample: Uint8Array): Promise<void> {
     return {
       content: [],
       structuredContent: {
-        dxfBase64: bytesToBase64(slice),
+        bytesBase64: bytesToBase64(slice),
         byteLength: bytes.byteLength,
         offset,
       },
@@ -209,13 +225,21 @@ async function show(config: ShowcaseConfig, sample: Uint8Array): Promise<void> {
   await bridge.connect(new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!));
 }
 
-const sample = new Uint8Array(await (await fetch("/sample.dxf")).arrayBuffer());
+const samples = new Map<string, Uint8Array>();
+const sampleFor = async (config: ShowcaseConfig): Promise<Uint8Array> => {
+  const url = config.sampleUrl ?? "/sample.dxf";
+  const cached = samples.get(url);
+  if (cached) return cached;
+  const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+  samples.set(url, bytes);
+  return bytes;
+};
 for (const config of CONFIGS) {
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.id = config.id;
   button.textContent = config.label;
-  button.addEventListener("click", () => void show(config, sample));
+  button.addEventListener("click", () => void sampleFor(config).then((s) => show(config, s)));
   nav.append(button);
 }
-void show(CONFIGS[0], sample);
+void sampleFor(CONFIGS[0]).then((s) => show(CONFIGS[0], s));

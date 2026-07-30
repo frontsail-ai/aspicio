@@ -69,6 +69,13 @@ local file path, or inline DXF text — resolved filesystem-first, so real
 paths win over content heuristics; a path-shaped source that doesn't exist
 fails with "file not found", not a parse error.
 
+The inline form is text only, so a binary format must arrive as a URL or,
+on the stdio server, a path — the hosted server has no path form at all.
+Each tool's `source` description states the forms that surface actually
+supports, declared once beside the tool table rather than per server. An
+inline source that is recognisably a PDF fails with a message naming the
+form to use instead, rather than a parse error from deep inside the file.
+
 ### AGT-8: MCP failures are protocol errors
 
 A broken source or unparseable drawing surfaces as a clean tool error
@@ -100,8 +107,15 @@ chatty session consumes the per-IP budget faster than plain HTTP calls.
 
 The remote MCP endpoint offers an interactive in-chat viewer through the
 MCP Apps extension: a `view_dxf` tool whose definition links a `ui://`
-HTML resource carrying the bundled WebGL viewer. The widget renders
-exactly the drawing delivered by the tool call — the DXF travels
+HTML resource carrying the bundled WebGL viewer. It opens either supported
+format — DXF or vector PDF — and for a PDF shows what PDF-8 describes:
+vector line work and text, not a page facsimile. The tool keeps its
+DXF-era name because it is a published MCP identifier (INV-12's
+external-contract exemption); the fields that carry the file across the
+wire are format-neutral. On this hosted surface a PDF must arrive as a
+URL — the inline form is text, which binary PDF bytes do not survive —
+while the stdio server also accepts a path. The widget renders
+exactly the drawing delivered by the tool call — the file travels
 widget-only in the result metadata, never to the model — and offers no
 way to open other files unless the tool call explicitly enabled file
 controls. The widget makes no network requests, and it renders fully —
@@ -159,5 +173,8 @@ six as `/describe`, `/render`, `/describe-pdf`, `/render-pdf`,
 `/describe-doc`, and `/render-doc`.
 
 Results report which format was read, so a caller never infers it from the
-shape of the answer. Both MCP surfaces offer the same six: they are
-declared once, so the local and hosted tool tables cannot drift apart.
+shape of the answer. Both MCP surfaces offer the same six format tools,
+declared once so the two tables cannot drift apart. The hosted surface adds
+two more — `view_dxf` and the app-only `load_dxf_for_viewer` of AGT-14 —
+for eight in total; they are hosted-only because the in-chat viewer needs a
+host that speaks the MCP Apps extension.

@@ -12,6 +12,7 @@
  */
 import { DrawingViewer, isEmptyLayer } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
+import { pdfParser } from "@aspicio/core/pdf";
 import type { LayerInfo } from "@aspicio/core";
 import { App } from "@modelcontextprotocol/ext-apps";
 import type { McpUiDisplayMode } from "@modelcontextprotocol/ext-apps";
@@ -266,7 +267,11 @@ shadow.innerHTML = `<style>${STYLE}</style>
 const el = (id: string): HTMLElement => shadow.getElementById(id) as HTMLElement;
 const root = el("root");
 
-const viewer = new DrawingViewer(el("viewer"), { background: CANVAS_BG, parsers: [dxfParser] });
+// Both formats: the widget serves whatever the tool call delivered (AGT-14).
+const viewer = new DrawingViewer(el("viewer"), {
+  background: CANVAS_BG,
+  parsers: [dxfParser, pdfParser],
+});
 
 // ---------------------------------------------------------------------------
 // State cards (replace the canvas — never overlay a stale drawing)
@@ -567,12 +572,12 @@ async function pullDrawing(source: string, byteLength: number): Promise<ArrayBuf
       throw new Error(text ?? "the drawing could not be fetched");
     }
     const sc = r.structuredContent as LoadResult | undefined;
-    if (!sc?.dxfBase64) throw new Error("the host returned no drawing data");
+    if (!sc?.bytesBase64) throw new Error("the host returned no drawing data");
     return sc;
   };
   try {
     const full = await call({});
-    const bytes = base64ToBytes(full.dxfBase64);
+    const bytes = base64ToBytes(full.bytesBase64);
     if (bytes.byteLength === full.byteLength) return bytes;
     // Truncated single-shot — fall through to chunked retrieval.
   } catch (err) {
@@ -585,7 +590,7 @@ async function pullDrawing(source: string, byteLength: number): Promise<ArrayBuf
   const chunks: Uint8Array[] = [];
   for (let offset = 0; offset < byteLength; offset += LOAD_CHUNK_BYTES) {
     const part = await call({ offset, length: LOAD_CHUNK_BYTES });
-    chunks.push(new Uint8Array(base64ToBytes(part.dxfBase64)));
+    chunks.push(new Uint8Array(base64ToBytes(part.bytesBase64)));
   }
   return concatChunks(chunks);
 }

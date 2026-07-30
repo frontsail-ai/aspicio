@@ -12,10 +12,10 @@ export function actionForToolResult(result: { _meta?: Record<string, unknown> })
   const meta = result._meta?.[VIEWER_META_KEY] as ViewerMeta | undefined;
   if (!meta) return { kind: "missing" };
   const allowFilePicker = meta.allowFilePicker === true;
-  if (meta.dxfBase64 !== undefined)
+  if (meta.bytesBase64 !== undefined)
     return {
       kind: "load",
-      bytes: base64ToBytes(meta.dxfBase64),
+      bytes: base64ToBytes(meta.bytesBase64),
       byteLength: meta.byteLength,
       allowFilePicker,
     };

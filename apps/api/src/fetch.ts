@@ -63,7 +63,7 @@ function validateSrcUrl(src: string, base?: URL): URL {
   return url;
 }
 
-export async function fetchDxf(src: string): Promise<Uint8Array> {
+export async function fetchDrawing(src: string): Promise<Uint8Array> {
   let url = validateSrcUrl(src);
 
   const controller = new AbortController();

@@ -131,6 +131,44 @@ export const TOOLS: readonly ToolMeta[] = [
   },
 ];
 
+/**
+ * What a tool's `source` accepts, per surface (AGT-7).
+ *
+ * This lived as a hand-written constant in each server, and both said "a
+ * .dxf file, or the DXF content inline as text" — attached to every tool from
+ * the table above, including `describe_pdf`. So the PDF tools instructed
+ * callers to send DXF, on both surfaces, for as long as the PDF tools have
+ * existed.
+ *
+ * Sharing the tool descriptions but not this one left the same drift risk one
+ * field over, so it moves here too. `paths` is the only real difference: the
+ * stdio server reads the filesystem and the hosted one cannot.
+ */
+export function sourceDescription(opts: { readonly paths: boolean }): string {
+  const forms = opts.paths
+    ? "An http(s) URL, a local file path, or inline DXF text."
+    : "A publicly reachable http(s) URL, or inline DXF text.";
+  // The inline form is text, which binary PDF bytes do not survive.
+  const binary = opts.paths
+    ? "A PDF is binary: pass it as a URL or a path, never inline."
+    : "A PDF is binary, so it must be a URL — inline PDF bytes are refused.";
+  const local = opts.paths
+    ? ""
+    : " (This is a hosted server — local file paths are not available; use the npx @aspicio/mcp local server for files on disk.)";
+  return `${forms} ${binary}${local}`;
+}
+
+/**
+ * Why an inline source that looks like a PDF is refused (AGT-7).
+ *
+ * Without this the bytes reach the parser mangled by text decoding and fail
+ * somewhere deep in the object layer, which tells the caller nothing about
+ * the thing they got wrong.
+ */
+export const INLINE_PDF_REFUSAL =
+  "A PDF cannot be passed inline — it is binary, and an inline source is text. Pass an http(s) URL to the PDF instead" +
+  " (or use the npx @aspicio/mcp local server, which reads files from disk).";
+
 /** The width argument every render tool accepts. */
 export const widthSchema = z
   .number()

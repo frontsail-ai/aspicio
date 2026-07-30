@@ -54,3 +54,24 @@ test("the pull config loads the drawing through chunked load_dxf_for_viewer", as
   await open(page, "pull-chunked");
   await expect(widget(page).locator("canvas")).toBeVisible({ timeout: 10000 });
 });
+
+// AGT-14: the in-chat viewer opens vector PDF too. The fake host delivers PDF
+// bytes through the same _meta path a real one would, so this proves the
+// widget's own parser wiring rather than the Worker's.
+//
+// Assertions target rendered elements inside the shadow root, which CSS
+// locators pierce. Note that `locator("body")` text assertions are useless
+// here: widget.html inlines the whole bundle into <body>, so body text matches
+// minified source rather than UI — a PDF case written that way passes with the
+// PDF parser removed.
+test("the PDF config renders the PDF's vector content in the widget", async ({ page }) => {
+  await open(page, "inline-pdf");
+  await expect(widget(page).locator("canvas")).toBeVisible();
+  // PDF-7 ships exactly one "Content" layer — no OCG layers. The chip is the
+  // single-element summary; the panel markup exists twice (inline + fullscreen).
+  await expect(widget(page).locator("#chip")).toHaveText(/^1 LAYER/);
+  await expect(widget(page).locator(".layer-rows .name").first()).toHaveText("Content");
+  // The widget posts its terminal state onto #root; a parse failure would
+  // leave anything but "loaded" and hide the canvas behind the state card.
+  await expect(widget(page).locator("#root")).toHaveAttribute("data-state", "loaded");
+});
