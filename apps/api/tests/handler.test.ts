@@ -396,3 +396,53 @@ test("the hosted surface offers exactly the shared tool set", async () => {
     expect(found?.description?.startsWith(tool.description)).toBe(true);
   }
 });
+
+// AGT-16 + INV-10: every documented endpoint must describe the formats it
+// actually accepts, in *all* its prose — not just the operation summary.
+//
+// The generator used to rewrite only `summary` and `description` at the
+// operation level, so `/describe-pdf` shipped a `src` parameter reading
+// "a .dxf file (ASCII or binary DXF)" and a 422 saying "could not be parsed
+// as DXF". Wrong guidance, in the document agent platforms import, on an
+// endpoint that only accepts PDF. Walking every string is the fix; this is
+// the guard, because the shallow version looked right until someone read the
+// generated output.
+test("no PDF-only endpoint mentions DXF anywhere in its prose (AGT-16)", async () => {
+  const doc = (await (await handleRequest(get("/openapi.json"), noPng)).json()) as {
+    paths: Record<string, unknown>;
+  };
+
+  /** Every `description`/`summary` string under a node, however deep. */
+  const prose = (node: unknown, out: string[] = []): string[] => {
+    if (Array.isArray(node)) {
+      for (const item of node) prose(item, out);
+      return out;
+    }
+    if (node === null || typeof node !== "object") return out;
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+      if ((key === "description" || key === "summary") && typeof value === "string")
+        out.push(value);
+      else prose(value, out);
+    }
+    return out;
+  };
+
+  for (const path of ["/describe-pdf", "/render-pdf"]) {
+    for (const text of prose(doc.paths[path])) {
+      expect(text, `${path}: "${text}"`).not.toMatch(/\bDXF\b|\.dxf/i);
+    }
+  }
+
+  // The agnostic pair may name DXF — but only alongside PDF, never alone.
+  for (const path of ["/describe-doc", "/render-doc"]) {
+    for (const text of prose(doc.paths[path])) {
+      if (/\bDXF\b/i.test(text)) expect(text, `${path}: "${text}"`).toMatch(/\bPDF\b/i);
+    }
+  }
+
+  // And the DXF-only pair stays DXF-only rather than being genericised: the
+  // point of the typed endpoints is that they say what they take.
+  for (const path of ["/describe", "/render"]) {
+    expect(prose(doc.paths[path]).join(" "), path).toMatch(/\bDXF\b/);
+  }
+});

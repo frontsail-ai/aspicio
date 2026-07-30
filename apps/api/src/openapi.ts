@@ -19,14 +19,18 @@ const dxfSourceDescription =
 export const openapi = {
   openapi: "3.1.0",
   info: {
-    title: "Aspicio DXF API",
+    title: "Aspicio DXF and PDF API",
     version: "1.0.0",
     description:
-      "Inspect and render DXF/CAD drawings. `describe` returns structured JSON facts " +
-      "(layers with the colors actually drawn, units, bounds, entity counts, text content); " +
-      "`render` returns the drawing as a PNG or SVG image. " +
-      "Input is a fetched `src` URL or the DXF file POSTed as the request body. " +
-      "DXF endpoints are rate-limited per client IP.",
+      "Inspect and render drawings — DXF/CAD and the vector content of PDF. A `describe` " +
+      "returns structured JSON facts (the format read, layers with the colors actually drawn, " +
+      "units, bounds, entity counts, text content); a `render` returns the drawing as a PNG or " +
+      "SVG image. `/describe` and `/render` read DXF only, `/describe-pdf` and `/render-pdf` " +
+      "read PDF only, and `/describe-doc` and `/render-doc` accept either and detect the format " +
+      "from the bytes; a typed endpoint handed the wrong format answers 422 naming the one that " +
+      "would have worked. A PDF render shows vector line work and text, not a page facsimile. " +
+      "Input is a fetched `src` URL or the file POSTed as the request body. Drawing endpoints " +
+      "are rate-limited per client IP.",
     license: { name: "MIT", url: "https://github.com/frontsail-ai/aspicio/blob/master/LICENSE" },
   },
   // Placeholder — the handler overwrites `servers` with the origin that
@@ -295,23 +299,90 @@ export const openapi = {
  * Generated from the DXF operations so the six stay in step — the only
  * differences are the path, the operation id, and which formats the wording
  * names.
+ *
+ * The rewrite walks *every* nested string, not just the operation's own
+ * `summary` and `description`. It used to do only those two, which left every
+ * generated PDF endpoint telling callers to pass "a .dxf file (ASCII or binary
+ * DXF)" and answering 422 with "could not be parsed as DXF" — wrong guidance
+ * in the document agent platforms import, on endpoints that only accept PDF.
+ * A per-endpoint parity test now pins the invariant, because the shallow
+ * version looked correct for as long as nobody read the generated output.
  */
 type Operation = Record<string, unknown>;
 
-function retarget(path: Operation, suffix: string, noun: string): Operation {
+/** Phrase rewrites per target, longest-context first: "DXF file" must match
+ *  before the bare "DXF", or the qualifier is left stranded. */
+const PHRASES: Record<string, readonly (readonly [RegExp, string])[]> = {
+  PDF: [
+    [/\ba \.dxf file \(ASCII or binary DXF\)/g, "a .pdf file"],
+    [/\bDXF file\b/g, "PDF file"],
+    [/\ba DXF\b/g, "a PDF"],
+    [/\bDXF\b/g, "PDF"],
+  ],
+  drawing: [
+    [
+      /\ba \.dxf file \(ASCII or binary DXF\)/g,
+      "a drawing file (DXF or PDF, detected from the bytes)",
+    ],
+    [/\bDXF file\b/g, "drawing file"],
+    // "a DXF drawing" → "a drawing", not "a drawing drawing": the alternation
+    // takes the first alternative that matches at a position, so every longer
+    // context has to precede the shorter one it contains.
+    [/\ba DXF drawing\b/g, "a drawing"],
+    [/\bDXF drawing\b/g, "drawing"],
+    [/\ba DXF\b/g, "a drawing"],
+    [/\bparsed as DXF\b/g, "parsed as any supported format"],
+    // Sentence-initial: the bare noun would read "drawing exceeds the 8 MB…".
+    [/\bDXF exceeds\b/g, "The drawing exceeds"],
+    [/\bDXF\b/g, "drawing"],
+  ],
+};
+
+/**
+ * Apply the phrases in a single pass.
+ *
+ * Chained `.replace()` calls re-scan their own output: the `.dxf file` rule
+ * emits "(DXF or PDF, detected from the bytes)", which the later bare-`DXF`
+ * rule then rewrote *inside* that replacement, producing "a drawing file
+ * (drawing (DXF or PDF, detected from the bytes) or PDF, detected from the
+ * bytes)". One alternation, matched left-to-right with the longest context
+ * first, cannot re-enter what it just wrote.
+ */
+function applyPhrases(text: string, phrases: readonly (readonly [RegExp, string])[]): string {
+  const combined = new RegExp(phrases.map(([pattern]) => `(?:${pattern.source})`).join("|"), "g");
+  return text.replace(combined, (match) => {
+    for (const [pattern, replacement] of phrases)
+      if (new RegExp(`^(?:${pattern.source})$`).test(match)) return replacement;
+    return match;
+  });
+}
+
+/** Rewrite prose in place, wherever it sits in the operation tree. */
+function rewriteProse(node: unknown, phrases: readonly (readonly [RegExp, string])[]): void {
+  if (Array.isArray(node)) {
+    for (const item of node) rewriteProse(item, phrases);
+    return;
+  }
+  if (node === null || typeof node !== "object") return;
+  const record = node as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "description" || key === "summary") {
+      if (typeof value === "string") record[key] = applyPhrases(value, phrases);
+      continue;
+    }
+    rewriteProse(value, phrases);
+  }
+}
+
+function retarget(path: Operation, suffix: string, target: "PDF" | "drawing"): Operation {
   const out: Operation = {};
   for (const [method, op] of Object.entries(path)) {
     const cloned = structuredClone(op) as Record<string, unknown>;
     if (typeof cloned["operationId"] === "string")
       cloned["operationId"] = `${cloned["operationId"]}${suffix}`;
-    for (const key of ["summary", "description"] as const) {
-      const text = cloned[key];
-      if (typeof text === "string")
-        cloned[key] = text
-          .replace(/\bDXF file\b/g, `${noun} file`)
-          .replace(/\ba DXF\b/g, noun === "PDF" ? "a PDF" : "a drawing")
-          .replace(/\bDXF\b/g, noun);
-    }
+    // `$ref`d components are shared by every endpoint, so they are never
+    // rewritten — only the inline prose this operation owns.
+    rewriteProse(cloned, PHRASES[target]);
     out[method] = cloned;
   }
   return out;
@@ -327,7 +398,7 @@ export const openapiDocument = {
     ...openapi.paths,
     "/describe-pdf": retarget(describePath, "Pdf", "PDF"),
     "/render-pdf": retarget(renderPath, "Pdf", "PDF"),
-    "/describe-doc": retarget(describePath, "Doc", "drawing (DXF or PDF, detected from the bytes)"),
-    "/render-doc": retarget(renderPath, "Doc", "drawing (DXF or PDF, detected from the bytes)"),
+    "/describe-doc": retarget(describePath, "Doc", "drawing"),
+    "/render-doc": retarget(renderPath, "Doc", "drawing"),
   },
 };
