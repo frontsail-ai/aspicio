@@ -449,15 +449,27 @@ test("no PDF-only endpoint mentions DXF anywhere in its prose (AGT-16)", async (
   // operationIds are the most agent-visible names in the document — an
   // OpenAPI platform turns each into a callable function — so they follow
   // INV-12 too. Appending the suffix used to yield `describeDxfPdf`.
+  //
+  // Deliberately no `.filter(Boolean)`: dropping empty ids would hide the
+  // worst case rather than catch it. A generator returning "" gives every
+  // operation the same missing name — eight operations no importer can tell
+  // apart — and a filtered uniqueness check passes it happily.
   const ids = (path: string): string[] =>
-    Object.values(doc.paths[path] as Record<string, { operationId?: string }>)
-      .map((op) => op.operationId ?? "")
-      .filter(Boolean);
+    Object.values(doc.paths[path] as Record<string, { operationId?: string }>).map(
+      (op) => op.operationId ?? "",
+    );
   for (const path of ["/describe-pdf", "/render-pdf", "/describe-doc", "/render-doc"]) {
     for (const id of ids(path)) expect(id, `${path} operationId`).not.toMatch(/Dxf/);
   }
-  // OpenAPI requires operationIds to be unique document-wide; a rename that
-  // collided would generate two functions with one name.
+  // Every operation carries a name at all...
+  for (const path of Object.keys(doc.paths)) {
+    for (const id of ids(path))
+      expect(id, `${path} has an operation with no operationId`).not.toBe("");
+  }
+  // ...and OpenAPI requires those names to be unique document-wide: a
+  // substitution that collided would generate two functions with one name.
   const all = Object.keys(doc.paths).flatMap(ids);
-  expect(new Set(all).size, `duplicate operationId in ${all.join(", ")}`).toBe(all.length);
+  expect(new Set(all).size, `duplicate or missing operationId in ${all.join(", ")}`).toBe(
+    all.length,
+  );
 });
