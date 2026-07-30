@@ -20,14 +20,14 @@ test("a result without the viewer meta yields no action", () => {
 test("an embedded drawing decodes back to the original bytes", () => {
   const dxf = "0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n";
   const action = actionForToolResult(
-    meta({ dxfBase64: btoa(dxf), byteLength: dxf.length, allowFilePicker: false }),
+    meta({ bytesBase64: btoa(dxf), byteLength: dxf.length, allowFilePicker: false }),
   );
   if (action.kind !== "load") throw new Error(`expected load, got ${action.kind}`);
   expect(new TextDecoder().decode(action.bytes)).toBe(dxf);
 });
 
 test("file-picker controls stay off unless the server enabled them (AGT-14)", () => {
-  const m = { dxfBase64: btoa("x"), byteLength: 1 };
+  const m = { bytesBase64: btoa("x"), byteLength: 1 };
   const off = actionForToolResult(meta({ ...m, allowFilePicker: false }));
   const on = actionForToolResult(meta({ ...m, allowFilePicker: true }));
   expect(off).toMatchObject({ kind: "load", allowFilePicker: false });

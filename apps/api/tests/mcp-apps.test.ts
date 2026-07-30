@@ -5,6 +5,8 @@ import {
   VIEWER_RESOURCE_URI,
 } from "@aspicio/widget/meta";
 import type { LoadResult, ViewerMeta } from "@aspicio/widget/meta";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { expect, test } from "vite-plus/test";
 import { handleRequest } from "../src/handler.ts";
 import { renderLink } from "../src/mcp.ts";
@@ -119,7 +121,7 @@ test("view_dxf embeds the drawing widget-only and answers the model with facts",
   expect((r.content as Array<{ text: string }>)[0].text).toMatch(/viewer/i);
   // Widget-facing: the exact DXF bytes, base64 in _meta.
   const meta = (r._meta as Record<string, ViewerMeta>)[VIEWER_META_KEY];
-  expect(atob(meta.dxfBase64!)).toBe(SAMPLE);
+  expect(atob(meta.bytesBase64!)).toBe(SAMPLE);
   expect(meta.byteLength).toBe(SAMPLE.length);
   await client.close();
 });
@@ -146,7 +148,7 @@ test("an over-cap inline drawing degrades to facts plus a too-large marker", asy
   const client = await connect();
   const r = await client.callTool({ name: "view_dxf", arguments: { source: big } });
   const meta = (r._meta as Record<string, ViewerMeta>)[VIEWER_META_KEY];
-  expect(meta.dxfBase64).toBeUndefined();
+  expect(meta.bytesBase64).toBeUndefined();
   expect(meta.source).toBeUndefined();
   expect(meta.tooLarge).toBe(true);
   expect(meta.byteLength).toBeGreaterThan(INLINE_EMBED_BYTES);
@@ -175,7 +177,7 @@ test("the widget's load tool is app-only and serves whole files and byte ranges"
   // Whole file round-trips byte-exact.
   const whole = await client.callTool({ name: LOAD_TOOL_NAME, arguments: { source: SAMPLE } });
   const w = whole.structuredContent as LoadResult;
-  expect(atob(w.dxfBase64)).toBe(SAMPLE);
+  expect(atob(w.bytesBase64)).toBe(SAMPLE);
   expect(w.byteLength).toBe(SAMPLE.length);
   expect(w.offset).toBe(0);
 
@@ -190,7 +192,7 @@ test("the widget's load tool is app-only and serves whole files and byte ranges"
     const sc = r.structuredContent as LoadResult;
     expect(sc.offset).toBe(offset);
     expect(sc.byteLength).toBe(SAMPLE.length);
-    parts.push(atob(sc.dxfBase64));
+    parts.push(atob(sc.bytesBase64));
   }
   expect(parts.join("")).toBe(SAMPLE);
   await client.close();
@@ -212,5 +214,68 @@ test("structured tools declare output schemas and validate real results (AGT-9)"
   expect(sc.entityCount).toBe(1);
   expect(sc.layers.map((l) => l.name)).toContain("WALLS");
   expect(JSON.parse((r.content as Array<{ text: string }>)[0].text)).toEqual(sc);
+  await client.close();
+});
+
+// AGT-14: the in-chat viewer opens both formats. AGT-7: on this surface a PDF
+// can only arrive as a URL, because the inline form is text and binary PDF
+// bytes do not survive it — so the constraint is asserted, not just written
+// down in a spec.
+const PDF_BYTES = readFileSync(
+  fileURLToPath(new URL("../../../packages/core/tests/fixtures/pdf/minimal.pdf", import.meta.url)),
+);
+
+test("view_dxf opens a PDF fetched from a URL (AGT-14)", async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async () => new Response(PDF_BYTES)) as typeof fetch;
+    const client = await connect();
+    const res = await client.callTool({
+      name: "view_dxf",
+      arguments: { source: "https://example.com/artwork.pdf" },
+    });
+    expect(res.isError).toBeFalsy();
+    // The model gets facts naming the format it actually read.
+    expect((res.structuredContent as { format: string }).format).toBe("pdf");
+    // The widget gets the bytes; the model never does.
+    const meta = (res._meta as Record<string, ViewerMeta>)[VIEWER_META_KEY];
+    expect(meta.bytesBase64).toBeDefined();
+    expect(atob(meta.bytesBase64!).startsWith("%PDF-")).toBe(true);
+    await client.close();
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("an inline PDF is refused with the form to use instead (AGT-7)", async () => {
+  const client = await connect();
+  // Every tool shares one loader, so checking the viewer covers the surface.
+  for (const name of ["view_dxf", "describe_pdf"]) {
+    const res = await client.callTool({
+      name,
+      arguments: { source: PDF_BYTES.toString("latin1") },
+    });
+    expect(res.isError, `${name} should refuse inline PDF`).toBe(true);
+    const text = (res.content as Array<{ text?: string }>)[0]?.text ?? "";
+    // Names the fix, not a parse failure from inside the object layer.
+    expect(text, name).toMatch(/http\(s\) URL/);
+    expect(text, name).not.toMatch(/xref|startxref|trailer/i);
+  }
+  await client.close();
+});
+
+test("every tool's source description states this surface's real forms (AGT-7)", async () => {
+  const client = await connect();
+  const { tools } = await client.listTools();
+  for (const tool of tools) {
+    const desc = (tool.inputSchema?.properties as { source?: { description?: string } } | undefined)
+      ?.source?.description;
+    if (desc === undefined) continue;
+    // No tool may name a single format as the thing it takes — the old
+    // hand-written string promised ".dxf" to describe_pdf as well.
+    expect(desc, tool.name).not.toMatch(/\.dxf|of the DXF/);
+    // The app-only pull tool is URL-only, so the binary caveat is moot there.
+    if (tool.name !== LOAD_TOOL_NAME) expect(desc, tool.name).toMatch(/PDF is binary/);
+  }
   await client.close();
 });

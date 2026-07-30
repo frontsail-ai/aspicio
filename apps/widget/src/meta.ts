@@ -23,7 +23,9 @@ export const VIEWER_RESOURCE_URI = "ui://aspicio/viewer-v2.html";
 export const INLINE_EMBED_BYTES = 64 * 1024;
 
 /** App-only tool (hidden from the model) the widget calls to pull the
- * drawing when it wasn't embedded. */
+ * drawing when it wasn't embedded. Keeps its DXF-era name: it is a published
+ * MCP identifier, so INV-12's external-contract exemption applies even though
+ * it now carries either format (AGT-14). */
 export const LOAD_TOOL_NAME = "load_dxf_for_viewer";
 
 /** Chunk size (raw bytes) for the pull fallback when a single response is
@@ -31,15 +33,16 @@ export const LOAD_TOOL_NAME = "load_dxf_for_viewer";
 export const LOAD_CHUNK_BYTES = 1_500_000;
 
 export interface ViewerMeta {
-  /** Base64 DXF bytes; present only when the drawing fits the embed cap. */
-  dxfBase64?: string;
+  /** Base64 drawing bytes (DXF or PDF); present only when the drawing fits
+   * the embed cap. */
+  bytesBase64?: string;
   /** http(s) source the widget may pull via {@link LOAD_TOOL_NAME}. Present
    * when the drawing was too large to embed but is refetchable. */
   source?: string;
   /** Set when the drawing can be neither embedded nor pulled (an inline
    * text source beyond the embed cap). */
   tooLarge?: boolean;
-  /** Size of the full DXF in bytes. */
+  /** Size of the full drawing in bytes. */
   byteLength: number;
   /** Server-driven gate: only when true may the widget offer controls to
    * open files other than the one delivered in this result (AGT-14). */
@@ -49,8 +52,8 @@ export interface ViewerMeta {
 /** structuredContent shape of a {@link LOAD_TOOL_NAME} response. */
 export interface LoadResult {
   /** Base64 of the requested byte range (or the whole file). */
-  dxfBase64: string;
-  /** Total size of the full DXF in bytes. */
+  bytesBase64: string;
+  /** Total size of the full drawing in bytes. */
   byteLength: number;
   /** Byte offset this response starts at. */
   offset: number;

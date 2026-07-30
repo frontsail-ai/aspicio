@@ -3,7 +3,9 @@ import { dxfParser } from "@aspicio/core/dxf";
 import { pdfParser } from "@aspicio/core/pdf";
 import {
   DRAWING_SUMMARY_SHAPE as SHARED_SUMMARY_SHAPE,
+  INLINE_PDF_REFUSAL,
   READ_ONLY_HINTS,
+  sourceDescription,
   TOOLS,
   widthSchema,
 } from "@aspicio/agent-tools";
@@ -23,20 +25,25 @@ import {
 import type { ViewerMeta } from "@aspicio/widget/meta";
 import { z } from "zod";
 import registry from "../../../server.json";
-import { fetchDxf } from "./fetch.ts";
+import { fetchDrawing } from "./fetch.ts";
 import type { RenderPng } from "./handler.ts";
 
 const DEFAULT_BG = "#16181d";
 
-const SOURCE_DESC =
-  "A publicly reachable http(s) URL to a .dxf file, or the DXF content inline as text. " +
-  "(This is a hosted server — local file paths are not available; use the npx @aspicio/mcp " +
-  "local server for files on disk.)";
+// This surface has no filesystem, so it declares the pathless source forms.
+const SOURCE_DESC = sourceDescription({ paths: false });
 
-/** Resolve a remote-MCP `source`: a guarded URL fetch, or inline DXF text. */
-async function loadDxf(source: string): Promise<Uint8Array> {
+/**
+ * Resolve a remote-MCP `source`: a guarded URL fetch, or inline text (AGT-7).
+ *
+ * An inline PDF is refused rather than encoded. `TextEncoder` would mangle the
+ * binary and the failure would surface from deep in the object layer, telling
+ * the caller nothing about what they actually got wrong.
+ */
+async function loadDrawing(source: string): Promise<Uint8Array> {
   const s = source.trim();
-  if (/^https?:\/\//i.test(s)) return fetchDxf(s);
+  if (/^https?:\/\//i.test(s)) return fetchDrawing(s);
+  if (s.startsWith("%PDF-")) throw new Error(INLINE_PDF_REFUSAL);
   return new TextEncoder().encode(source);
 }
 
@@ -100,7 +107,8 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
         "(view_dxf) over a static render — panning, zooming, and layer toggles are far more " +
         "useful to them than a fixed image. If your platform requires the user to approve " +
         "interactive tools first, offer the viewer and ask instead of silently falling back " +
-        "to a static render. Use describe_dxf and render_dxf for your own analysis.",
+        "to a static render. The viewer reads DXF and vector PDF alike. Use the describe_* " +
+        "and render_* tools for your own analysis.",
     },
   );
 
@@ -120,10 +128,10 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
       extra.push(
         "Some chat UIs do not display the returned image to the user: for URL sources the result also includes a direct image link — show it (e.g. as a markdown image) when they need to see the render.",
       );
-    if (tool.format !== "pdf")
-      extra.push(
-        "When the user wants to see or explore the drawing themselves, prefer view_dxf (interactive viewer) — if your platform gates it behind user approval, offer it and ask rather than substituting a static render.",
-      );
+    // The viewer opens both formats now (AGT-14), so every tool recommends it.
+    extra.push(
+      "When the user wants to see or explore the drawing themselves, prefer view_dxf (interactive viewer) — if your platform gates it behind user approval, offer it and ask rather than substituting a static render.",
+    );
     return [tool.description, ...extra].join(" ");
   };
 
@@ -140,7 +148,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
           outputSchema: DRAWING_SUMMARY_SHAPE,
         },
         async ({ source }) => {
-          const doc = await parseFor(parsers, await loadDxf(source), "describe");
+          const doc = await parseFor(parsers, await loadDrawing(source), "describe");
           const summary = describeDrawing(doc, tessellate(doc, {}));
           return {
             content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
@@ -158,7 +166,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
           inputSchema: { source: z.string().describe(SOURCE_DESC), width: widthSchema },
         },
         async ({ source, width }) => {
-          const doc = await parseFor(parsers, await loadDxf(source), "render");
+          const doc = await parseFor(parsers, await loadDrawing(source), "render");
           const svg = tessellationToSvg(tessellate(doc, {}), undefined, { background: DEFAULT_BG });
           const png = await renderPng(svg, width ?? 1200);
           const link = renderLink(origin, source, width ?? 1200);
@@ -202,10 +210,10 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     server,
     "view_dxf",
     {
-      title: "Open a DXF in the interactive viewer",
+      title: "Open a drawing in the interactive viewer",
       annotations: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
       description:
-        "Open an interactive DXF viewer the user can pan, zoom, and toggle layers in (renders in-chat on MCP Apps-capable hosts). Use this when the user wants to see or explore the drawing themselves; for your own analysis use describe_dxf (facts) or render_dxf (image). The viewer shows only the drawing from this call. Delivery is handled by the widget itself: small drawings are embedded in the result and larger URL-sourced drawings are fetched by the widget through its own tool call — never re-fetch or inline the file for the viewer's sake, and don't blind-retry if the user reports an empty viewer (the viewer posts its actual status back to the conversation context).",
+        "Open an interactive viewer the user can pan, zoom, and toggle layers in (renders in-chat on MCP Apps-capable hosts). Reads DXF and vector PDF; for a PDF it shows line work and text rather than a page facsimile, so images, shadings, and transparency are absent by design. Use this when the user wants to see or explore the drawing themselves; for your own analysis use a describe_* tool (facts) or a render_* tool (image). The viewer shows only the drawing from this call. Delivery is handled by the widget itself: small drawings are embedded in the result and larger URL-sourced drawings are fetched by the widget through its own tool call — never re-fetch or inline the file for the viewer's sake, and don't blind-retry if the user reports an empty viewer (the viewer posts its actual status back to the conversation context).",
       inputSchema: {
         source: z.string().describe(SOURCE_DESC),
         allow_file_open: z
@@ -219,8 +227,8 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
       _meta: { ui: { resourceUri: VIEWER_RESOURCE_URI } },
     },
     async ({ source, allow_file_open }) => {
-      const bytes = await loadDxf(source);
-      const doc = await parseWith([dxfParser], bytes);
+      const bytes = await loadDrawing(source);
+      const doc = await parseWith([dxfParser, pdfParser], bytes);
       const summary = describeDrawing(doc, tessellate(doc, {}));
       const allowFilePicker = allow_file_open === true;
       const trimmed = source.trim();
@@ -231,12 +239,12 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
       // so big payloads are not deliverable through the result itself.
       const viewerMeta: ViewerMeta =
         bytes.byteLength <= INLINE_EMBED_BYTES
-          ? { dxfBase64: toBase64(bytes), byteLength: bytes.byteLength, allowFilePicker }
+          ? { bytesBase64: toBase64(bytes), byteLength: bytes.byteLength, allowFilePicker }
           : isUrl
             ? { source: trimmed, byteLength: bytes.byteLength, allowFilePicker }
             : { tooLarge: true, byteLength: bytes.byteLength, allowFilePicker };
       const text =
-        viewerMeta.dxfBase64 !== undefined
+        viewerMeta.bytesBase64 !== undefined
           ? "Opened the drawing in the interactive viewer."
           : viewerMeta.source !== undefined
             ? "Viewer opened; it is fetching the drawing itself and will report its status."
@@ -261,7 +269,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
       description:
         "Internal: returns DXF bytes (base64) for the in-chat viewer. Called by the widget, not the model.",
       inputSchema: {
-        source: z.string().describe("http(s) URL of the DXF (same guards as the other tools)"),
+        source: z.string().describe("http(s) URL of the drawing (same guards as the other tools)"),
         offset: z.number().int().min(0).optional().describe("Byte offset of the requested range"),
         length: z
           .number()
@@ -272,14 +280,14 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
           .describe("Byte length of the requested range"),
       },
       outputSchema: {
-        dxfBase64: z.string().describe("The requested bytes, base64"),
+        bytesBase64: z.string().describe("The requested bytes, base64"),
         byteLength: z.number().int().describe("Total size of the whole file"),
         offset: z.number().int().describe("Byte offset this slice starts at"),
       },
       _meta: { ui: { resourceUri: VIEWER_RESOURCE_URI, visibility: ["app"] } },
     },
     async ({ source, offset, length }) => {
-      const bytes = await loadDxf(source);
+      const bytes = await loadDrawing(source);
       const start = offset ?? 0;
       const slice =
         offset === undefined && length === undefined
@@ -288,7 +296,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
       return {
         content: [{ type: "text", text: `${slice.byteLength} bytes at offset ${start}` }],
         structuredContent: {
-          dxfBase64: toBase64(slice),
+          bytesBase64: toBase64(slice),
           byteLength: bytes.byteLength,
           offset: start,
         },

@@ -1,7 +1,7 @@
 import { describeDrawing, parseWith, tessellate, tessellationToSvg } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
 import { pdfParser } from "@aspicio/core/pdf";
-import { fetchDxf, HttpError, MAX_BYTES } from "./fetch.ts";
+import { fetchDrawing, HttpError, MAX_BYTES } from "./fetch.ts";
 import { handleMcp } from "./mcp.ts";
 import { openapiDocument } from "./openapi.ts";
 
@@ -77,7 +77,7 @@ async function resolveDxf(req: Request, url: URL): Promise<Uint8Array> {
   }
   const src = url.searchParams.get("src");
   if (!src) throw new HttpError(400, "provide `?src=<dxf-url>` or POST the DXF as the body");
-  return fetchDxf(src);
+  return fetchDrawing(src);
 }
 
 async function handleDescribe(

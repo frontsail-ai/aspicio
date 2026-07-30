@@ -53,7 +53,7 @@ function validateUrl(src: string, base?: URL): URL {
   return url;
 }
 
-async function fetchDxf(src: string): Promise<Uint8Array> {
+async function fetchDrawing(src: string): Promise<Uint8Array> {
   let url = validateUrl(src);
   // Follow redirects manually so every hop passes the private-host guard.
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -78,9 +78,9 @@ async function fetchDxf(src: string): Promise<Uint8Array> {
  * Resolve a `source` to DXF bytes. Accepts an http(s) URL (fetched with a
  * private-host guard), a local file path (read), or inline DXF text.
  */
-export async function loadDxf(source: string): Promise<Uint8Array> {
+export async function loadDrawing(source: string): Promise<Uint8Array> {
   const s = source.trim();
-  if (/^https?:\/\//i.test(s)) return fetchDxf(s);
+  if (/^https?:\/\//i.test(s)) return fetchDrawing(s);
   // A path is a single short line; check the filesystem before any content
   // heuristics so real paths win even when they contain words like SECTION.
   if (!source.includes("\n") && s.length < 4096) {

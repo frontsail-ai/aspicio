@@ -4,18 +4,25 @@ import { z } from "zod";
 // `initialize` reports the real published version, not the repo's 0.0.0
 // placeholder (registries display this field).
 import pkg from "../package.json";
-import { DRAWING_SUMMARY_SHAPE, READ_ONLY_HINTS, TOOLS, widthSchema } from "@aspicio/agent-tools";
+import {
+  DRAWING_SUMMARY_SHAPE,
+  READ_ONLY_HINTS,
+  sourceDescription,
+  TOOLS,
+  widthSchema,
+} from "@aspicio/agent-tools";
 import {
   describeDoc,
   describeDxf,
   describePdf,
-  loadDxf,
+  loadDrawing,
   renderDocPng,
   renderPdfPng,
   renderPng,
 } from "./tools.ts";
 
-const SOURCE_DESC = "An http(s) URL to a .dxf, a local file path, or inline DXF text.";
+// This surface reads the filesystem, so it declares the path form (AGT-7).
+const SOURCE_DESC = sourceDescription({ paths: true });
 
 // Mirrors DrawingSummary (@aspicio/core describe.ts). Declared as
 // describe_dxf's output schema so models consume results reliably; the
@@ -57,7 +64,7 @@ export function createServer(): McpServer {
           outputSchema: DRAWING_SUMMARY_SHAPE,
         },
         async ({ source }) => {
-          const summary = await describeFor[tool.format](await loadDxf(source));
+          const summary = await describeFor[tool.format](await loadDrawing(source));
           return {
             content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
             structuredContent: summary as unknown as Record<string, unknown>,
@@ -75,7 +82,7 @@ export function createServer(): McpServer {
           inputSchema: { source: z.string().describe(SOURCE_DESC), width: widthSchema },
         },
         async ({ source, width }) => {
-          const png = await renderFor[tool.format](await loadDxf(source), width);
+          const png = await renderFor[tool.format](await loadDrawing(source), width);
           return {
             content: [
               { type: "image", data: Buffer.from(png).toString("base64"), mimeType: "image/png" },
