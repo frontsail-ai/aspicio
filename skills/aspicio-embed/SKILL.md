@@ -1,9 +1,9 @@
 ---
 name: aspicio-embed
-description: "Use when building or modifying an app that displays DXF/CAD drawings in the browser — embedding a DXF viewer in React, Vue, Svelte, plain HTML, or vanilla JS, adding layer panels, deep links, exports, or keyboard shortcuts. Covers @aspicio/elements, @aspicio/react, and @aspicio/core install, props/attributes, common pitfalls (peer deps, workspace aliasing), and the headless helpers."
+description: "Use when building or modifying an app that displays DXF/CAD drawings or vector PDFs in the browser — embedding a drawing viewer in React, Vue, Svelte, plain HTML, or vanilla JS, adding layer panels, deep links, exports, or keyboard shortcuts. Covers @aspicio/elements, @aspicio/react, and @aspicio/core install, per-format entry points, props/attributes, common pitfalls (peer deps, workspace aliasing), and the headless helpers."
 ---
 
-# Embedding the Aspicio DXF viewer
+# Embedding the Aspicio drawing viewer (DXF and PDF)
 
 ## Install
 
@@ -25,10 +25,20 @@ telling you exactly this:
 
 ```ts
 import "@aspicio/react/formats/dxf"; // or /vue, /svelte, /elements
+import "@aspicio/react/formats/pdf"; // both, if the app opens both
 import { dxfParser } from "@aspicio/core/dxf"; // vanilla: pass it to the viewer
+import { pdfParser } from "@aspicio/core/pdf";
 ```
 
-That indirection is what keeps a DXF app from shipping other formats' parsers.
+That indirection is what keeps a DXF app from shipping the PDF parser, and
+vice versa (INV-11) — import only the formats you open.
+
+A PDF is read as vector line work and text: paths, strokes, fills, and glyphs,
+the content a PDF/X-4 artwork or dieline carries. Images, shadings, and
+transparency are counted as skipped rather than drawn, so a render shows line
+work rather than a page facsimile, and a scanned PDF shows almost nothing.
+Content arrives on a single "Content" layer, pages become spaces, and
+measurements are in points, because a PDF carries no drawing scale.
 
 ## React: one component
 
@@ -99,9 +109,13 @@ Same behavior as `<AspicioEmbed>`, attribute/property/event flavored: attributes
 ```ts
 import { DrawingViewer } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
-const viewer = new DrawingViewer(container, { background: 0x16181d, parsers: [dxfParser] });
-await viewer.load(file); // File | Blob | ArrayBuffer | DXF text
-await viewer.loadUrl("/drawing.dxf"); // for URLs — don't pass a URL to load()
+// Pass every format the app should open; a viewer reads only what it is given.
+const viewer = new DrawingViewer(container, {
+  background: 0x16181d,
+  parsers: [dxfParser, pdfParser],
+});
+await viewer.load(file); // File | Blob | ArrayBuffer | DXF text (PDF is binary)
+await viewer.loadUrl("/drawing.pdf"); // for URLs — don't pass a URL to load()
 ```
 
 ## Headless (no browser)
@@ -115,7 +129,10 @@ server-side without a canvas.
 
 - **Missing `three` peer** → install error or runtime "Cannot find module 'three'".
 - **No format imported** → every load fails with "No formats imported — add
-  `import "@aspicio/elements/formats/dxf"`". Import the format entry once.
+  `import "@aspicio/elements/formats/dxf"`". Import the format entry once, per
+  format: importing `formats/dxf` does not make the viewer read PDF.
+- **Passing a PDF as a string** → `load()` accepts DXF _text_, but a PDF is
+  binary. Pass a `File`, `Blob`, or `ArrayBuffer`, or use `loadUrl()`.
 - **Monorepo/workspace dev**: tsconfig `paths` fix types only; Vite needs `resolve.alias` entries mapping `@aspicio/core` → its source (list subpaths like `@aspicio/core/dxf` **first** — a string alias matches prefixes and the first match wins), or the app runs stale built `dist`.
 - **Deep links**: camera state round-trips via `viewer.view` / `viewer.setView(state)`; the library never touches `location` — wire your own router (the demo's `viewurl.ts` is the reference).
 - **SSR**: the viewer touches the DOM only after mount; `AspicioEmbed` is StrictMode- and SSR-safe as shipped — don't `new DrawingViewer()` during render.
