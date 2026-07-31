@@ -9,6 +9,21 @@ import type { Page } from "@playwright/test";
 
 const widget = (page: Page) => page.frameLocator("iframe");
 
+/*
+ * Never assert on `widget(page).locator("body")` text.
+ *
+ * `widget.html` inlines the entire bundle into <body>, so the body's text is
+ * minified source, not UI. A text assertion there matches any string that
+ * appears anywhere in the widget's code — including the very UI strings a test
+ * means to look for — so it passes whether or not the UI rendered. Three tests
+ * here did exactly that, and one of them kept passing with the PDF parser
+ * removed entirely.
+ *
+ * This is not looseness that a stricter regex would fix: the assertion cannot
+ * fail. The real UI lives in a shadow root, which CSS locators pierce, so
+ * target its elements instead.
+ */
+
 async function open(page: Page, configId?: string): Promise<void> {
   await page.goto("/");
   if (configId) await page.locator(`button[data-id="${configId}"]`).click();
@@ -22,7 +37,7 @@ test("the default config renders the drawing inside the widget iframe", async ({
   await open(page);
   await expect(widget(page).locator("canvas")).toBeVisible();
   // The status chip reports the layer count from the delivered drawing.
-  await expect(widget(page).locator("body")).toContainText(/layer/i);
+  await expect(widget(page).locator("#chip")).toHaveText(/\d+ LAYER/i);
 });
 
 test("the light theme config themes the widget document", async ({ page }) => {
@@ -40,13 +55,16 @@ test("the fullscreen light config shows light chrome around the dark canvas", as
     .toBe("light");
   // Fullscreen chrome is where the light theme is actually visible.
   await expect(widget(page).locator('button[aria-label="Exit fullscreen"]')).toBeVisible();
-  await expect(widget(page).locator("body")).toContainText(/layers/i);
+  await expect(widget(page).locator(".layers-head .h").first()).toHaveText(/^Layers · \d+/);
   await expect(widget(page).locator("canvas")).toBeVisible();
 });
 
 test("the too-large config shows the state card instead of a canvas", async ({ page }) => {
   await open(page, "too-large");
-  await expect(widget(page).locator("body")).toContainText("Too large to view inline");
+  await expect(widget(page).locator("#state .card .title")).toContainText(
+    "Too large to view inline",
+  );
+  await expect(widget(page).locator("#root")).toHaveAttribute("data-state", "toolarge");
   await expect(widget(page).locator("canvas")).not.toBeVisible();
 });
 
@@ -58,12 +76,6 @@ test("the pull config loads the drawing through chunked load_dxf_for_viewer", as
 // AGT-14: the in-chat viewer opens vector PDF too. The fake host delivers PDF
 // bytes through the same _meta path a real one would, so this proves the
 // widget's own parser wiring rather than the Worker's.
-//
-// Assertions target rendered elements inside the shadow root, which CSS
-// locators pierce. Note that `locator("body")` text assertions are useless
-// here: widget.html inlines the whole bundle into <body>, so body text matches
-// minified source rather than UI — a PDF case written that way passes with the
-// PDF parser removed.
 test("the PDF config renders the PDF's vector content in the widget", async ({ page }) => {
   await open(page, "inline-pdf");
   await expect(widget(page).locator("canvas")).toBeVisible();
