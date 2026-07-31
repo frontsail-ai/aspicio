@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.frontsail-ai/aspicio",
   "title": "Aspicio",
-  "description": "DXF drawings for AI agents: structured facts, PNG renders, and an interactive in-chat viewer.",
+  "description": "DXF and PDF/X-4 for AI agents: structured facts, PNG renders, an interactive in-chat viewer.",
   "websiteUrl": "https://aspicio.frontsail.app",
   "icons": [
     {

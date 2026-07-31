@@ -86,13 +86,22 @@ official listing, use the site's Submit form.
 
 ## What to say (shared blurb)
 
-> **Aspicio** — open, inspect, and render DXF/CAD drawings. `describe_dxf`
-> returns structured JSON (layers with the colors actually drawn, units,
-> bounds, entity counts, and the drawing's text content — title blocks
-> and dimension values included); `render_dxf` returns a PNG the model
-> can look at. Sources: URL, local file path (stdio server), or inline
-> DXF. ASCII and binary DXF. Remote endpoint available for web clients
-> with connector support.
+> **Aspicio** — open, inspect, and render DXF/CAD drawings and vector
+> PDFs. Three describe/render pairs: `describe_dxf`/`render_dxf` for DXF,
+> `describe_pdf`/`render_pdf` for PDF, and `describe_doc`/`render_doc`
+> when the format isn't known (detected from the bytes). A `describe`
+> returns structured JSON (the format read, layers with the colors
+> actually drawn, units, bounds, entity counts, and the drawing's text
+> content — title blocks and dimension values included); a `render`
+> returns a PNG the model can look at. Built for PDF/X-4 artwork and
+> dielines: a PDF is read as vector line work and text rather than a page
+> facsimile, so images, shadings, and transparency are reported as
+> skipped, and measurements are in points because a PDF carries no
+> drawing scale. Sources: URL, local file path (stdio server), or inline
+> DXF text — a PDF is binary, so it needs a URL or a path. ASCII and
+> binary DXF alike. Remote endpoint available for web clients with
+> connector support, including an interactive in-chat viewer that opens
+> either format.
 
 ## Keeping listings honest
 
