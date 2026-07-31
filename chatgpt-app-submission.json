@@ -3,8 +3,8 @@
   "schema_version": 1,
   "app_info": {
     "display_name": "Aspicio",
-    "subtitle": "View and inspect DXF drawings",
-    "description": "Aspicio turns DXF CAD drawings into things ChatGPT can work with: structured facts (units, bounds, layers with the colors actually drawn, entity counts, and the drawing's text content), rendered PNG images, and an interactive in-chat viewer with pan, zoom, layer toggles, and fullscreen. Point it at a drawing URL or paste DXF text to read title blocks and dimension values, check layer structure, and visually inspect floor plans, die-cut layouts, and mechanical parts without leaving the conversation.",
+    "subtitle": "View and inspect DXF and PDF drawings",
+    "description": "Aspicio turns DXF CAD drawings and vector PDFs into things ChatGPT can work with: structured facts (the format read, units, bounds, layers with the colors actually drawn, entity counts, and the drawing’s text content), rendered PNG images, and an interactive in-chat viewer with pan, zoom, layer toggles, and fullscreen. Point it at a drawing URL — or paste DXF text — to read title blocks and dimension values, check layer structure, and visually inspect floor plans, die-cut layouts, PDF/X-4 artwork and dielines, and mechanical parts without leaving the conversation. A PDF is read as vector line work and text rather than a page facsimile, so images, shadings, and transparency are reported as skipped rather than drawn.",
     "category": "DESIGN"
   },
   "tools": {
@@ -32,6 +32,54 @@
         "destructive_justification": "Rendering is a pure read-and-transform; nothing is deleted, overwritten, or sent anywhere irreversible."
       }
     },
+    "describe_pdf": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Parses the PDF’s vector content and returns computed facts (units in points, bounds, layers, entity counts, text content, and what was skipped); it stores nothing and modifies nothing.",
+        "open_world_justification": "Fetches the user-supplied http(s) PDF URL with guarded GET requests (private networks blocked, size-capped, rate-limited); it never writes to external systems.",
+        "destructive_justification": "Performs no deletion, overwrite, or other irreversible action; every response is derived per-request from the input drawing."
+      }
+    },
+    "render_pdf": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Rasterizes the PDF’s vector line work and text to a PNG in memory and returns it; no state is created or changed.",
+        "open_world_justification": "Fetches the user-supplied http(s) PDF URL with guarded GET requests (private networks blocked, size-capped, rate-limited); it never writes to external systems.",
+        "destructive_justification": "Rendering is a pure read-and-transform; nothing is deleted, overwritten, or sent anywhere irreversible."
+      }
+    },
+    "describe_doc": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Detects the format from the bytes, then returns the same computed facts as the typed tools; it stores nothing and modifies nothing.",
+        "open_world_justification": "Fetches the user-supplied http(s) drawing URL with guarded GET requests (private networks blocked, size-capped, rate-limited); it never writes to external systems.",
+        "destructive_justification": "Performs no deletion, overwrite, or other irreversible action; every response is derived per-request from the input drawing."
+      }
+    },
+    "render_doc": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Detects the format from the bytes and rasterizes the drawing to a PNG in memory; no state is created or changed.",
+        "open_world_justification": "Fetches the user-supplied http(s) drawing URL with guarded GET requests (private networks blocked, size-capped, rate-limited); it never writes to external systems.",
+        "destructive_justification": "Rendering is a pure read-and-transform; nothing is deleted, overwritten, or sent anywhere irreversible."
+      }
+    },
     "view_dxf": {
       "annotations": {
         "readOnlyHint": true,
@@ -40,7 +88,7 @@
       },
       "justifications": {
         "read_only_justification": "Returns a structured summary plus widget-only drawing data for the in-chat viewer; it reads the drawing and changes nothing.",
-        "open_world_justification": "May fetch the user-supplied http(s) DXF URL with guarded GET requests; the viewer widget itself makes no network requests and writes nothing external.",
+        "open_world_justification": "May fetch the user-supplied http(s) drawing URL (DXF or PDF) with guarded GET requests; the viewer widget itself makes no network requests.",
         "destructive_justification": "Opening the viewer has no side effects; the widget is locked to the delivered drawing and cannot alter or delete anything."
       }
     },
@@ -52,7 +100,7 @@
       },
       "justifications": {
         "read_only_justification": "App-only data channel: returns the drawing's bytes (whole or a byte range) to the viewer widget; it reads and returns data only.",
-        "open_world_justification": "Fetches the same user-supplied http(s) DXF URL under the same guards as the other tools; it never writes externally.",
+        "open_world_justification": "Fetches the same user-supplied http(s) drawing URL (DXF or PDF) under the same guards as the other tools; it never writes externally.",
         "destructive_justification": "Serving bytes to the widget deletes and changes nothing."
       }
     }
@@ -97,15 +145,23 @@
       "tools_triggered": "describe_dxf",
       "expected_output": "Parses the pasted DXF text and reports its entities (one LINE on layer WALLS) with units and bounds.",
       "expected_output_url": null
+    },
+    {
+      "description": "A vector PDF is inspected as a drawing, with its own units and honest skipped counts.",
+      "user_prompt": "What is in this PDF drawing, and what units is it in? https://aspicio.frontsail.app/sample.pdf",
+      "file_attachment_urls": null,
+      "tools_triggered": "describe_pdf",
+      "expected_output": "Reports the format as pdf and units as points (a PDF carries no drawing scale), lists the single \"Content\" layer with its entity counts, and names anything skipped (images, shadings, transparency) rather than implying it was drawn.",
+      "expected_output_url": null
     }
   ],
   "negative_test_cases": [
     {
-      "description": "Other CAD formats are out of scope; the app handles DXF only.",
+      "description": "Other CAD formats are out of scope; the app reads DXF and PDF, and converts nothing.",
       "user_prompt": "Convert this STEP file to STL for 3D printing.",
       "file_attachment_urls": null,
       "tools_triggered": null,
-      "expected_output": "The app should not be invoked; it reads DXF drawings and does not convert other CAD formats.",
+      "expected_output": "The app should not be invoked; it reads DXF and PDF drawings for inspection and rendering, and does not convert between CAD formats.",
       "expected_output_url": null
     },
     {

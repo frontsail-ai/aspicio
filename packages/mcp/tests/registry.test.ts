@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
+import { TOOLS } from "@aspicio/agent-tools";
 
 // Registry metadata is machine-consumed: a field-name drift means the
 // submission is rejected, with green CI. Pin the shape the MCP registry
@@ -80,4 +81,47 @@ test("glama.json names at least one maintainer", () => {
   const glama = JSON.parse(read("glama.json")) as { maintainers: string[] };
   expect(glama.maintainers.length).toBeGreaterThan(0);
   for (const m of glama.maintainers) expect(m).toMatch(/^[\w-]+$/);
+});
+
+// `chatgpt-app-submission.json` is the import file the OpenAI app form's Info
+// step accepts. Nothing guarded its content, and it drifted exactly as you
+// would expect: it listed three of the eight tools for two releases, kept
+// describing `view_dxf` as DXF-only after #142 gave it PDF, and carried a
+// negative test case asserting "the app handles DXF only" — a behavioural
+// claim a reviewer tests against the running app, and one PDF support had
+// already falsified.
+//
+// The form blocks on a missing behaviour hint, so a tool added here without
+// hints fails at submission time rather than in CI. This closes that gap.
+test("the ChatGPT submission covers every tool the servers advertise", () => {
+  const submission = JSON.parse(read("chatgpt-app-submission.json")) as {
+    tools: Record<string, { annotations?: Record<string, boolean> }>;
+    app_info: { subtitle: string; description: string };
+    test_cases: { tools_triggered: string | null }[];
+  };
+  const listed = Object.keys(submission.tools);
+
+  // Every format tool from the shared table (AGT-16), plus the two the hosted
+  // surface adds for the in-chat viewer (AGT-14).
+  for (const tool of TOOLS) expect(listed, `${tool.name} missing`).toContain(tool.name);
+  for (const name of ["view_dxf", "load_dxf_for_viewer"])
+    expect(listed, `${name} missing`).toContain(name);
+
+  // All three hints, explicitly — the submission form rejects a gap (AGT-6).
+  for (const [name, tool] of Object.entries(submission.tools)) {
+    for (const hint of ["readOnlyHint", "openWorldHint", "destructiveHint"])
+      expect(tool.annotations?.[hint], `${name}.${hint}`).toBeTypeOf("boolean");
+  }
+
+  // The app copy must not describe a DXF-only product (INV-10).
+  for (const [field, text] of Object.entries(submission.app_info))
+    if (/\bDXF\b/.test(text)) expect(text, `app_info.${field}`).toMatch(/\bPDF\b/);
+
+  // And at least one positive case must exercise PDF, so a reviewer has
+  // something testing the format the submission claims.
+  const triggered = submission.test_cases.map((c) => c.tools_triggered ?? "");
+  expect(
+    triggered.some((t) => t.includes("pdf")),
+    "no PDF test case",
+  ).toBe(true);
 });
