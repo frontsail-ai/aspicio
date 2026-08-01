@@ -93,10 +93,9 @@ spaces of PDF-5, not one per page.
 Content belonging to no group stays on a layer named "Content", which remains
 for that purpose rather than disappearing — real files range from fully layered
 to fully unlayered. Layer panel and visibility semantics behave as they do for
-DXF, including the classification of INV-2's empty layers: a group declared in
-the file but referenced by no content becomes a layer with no entities, which
-the shared `isEmptyLayer` rule collapses in every panel. That is correct
-reporting of what the file declares, not a stray row.
+DXF: a group declared in the file but referenced by no content becomes a layer
+with no entities, which the shared `isEmptyLayer` rule collapses in every
+panel. That is correct reporting of what the file declares, not a stray row.
 
 Layer order follows the default configuration's `/Order`, then any remaining
 groups in the order `/OCGs` declares them. `/Order` is routinely partial — a
