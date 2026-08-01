@@ -82,17 +82,52 @@ A PDF document reports "pt" as its unit, and every measurement derives from
 PDF user space unchanged — no axis flip, no invented scale. A drawing whose
 real-world scale lives only in its artwork is not second-guessed.
 
-### PDF-7: Unlayered content lands on one layer
+### PDF-7: Optional-content groups become layers
 
-PDF content carries no layer identity in this phase, so everything loads onto a
-single layer named "Content". Layer panel, visibility, and color semantics
-behave as they do for DXF.
+Content marked with an optional-content group loads onto a layer named for that
+group — through marked content (`/OC … BDC … EMC`) or through an `/OC` entry on
+a form or image XObject; both occur in real files. Layer identity is
+document-wide: a group referenced from several pages is one layer across the
+spaces of PDF-5, not one per page.
+
+Content belonging to no group stays on a layer named "Content", which remains
+for that purpose rather than disappearing — real files range from fully layered
+to fully unlayered. Layer panel and visibility semantics behave as they do for
+DXF: a group declared in the file but referenced by no content becomes a layer
+with no entities, which the shared `isEmptyLayer` rule collapses in every
+panel. That is correct reporting of what the file declares, not a stray row.
+
+Layer order follows the default configuration's `/Order`, then any remaining
+groups in the order `/OCGs` declares them. `/Order` is routinely partial — a
+real file carries 35 groups and orders 3 — so it selects sequence, never
+membership: no group is dropped for being unordered.
+
+Default visibility is read from whichever list the base state makes meaningful:
+with the default base state of on, the `/OFF` list hides; with a base state of
+off, everything is hidden except the `/ON` list. Reading only `/OFF` would
+render a mostly-hidden document fully visible, silently. Where a group declares
+usage auto-states that would differ between screen and print, the screen state
+wins — Aspicio is a viewer — and the divergence is counted (PDF-8).
+
+A membership dictionary naming exactly one group resolves to that group. One
+naming several is a set rather than a layer: the first is used and the
+simplification counted (PDF-8). One carrying a visibility expression is not
+evaluated; its content stays on "Content" and the expression is counted.
+
+A PDF has no layer table, so a layer's `color` carries a neutral placeholder
+rather than a claim. The colors actually drawn populate `effectiveColors` from
+tessellation, which is the field INV-2 tells every surface to prefer; a layer
+that drew nothing has none.
 
 ### PDF-8: What this viewer does not draw is counted, never fatal
 
 Images, shadings, soft masks, non-normal blend modes, patterned fills,
 clipping paths, and glyph drawing procedures are skipped and reported per kind
-(INV-3), so a describe answers honestly about what was left out.
+(INV-3), so a describe answers honestly about what was left out. Three
+optional-content cases are counted the same way (PDF-7): a membership
+dictionary simplified to its first group, a visibility expression left
+unevaluated, and a group whose print visibility differs from the screen state
+that was used.
 
 Glyph drawing procedures are counted where embedded typefaces are not, because
 they are vector artwork this pipeline could otherwise interpret — the count
