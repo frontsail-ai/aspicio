@@ -81,6 +81,28 @@ every published frontend package.
 Format-neutral types read `Drawing*` (`DrawingDocument`, `DrawingParser`,
 `DrawingParseError`); product-level components and themes read `Aspicio*`;
 only DXF-specific API keeps `Dxf` (`parseDxf`, `binaryDxfToText`, the
-`/dxf` entry points). Names that are external contracts — npm package
-names, custom element tags, MCP tool names, HTTP paths — are exempt: they
-are stable regardless of what they describe.
+`/dxf` entry points).
+
+Exemptions exist for one reason: renaming would break something already
+installed that shipping new code cannot fix. Three layers follow from it.
+
+**The settled list**, where no judgement is needed: npm package names,
+custom element tags, MCP tool names, and HTTP paths. `view_dxf` and
+`load_dxf_for_viewer` serve both formats and keep their names on this
+basis (AGT-14). Custom element tags show why the list has to exist at
+all — they live in consumers' HTML, so nothing we ship records them and
+no search of ours can find them.
+
+**The test for anything else**, falsifiable rather than argued: a name is
+exempt only if it appears in one of the registry manifests we publish —
+`server.json`, `smithery.yaml`, `chatgpt-app-submission.json`. Not "a
+file we publish": npm ships `README.md` in every tarball and the READMEs
+document everything, so that phrasing exempts every name in the project.
+A name in none of the manifests follows the rule however outward-facing
+it looks.
+
+OpenAPI `operationId`s are the worked example. A platform turns each into
+a callable function, which reads as external by any plain reading — but
+they appear in no manifest and reach importers only through a document
+re-fetched on every import, so they were renamed (`describeDxfPdf` →
+`describePdf`) while `view_dxf` was not.
