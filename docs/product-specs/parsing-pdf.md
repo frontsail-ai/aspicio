@@ -109,6 +109,14 @@ render a mostly-hidden document fully visible, silently. Where a group declares
 usage auto-states that would differ between screen and print, the screen state
 wins — Aspicio is a viewer — and the divergence is counted (PDF-8).
 
+Two groups may declare the same name, and real files do. A document's layers
+are keyed by name, so the second and later groups sharing one are suffixed —
+"One (2)" — rather than merged: every group the file declares keeps its own row
+and its own toggle. Merging would hide content the reader never asked to hide,
+which is the failure INV-2 guards against on the colour side. Nothing is
+counted, because nothing is omitted; only a display name differs from the
+file's.
+
 A membership dictionary naming exactly one group resolves to that group. One
 naming several is a set rather than a layer: the first is used and the
 simplification counted (PDF-8). One carrying a visibility expression is not

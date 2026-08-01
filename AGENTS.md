@@ -116,6 +116,13 @@ docs/             architecture, guidelines, product specs, releasing
   parser from the widget takes `dist/widget.html` from 1,020,287 to
   990,341 bytes). Same family as `vp run e2e` cache-missing silently, but
   worse: this one looks like a passing verification.
+- **`vp check` is not the gate; `vp run ready` is.** The example apps
+  compile `packages/core` **from source** under stricter settings than
+  core's own tsconfig, so `noUnusedParameters` and `erasableSyntaxOnly`
+  violations pass `vp check` and fail the build. Two incidents: Phase 0's
+  constructor parameter properties, and an unused parameter in the
+  optional-content model. If you touched core, run the gate before
+  believing a green check.
 - **Centralizing a contract: enumerate what it contains, not just its
   top-level fields.** Three bugs in one week shared this shape — shared
   machinery covered the obvious strings while something one level down

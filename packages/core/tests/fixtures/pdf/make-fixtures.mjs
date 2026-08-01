@@ -694,3 +694,177 @@ writeFileSync("no-pages.pdf", classic([catalog, [2, "<< /Type /Pages /Kids [] /C
 }
 
 console.log("wrote gate-path fixtures");
+
+// ---------------------------------------------------------------------------
+// Optional content (PDF-7). Each isolates one decision from the corpus probe.
+{
+  const draw = "0 0 1 RG 10 10 m 90 90 l S\n";
+  /** A page whose content marks `spans` as /OC via /Properties. */
+  const ocPage = (spans, props, extra = "") => {
+    const body = spans.map(([tag, ops]) => (tag ? `/OC /${tag} BDC\n${ops}EMC\n` : ops)).join("");
+    return { body, props, extra };
+  };
+  const build = (objects, ocProps) =>
+    classic([[1, `<< /Type /Catalog /Pages 2 0 R /OCProperties ${ocProps} >>`], ...objects]);
+
+  const page = (contentNum, propsEntries, extra = "") => [
+    2,
+    `<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 100 100] >>`,
+  ];
+  const pageObj = (propsEntries, extra = "") => [
+    3,
+    `<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /Properties << ${propsEntries} >> ${extra} >> >>`,
+  ];
+  const stream = (num, text) => [
+    num,
+    Buffer.concat([enc(`<< /Length ${text.length} >>\nstream\n`), enc(text), enc("\nendstream")]),
+  ];
+  const ocg = (num, name) => [num, `<< /Type /OCG /Name (${name}) >>`];
+
+  // 1. Two groups, one hidden by /OFF — the ordinary case.
+  writeFileSync(
+    "ocg-basic.pdf",
+    build(
+      [
+        page(),
+        pageObj("/L1 5 0 R /L2 6 0 R"),
+        stream(4, `/OC /L1 BDC\n${draw}EMC\n/OC /L2 BDC\n${draw}EMC\n`),
+        ocg(5, "Visible Layer"),
+        ocg(6, "Hidden Layer"),
+      ],
+      "<< /OCGs [5 0 R 6 0 R] /D << /Order [5 0 R 6 0 R] /OFF [6 0 R] >> >>",
+    ),
+  );
+
+  // 2. /BaseState /OFF: everything hidden except the /ON list. Reading only
+  //    /OFF renders this document fully visible — silently. No corpus file
+  //    has one, which is exactly why this fixture exists.
+  writeFileSync(
+    "ocg-basestate-off.pdf",
+    build(
+      [
+        page(),
+        pageObj("/L1 5 0 R /L2 6 0 R"),
+        stream(4, `/OC /L1 BDC\n${draw}EMC\n/OC /L2 BDC\n${draw}EMC\n`),
+        ocg(5, "Shown By ON"),
+        ocg(6, "Hidden By Base"),
+      ],
+      "<< /OCGs [5 0 R 6 0 R] /D << /BaseState /OFF /ON [5 0 R] >> >>",
+    ),
+  );
+
+  // 3. /Order names one of three groups. The other two must still appear.
+  writeFileSync(
+    "ocg-partial-order.pdf",
+    build(
+      [
+        page(),
+        pageObj("/L1 5 0 R /L2 6 0 R /L3 7 0 R"),
+        stream(4, `/OC /L1 BDC\n${draw}EMC\n/OC /L2 BDC\n${draw}EMC\n/OC /L3 BDC\n${draw}EMC\n`),
+        ocg(5, "First"),
+        ocg(6, "Second"),
+        ocg(7, "Ordered"),
+      ],
+      "<< /OCGs [5 0 R 6 0 R 7 0 R] /D << /Order [7 0 R] >> >>",
+    ),
+  );
+
+  // 4. A membership dictionary over two groups — the fallback the corpus
+  //    never triggers: first group wins, simplification counted.
+  writeFileSync(
+    "ocg-ocmd-multi.pdf",
+    build(
+      [
+        page(),
+        pageObj("/M1 8 0 R"),
+        stream(4, `/OC /M1 BDC\n${draw}EMC\n`),
+        ocg(5, "Alpha"),
+        ocg(6, "Beta"),
+        [8, "<< /Type /OCMD /OCGs [5 0 R 6 0 R] >>"],
+      ],
+      "<< /OCGs [5 0 R 6 0 R] /D << >> >>",
+    ),
+  );
+
+  // 5. A visibility expression: not evaluated, content stays on Content.
+  writeFileSync(
+    "ocg-visibility-expression.pdf",
+    build(
+      [
+        page(),
+        pageObj("/M1 8 0 R"),
+        stream(4, `/OC /M1 BDC\n${draw}EMC\n`),
+        ocg(5, "A"),
+        ocg(6, "B"),
+        [8, "<< /Type /OCMD /VE [/Not [/And 5 0 R 6 0 R]] >>"],
+      ],
+      "<< /OCGs [5 0 R 6 0 R] /D << >> >>",
+    ),
+  );
+
+  // 6. A group declared but referenced by nothing — a real layer with no
+  //    entities, which isEmptyLayer collapses in every panel (PDF-7).
+  writeFileSync(
+    "ocg-unused-group.pdf",
+    build(
+      [
+        page(),
+        pageObj("/L1 5 0 R"),
+        stream(4, `/OC /L1 BDC\n${draw}EMC\n`),
+        ocg(5, "Drawn"),
+        ocg(6, "Declared Only"),
+      ],
+      "<< /OCGs [5 0 R 6 0 R] /D << /Order [5 0 R 6 0 R] >> >>",
+    ),
+  );
+
+  // 7. Print usage contradicts the screen state actually used (PDF-8).
+  writeFileSync(
+    "ocg-print-differs.pdf",
+    build(
+      [
+        page(),
+        pageObj("/L1 5 0 R"),
+        stream(4, `/OC /L1 BDC\n${draw}EMC\n`),
+        [5, "<< /Type /OCG /Name (Watermark) /Usage << /Print << /PrintState /OFF >> >> >>"],
+      ],
+      "<< /OCGs [5 0 R] /D << /Order [5 0 R] /AS [<< /Event /Print /OCGs [5 0 R] >>] >> >>",
+    ),
+  );
+
+  // 8. A membership whose /OCGs names nothing we know — an empty array, or a
+  //    group absent from /OCProperties. There is no layer to place content on,
+  //    so it is counted rather than silently dropped.
+  writeFileSync(
+    "ocg-ocmd-empty.pdf",
+    build(
+      [
+        page(),
+        pageObj("/M1 8 0 R"),
+        stream(4, `/OC /M1 BDC\n${draw}EMC\n`),
+        ocg(5, "Declared"),
+        [8, "<< /Type /OCMD /OCGs [] >>"],
+      ],
+      "<< /OCGs [5 0 R] /D << /Order [5 0 R] >> >>",
+    ),
+  );
+
+  // 9. Two distinct groups declaring the same name — a real corpus file does
+  //    this. Layers are keyed by name downstream, so without disambiguation
+  //    they merge into one row with one toggle over both.
+  writeFileSync(
+    "ocg-duplicate-names.pdf",
+    build(
+      [
+        page(),
+        pageObj("/L1 5 0 R /L2 6 0 R"),
+        stream(4, `/OC /L1 BDC\n${draw}EMC\n/OC /L2 BDC\n${draw}EMC\n`),
+        ocg(5, "One"),
+        ocg(6, "One"),
+      ],
+      "<< /OCGs [5 0 R 6 0 R] /D << /Order [5 0 R 6 0 R] >> >>",
+    ),
+  );
+
+  console.log("wrote optional-content fixtures");
+}
