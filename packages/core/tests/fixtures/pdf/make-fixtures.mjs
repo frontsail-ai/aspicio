@@ -849,5 +849,22 @@ console.log("wrote gate-path fixtures");
     ),
   );
 
+  // 9. Two distinct groups declaring the same name — a real corpus file does
+  //    this. Layers are keyed by name downstream, so without disambiguation
+  //    they merge into one row with one toggle over both.
+  writeFileSync(
+    "ocg-duplicate-names.pdf",
+    build(
+      [
+        page(),
+        pageObj("/L1 5 0 R /L2 6 0 R"),
+        stream(4, `/OC /L1 BDC\n${draw}EMC\n/OC /L2 BDC\n${draw}EMC\n`),
+        ocg(5, "One"),
+        ocg(6, "One"),
+      ],
+      "<< /OCGs [5 0 R 6 0 R] /D << /Order [5 0 R 6 0 R] >> >>",
+    ),
+  );
+
   console.log("wrote optional-content fixtures");
 }

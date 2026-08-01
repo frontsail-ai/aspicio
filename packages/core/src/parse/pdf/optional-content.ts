@@ -179,10 +179,21 @@ export async function readOptionalContent(
   const ordered = await orderedKeys(doc, await doc.array(config.get("Order")));
   const seen = new Set<string>();
   const layers: OcgLayer[] = [];
+  // Two groups may declare the same name — a real file does. A document's
+  // layers are keyed by name, so a collision would merge them: one panel row
+  // where the file has two, and a toggle hiding content the user did not ask
+  // to hide. The later group is suffixed instead, so every declared group
+  // keeps its own row and its own toggle (PDF-7).
+  const usedNames = new Map<string, number>();
+  const uniqueName = (name: string): string => {
+    const seenCount = usedNames.get(name) ?? 0;
+    usedNames.set(name, seenCount + 1);
+    return seenCount === 0 ? name : `${name} (${seenCount + 1})`;
+  };
   const push = (key: string): void => {
     if (seen.has(key) || !names.has(key)) return;
     seen.add(key);
-    layers.push({ key, name: names.get(key) ?? key, visible: visibleOf(key) });
+    layers.push({ key, name: uniqueName(names.get(key) ?? key), visible: visibleOf(key) });
   };
   for (const key of ordered) push(key);
   for (const ref of groupRefs) {

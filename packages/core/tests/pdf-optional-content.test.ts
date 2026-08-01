@@ -107,6 +107,16 @@ test("a visibility expression is not evaluated; its content stays unlayered", as
   expect(resolved?.counted).toBe(OC_VISIBILITY_EXPRESSION);
 });
 
+test("two groups sharing a name stay two layers (PDF-7)", async () => {
+  const { doc, catalog } = await load("ocg-duplicate-names.pdf");
+  const oc = await readOptionalContent(doc, catalog);
+  // A document's layers are keyed by name, so without a suffix these two
+  // distinct groups merge: one row where the file declares two, and one
+  // toggle hiding both. A real corpus file (issue269_1) does exactly this.
+  expect(oc.layers.map((l) => l.name)).toEqual(["One", "One (2)"]);
+  expect(new Set(oc.layers.map((l) => l.key)).size).toBe(2);
+});
+
 test("a group declared but never referenced is still a layer (PDF-7)", async () => {
   const { doc, catalog } = await load("ocg-unused-group.pdf");
   const oc = await readOptionalContent(doc, catalog);
