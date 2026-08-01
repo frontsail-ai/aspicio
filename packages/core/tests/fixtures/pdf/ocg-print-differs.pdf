@@ -1,0 +1,35 @@
+%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [5 0 R] /D << /Order [5 0 R] /AS [<< /Event /Print /OCGs [5 0 R] >>] >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 100 100] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /Properties << /L1 5 0 R >>  >> >>
+endobj
+4 0 obj
+<< /Length 43 >>
+stream
+/OC /L1 BDC
+0 0 1 RG 10 10 m 90 90 l S
+EMC
+
+endstream
+endobj
+5 0 obj
+<< /Type /OCG /Name (Watermark) /Usage << /Print << /PrintState /OFF >> >> >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000156 00000 n 
+0000000237 00000 n 
+0000000346 00000 n 
+0000000439 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R  >>
+startxref
+532
+%%EOF
