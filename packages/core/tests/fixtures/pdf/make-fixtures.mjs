@@ -699,18 +699,10 @@ console.log("wrote gate-path fixtures");
 // Optional content (PDF-7). Each isolates one decision from the corpus probe.
 {
   const draw = "0 0 1 RG 10 10 m 90 90 l S\n";
-  /** A page whose content marks `spans` as /OC via /Properties. */
-  const ocPage = (spans, props, extra = "") => {
-    const body = spans.map(([tag, ops]) => (tag ? `/OC /${tag} BDC\n${ops}EMC\n` : ops)).join("");
-    return { body, props, extra };
-  };
   const build = (objects, ocProps) =>
     classic([[1, `<< /Type /Catalog /Pages 2 0 R /OCProperties ${ocProps} >>`], ...objects]);
 
-  const page = (contentNum, propsEntries, extra = "") => [
-    2,
-    `<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 100 100] >>`,
-  ];
+  const page = () => [2, `<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 100 100] >>`];
   const pageObj = (propsEntries, extra = "") => [
     3,
     `<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /Properties << ${propsEntries} >> ${extra} >> >>`,
@@ -863,6 +855,82 @@ console.log("wrote gate-path fixtures");
         ocg(6, "One"),
       ],
       "<< /OCGs [5 0 R 6 0 R] /D << /Order [5 0 R 6 0 R] >> >>",
+    ),
+  );
+
+  // 10. Marked content that is NOT /OC — artifacts, spans, tagged structure.
+  //     Every BDC opens a mark that EMC closes, so pushing only for /OC while
+  //     popping for every EMC desynchronizes the stack and leaks content onto
+  //     the wrong layer. Most real marked content carries no /OC at all.
+  writeFileSync(
+    "ocg-non-oc-marks.pdf",
+    build(
+      [
+        page(),
+        pageObj("/L1 5 0 R"),
+        stream(
+          4,
+          // Both a BMC and a non-/OC BDC nested inside the /OC region: if
+          // either fails to push, its EMC closes the /OC mark early and the
+          // stroke after it falls to "Content".
+          `/OC /L1 BDC\n` +
+            `/Artifact BMC\n${draw}EMC\n` +
+            `/Span << /ActualText (x) >> BDC\n${draw}EMC\n` +
+            `${draw}` +
+            `EMC\n` +
+            `${draw}`,
+        ),
+        ocg(5, "Marked"),
+      ],
+      "<< /OCGs [5 0 R] /D << /Order [5 0 R] >> >>",
+    ),
+  );
+
+  // 11. Unbalanced: an EMC with no BDC, and a BDC never closed. Malformed
+  //     input must draw less, never fail (INV-3).
+  writeFileSync(
+    "ocg-unbalanced-marks.pdf",
+    build(
+      [
+        page(),
+        pageObj("/L1 5 0 R"),
+        stream(4, `EMC\n${draw}/OC /L1 BDC\n${draw}`),
+        ocg(5, "Never Closed"),
+      ],
+      "<< /OCGs [5 0 R] /D << /Order [5 0 R] >> >>",
+    ),
+  );
+
+  // A form whose content opens a mark and never closes it.
+  const formBody = `${draw}/Artifact BMC\n${draw}`;
+
+  // 12. A form XObject carrying /OC — the corpus uses this as often as marked
+  //     content, and three files use only this form.
+  writeFileSync(
+    "ocg-xobject-oc.pdf",
+    build(
+      [
+        page(),
+        [
+          3,
+          "<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /XObject << /F1 7 0 R >> >> >>",
+        ],
+        // The parent draws after the form returns: if the form's unclosed
+        // mark leaks, this stroke lands on the form's layer.
+        stream(4, `/F1 Do\n${draw}`),
+        ocg(5, "Form Layer"),
+        [
+          7,
+          Buffer.concat([
+            enc(
+              `<< /Type /XObject /Subtype /Form /BBox [0 0 100 100] /OC 5 0 R /Length ${formBody.length} >>\nstream\n`,
+            ),
+            enc(formBody),
+            enc("\nendstream"),
+          ]),
+        ],
+      ],
+      "<< /OCGs [5 0 R] /D << /Order [5 0 R] >> >>",
     ),
   );
 

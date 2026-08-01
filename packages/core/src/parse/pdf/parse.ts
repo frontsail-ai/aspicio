@@ -10,6 +10,7 @@ import type { DrawingDocument, Entity, LayerInfo, LineTypeDef, Layout } from "..
 import { PDF_FORMAT, PdfDocument, pdfError } from "./document.ts";
 import { checkStrictGate } from "./gate.ts";
 import { CONTENT_LAYER, IDENTITY, interpretContent, multiply } from "./interpret.ts";
+import { readOptionalContent } from "./optional-content.ts";
 import type { InterpretOptions, Matrix } from "./interpret.ts";
 import { toNumber } from "./objects.ts";
 import type { PdfDict } from "./objects.ts";
@@ -44,6 +45,10 @@ export async function parsePdfBytes(
   const lineTypes = new Map<string, LineTypeDef>();
   const unsupported: Record<string, number> = {};
 
+  // Read once for the document: a group referenced from several pages is one
+  // layer, not one per page (PDF-7).
+  const optionalContent = await readOptionalContent(doc, await doc.catalog(), unsupported);
+
   for (const [index, page] of pages.entries()) {
     const content = await doc.pageContent(page);
     // Decoding reports rather than throws, so a page whose content would not
@@ -62,7 +67,7 @@ export async function parsePdfBytes(
         doc,
         content,
         resources,
-        options,
+        { ...options, optionalContent },
         await pageMatrix(doc, page),
       );
     } catch {
@@ -93,18 +98,30 @@ export async function parsePdfBytes(
   // describe imply the drawing is complete (PDF-8).
   if (doc.truncatedStreams > 0) unsupported["TruncatedStream"] = doc.truncatedStreams;
 
-  const layers = new Map<string, LayerInfo>([
-    [
-      CONTENT_LAYER,
-      {
-        name: CONTENT_LAYER,
-        color: CONTENT_LAYER_COLOR,
-        visible: true,
-        frozen: false,
-        entityCount: entities.length,
-      },
-    ],
-  ]);
+  // Entity counts per layer; every group gets a row even when nothing drew on
+  // it, so the panel reports what the file declares (PDF-7).
+  const counts = new Map<string, number>();
+  for (const entity of entities) counts.set(entity.layer, (counts.get(entity.layer) ?? 0) + 1);
+  for (const layout of layouts)
+    for (const entity of layout.entities)
+      counts.set(entity.layer, (counts.get(entity.layer) ?? 0) + 1);
+
+  const layers = new Map<string, LayerInfo>();
+  const addLayer = (name: string, visible: boolean): void => {
+    layers.set(name, {
+      name,
+      // A PDF has no layer table, so this is a placeholder; the colours drawn
+      // populate effectiveColors after tessellation (INV-2).
+      color: CONTENT_LAYER_COLOR,
+      visible,
+      frozen: false,
+      entityCount: counts.get(name) ?? 0,
+    });
+  };
+  for (const layer of optionalContent.layers) addLayer(layer.name, layer.visible);
+  // "Content" survives as the home for unmarked content, which real files have
+  // in quantity — three corpus files are entirely unmarked.
+  if (!layers.has(CONTENT_LAYER)) addLayer(CONTENT_LAYER, true);
 
   return {
     layers,
