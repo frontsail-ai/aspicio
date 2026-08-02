@@ -55,7 +55,9 @@ test("unbalanced marked content draws less, never throws (INV-3)", async () => {
 
 test("content marked with /OC lands on that group's layer", async () => {
   const doc = await parse("ocg-basic.pdf");
-  expect([...doc.layers.keys()]).toEqual(["Visible Layer", "Hidden Layer", "Content"]);
+  // "Content" is absent: every entity is on a group, so the panel shows only
+  // what the file declares.
+  expect([...doc.layers.keys()]).toEqual(["Visible Layer", "Hidden Layer"]);
   expect(onLayer(doc, "Visible Layer")).toBe(1);
   expect(onLayer(doc, "Hidden Layer")).toBe(1);
   expect(doc.layers.get("Hidden Layer")?.visible).toBe(false);
@@ -70,6 +72,16 @@ test("an XObject's own /OC layers its content, and cannot leak (PDF-7)", async (
   expect(onLayer(doc, "Content")).toBe(1);
 });
 
+test("one group carrying content on two pages is one layer (PDF-7)", async () => {
+  const doc = await parse("ocg-multipage-shared.pdf");
+  // Page 1 is model space, page 2 a layout (PDF-5) — but layer identity is
+  // document-wide, so this is one row whose count spans both, not two rows.
+  expect([...doc.layers.keys()]).toEqual(["Shared Across Pages"]);
+  expect(doc.layers.get("Shared Across Pages")?.entityCount).toBe(3);
+  expect(doc.layouts?.length).toBe(1);
+  expect(onLayer(doc, "Shared Across Pages")).toBe(3);
+});
+
 test("a declared group that draws nothing is still a layer with no entities", async () => {
   const doc = await parse("ocg-unused-group.pdf");
   expect([...doc.layers.keys()]).toContain("Declared Only");
@@ -79,7 +91,7 @@ test("a declared group that draws nothing is still a layer with no entities", as
 
 test("two groups sharing a name keep separate layers and separate content", async () => {
   const doc = await parse("ocg-duplicate-names.pdf");
-  expect([...doc.layers.keys()]).toEqual(["One", "One (2)", "Content"]);
+  expect([...doc.layers.keys()]).toEqual(["One", "One (2)"]);
   expect(onLayer(doc, "One")).toBe(1);
   expect(onLayer(doc, "One (2)")).toBe(1);
 });

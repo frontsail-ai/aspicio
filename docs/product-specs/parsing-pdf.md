@@ -92,7 +92,9 @@ spaces of PDF-5, not one per page.
 
 Content belonging to no group stays on a layer named "Content", which remains
 for that purpose rather than disappearing — real files range from fully layered
-to fully unlayered. Layer panel and visibility semantics behave as they do for
+to fully unlayered. It is listed when it holds something, or when nothing else
+does, so a fully-layered file shows only the groups the file declares and a
+drawing always has at least one layer. Layer panel and visibility semantics behave as they do for
 DXF: a group declared in the file but referenced by no content becomes a layer
 with no entities, which the shared `isEmptyLayer` rule collapses in every
 panel. That is correct reporting of what the file declares, not a stray row.

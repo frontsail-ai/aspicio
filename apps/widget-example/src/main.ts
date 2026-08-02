@@ -127,6 +127,20 @@ const CONFIGS: ShowcaseConfig[] = [
     }),
   },
   {
+    id: "inline-pdf-layers",
+    label: "Inline · PDF with optional-content layers",
+    width: 920,
+    height: 540,
+    theme: "dark",
+    displayMode: "inline",
+    sampleUrl: "/layered.pdf",
+    meta: (sample) => ({
+      bytesBase64: bytesToBase64(sample),
+      byteLength: sample.byteLength,
+      allowFilePicker: false,
+    }),
+  },
+  {
     id: "pull-chunked",
     label: "Pull path (chunked fetch)",
     width: 920,

@@ -934,5 +934,31 @@ console.log("wrote gate-path fixtures");
     ),
   );
 
+  // 13. One group carrying content on two pages. Layer identity is
+  //     document-wide (PDF-7), so this must be one layer whose count spans
+  //     both — not one layer per page. The only multi-page corpus file cannot
+  //     prove this: its shared group is an image XObject, so it draws nothing.
+  writeFileSync(
+    "ocg-multipage-shared.pdf",
+    classic([
+      [
+        1,
+        "<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [7 0 R] /D << /Order [7 0 R] >> >> >>",
+      ],
+      [2, "<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 /MediaBox [0 0 100 100] >>"],
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /Properties << /L1 7 0 R >> >> >>",
+      ],
+      stream(4, `/OC /L1 BDC\n${draw}EMC\n`),
+      [
+        5,
+        "<< /Type /Page /Parent 2 0 R /Contents 6 0 R /Resources << /Properties << /L1 7 0 R >> >> >>",
+      ],
+      stream(6, `/OC /L1 BDC\n${draw}${draw}EMC\n`),
+      ocg(7, "Shared Across Pages"),
+    ]),
+  );
+
   console.log("wrote optional-content fixtures");
 }
