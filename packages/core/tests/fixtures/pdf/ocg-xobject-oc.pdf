@@ -1,0 +1,45 @@
+%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [5 0 R] /D << /Order [5 0 R] >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 100 100] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /XObject << /F1 7 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 34 >>
+stream
+/F1 Do
+0 0 1 RG 10 10 m 90 90 l S
+
+endstream
+endobj
+5 0 obj
+<< /Type /OCG /Name (Form Layer) >>
+endobj
+7 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 100 100] /OC 5 0 R /Length 68 >>
+stream
+0 0 1 RG 10 10 m 90 90 l S
+/Artifact BMC
+0 0 1 RG 10 10 m 90 90 l S
+
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000116 00000 n 
+0000000197 00000 n 
+0000000302 00000 n 
+0000000386 00000 n 
+0000000000 65535 f 
+0000000437 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R  >>
+startxref
+615
+%%EOF

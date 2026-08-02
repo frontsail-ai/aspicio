@@ -22,6 +22,7 @@ import { PdfLexer, isKeyword, isName, isRef, isString, toNumber } from "./object
 import { buildFontDecoder } from "./text.ts";
 import type { FontDecoder } from "./text.ts";
 import type { PdfDict, PdfValue } from "./objects.ts";
+import type { OptionalContent } from "./optional-content.ts";
 
 /** The single layer PDF content lands on until OCG support arrives (PDF-7). */
 export const CONTENT_LAYER = "Content";
@@ -125,6 +126,8 @@ export interface InterpretResult {
 export interface InterpretOptions {
   /** Segments per full circle when flattening curves. */
   curveSegments?: number;
+  /** Optional-content model; absent leaves everything on "Content" (PDF-7). */
+  optionalContent?: OptionalContent;
 }
 
 /**
@@ -140,7 +143,11 @@ export async function interpretContent(
   options: InterpretOptions = {},
   baseCtm: Matrix = IDENTITY,
 ): Promise<InterpretResult> {
-  const run = new Interpreter(doc, options.curveSegments ?? DEFAULT_CURVE_SEGMENTS);
+  const run = new Interpreter(
+    doc,
+    options.curveSegments ?? DEFAULT_CURVE_SEGMENTS,
+    options.optionalContent,
+  );
   await run.execute(content, resources, baseCtm, 0);
   return { entities: run.entities, lineTypes: run.lineTypes, unsupported: run.unsupported };
 }
@@ -158,13 +165,65 @@ class Interpreter {
 
   private readonly doc: PdfDocument;
   private readonly curveSegments: number;
+  private readonly oc: OptionalContent | undefined;
+  /**
+   * One entry per open `BDC`/`BMC`, holding the layer it opened or undefined.
+   *
+   * Every marked-content operator pushes, not just `/OC` ones: `BDC` also tags
+   * artifacts, spans, and tagged-PDF structure, and `EMC` closes all of them
+   * alike. Pushing only for `/OC` while popping for every `EMC` would
+   * desynchronize the stack and leak content onto the wrong layer.
+   *
+   * Deliberately separate from the graphics-state stack: `q … BDC … Q … EMC`
+   * is legal, so riding `q`/`Q` would pop a layer it never pushed.
+   */
+  private readonly marks: (string | undefined)[] = [];
 
   // Explicit fields rather than constructor parameter properties: the example
   // apps compile core from source under `erasableSyntaxOnly`, which rejects
   // the shorthand.
-  constructor(doc: PdfDocument, curveSegments: number) {
+  constructor(doc: PdfDocument, curveSegments: number, oc?: OptionalContent) {
     this.doc = doc;
     this.curveSegments = curveSegments;
+    this.oc = oc;
+  }
+
+  /**
+   * The layer a paint operator lands on: the innermost open `/OC` mark.
+   *
+   * Innermost wins when marks nest — the 1:1 model holds one layer, and the
+   * spec's "visible only if all are visible" cannot be expressed by a single
+   * name, so the nearest enclosing group is the honest choice (PDF-7).
+   */
+  private currentLayer(): string {
+    for (let i = this.marks.length - 1; i >= 0; i--) {
+      const layer = this.marks[i];
+      if (layer !== undefined) return layer;
+    }
+    return CONTENT_LAYER;
+  }
+
+  /** Resolve an `/OC` value on an XObject to a layer name. */
+  private async ocLayerFor(value: PdfValue | undefined): Promise<string | undefined> {
+    if (value === undefined || this.oc === undefined) return undefined;
+    const resolution = await this.oc.resolve(value);
+    if (resolution?.counted) this.count(resolution.counted);
+    return resolution?.layerKey === undefined ? undefined : this.oc.nameOf(resolution.layerKey);
+  }
+
+  /** Resolve a `BDC` `/OC` operand: a name into `/Properties`, or an inline dict. */
+  private async markFor(
+    tag: PdfValue | undefined,
+    operand: PdfValue | undefined,
+    resources: PdfDict | undefined,
+  ): Promise<string | undefined> {
+    if (!isName(tag) || tag.name !== "OC" || this.oc === undefined) return undefined;
+    let target = operand;
+    if (isName(operand)) {
+      const properties = await this.doc.dict(resources?.get("Properties"));
+      target = properties?.get(operand.name);
+    }
+    return this.ocLayerFor(target);
   }
 
   private count(kind: string): void {
@@ -249,6 +308,25 @@ class Interpreter {
 
       switch (value.op) {
         /* --- graphics state --- */
+        /* --- marked content (PDF-7) --- */
+        case "BDC":
+          this.marks.push(
+            await this.markFor(
+              operands[operands.length - 2],
+              operands[operands.length - 1],
+              resources,
+            ),
+          );
+          break;
+        case "BMC":
+          // No /OC operand at all, but it still opens a mark that EMC closes.
+          this.marks.push(undefined);
+          break;
+        case "EMC":
+          // Unbalanced EMC draws less, never throws (INV-3).
+          this.marks.pop();
+          break;
+
         case "q":
           stack.push(cloneState(state));
           break;
@@ -550,7 +628,7 @@ class Interpreter {
       if (height > 0) {
         const entity: TextEntity = {
           type: "TEXT",
-          layer: CONTENT_LAYER,
+          layer: this.currentLayer(),
           color: state.fillColor,
           position,
           text,
@@ -605,7 +683,7 @@ class Interpreter {
       if (points.length < 2) continue;
       const entity: PolylineEntity = {
         type: "POLYLINE",
-        layer: CONTENT_LAYER,
+        layer: this.currentLayer(),
         color: state.strokeColor,
         points,
         bulges: points.map(() => 0),
@@ -674,7 +752,7 @@ class Interpreter {
   private pushHatch(loops: Point2[][], state: GraphicsState): void {
     const entity: HatchEntity = {
       type: "HATCH",
-      layer: CONTENT_LAYER,
+      layer: this.currentLayer(),
       color: state.fillColor,
       // First loop is the outer boundary, the rest are holes — the same
       // convention DXF fills use (PDF-3).
@@ -780,7 +858,16 @@ class Interpreter {
         ? (matrixValue.map((v) => toNumber(v)) as unknown as Matrix)
         : IDENTITY;
     const formResources = (await this.doc.dict(object.dict.get("Resources"))) ?? resources;
+
+    // A form or image XObject may carry `/OC` itself — the corpus uses this as
+    // often as marked content, and three files use only this form.
+    const formLayer = await this.ocLayerFor(object.dict.get("OC"));
+    const depthBefore = this.marks.length;
+    if (formLayer !== undefined) this.marks.push(formLayer);
     await this.execute(decoded, formResources, multiply(matrix, state.ctm), depth + 1);
+    // Truncate rather than pop: a form whose content leaves marks unbalanced
+    // must not leak them into its parent (INV-3).
+    this.marks.length = depthBefore;
   }
 }
 

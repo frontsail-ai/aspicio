@@ -175,8 +175,13 @@ export class PdfDocument {
    * down from ancestors, because a page that omits them means "use my
    * parent's" — not "I have none".
    */
+  /** The document catalog — the trailer's `/Root`. */
+  async catalog(): Promise<PdfDict | undefined> {
+    return this.dict(this.trailerValue("Root"));
+  }
+
   async pages(): Promise<PdfDict[]> {
-    const root = await this.dict(this.trailerValue("Root"));
+    const root = await this.catalog();
     const pagesNode = root?.get("Pages");
     const out: PdfDict[] = [];
     const seen = new Set<number>();

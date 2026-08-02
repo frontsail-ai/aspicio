@@ -20,7 +20,7 @@
  *   the first document that ships `/BaseState /OFF`, silently.
  */
 
-import { isName, isRef } from "./objects.ts";
+import { isDict, isName, isRef } from "./objects.ts";
 import type { PdfDict, PdfValue } from "./objects.ts";
 import type { PdfDocument } from "./document.ts";
 
@@ -86,7 +86,12 @@ export class OptionalContent {
    */
   async resolve(value: PdfValue | undefined): Promise<OcResolution | undefined> {
     const key = refKey(value);
-    if (key === undefined) return undefined;
+    // `/OC` may also be an inline dictionary rather than a reference:
+    // `/OC <</Type/OCMD /OCGs [5 0 R]>> BDC`. It has no identity to cache by,
+    // so it resolves each time — inline forms are rare and short.
+    if (key === undefined) {
+      return isDict(value) && this.doc ? this.resolveMembership(value) : undefined;
+    }
     if (this.cache.has(key)) return this.cache.get(key);
 
     let resolution: OcResolution | undefined;
