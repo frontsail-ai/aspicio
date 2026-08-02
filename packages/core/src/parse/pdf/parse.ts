@@ -119,9 +119,13 @@ export async function parsePdfBytes(
     });
   };
   for (const layer of optionalContent.layers) addLayer(layer.name, layer.visible);
-  // "Content" survives as the home for unmarked content, which real files have
-  // in quantity — three corpus files are entirely unmarked.
-  if (!layers.has(CONTENT_LAYER)) addLayer(CONTENT_LAYER, true);
+  // "Content" is the home for unmarked content, which real files have in
+  // quantity — three corpus files are entirely unmarked. It appears when it
+  // holds something, or when nothing else does, so a fully-layered file does
+  // not gain a row the file never declared and a drawing always has a layer.
+  const unmarked = counts.get(CONTENT_LAYER) ?? 0;
+  if (!layers.has(CONTENT_LAYER) && (unmarked > 0 || layers.size === 0))
+    addLayer(CONTENT_LAYER, true);
 
   return {
     layers,

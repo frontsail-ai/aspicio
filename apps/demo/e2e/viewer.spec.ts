@@ -1085,11 +1085,32 @@ test("opens a PDF and renders its vector content", async ({ page }) => {
   await expect(page.locator("#file-chip")).toHaveText("sample.pdf");
 
   const probe = await probeViewer(page);
-  // PDF-7: everything lands on one "Content" layer.
+  // This sample declares no optional content, so everything lands on
+  // "Content" — the fallback PDF-7 keeps for exactly that case.
   expect(probe.layers.map((l) => l.name)).toContain("Content");
   // PDF-3/PDF-4: strokes, a fill, and text all became entities.
   expect(probe.entityCount).toBeGreaterThan(2);
   expect(probe.segmentCount).toBeGreaterThan(2);
+});
+
+// PDF-7: optional-content groups become layers, and the panel is where a
+// user sees them. The renderer and its panel are verified end-to-end (INV-7).
+test("a PDF's optional-content groups appear as layers in the panel", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#file").setInputFiles(fixture("layered.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("layered.pdf");
+
+  // Two groups, one hidden by /OFF. Both are rows the user can toggle; the
+  // "Content" layer drew nothing here, so it collapses into the empty group.
+  await expect(page.locator("#layer-list > .layer-row")).toHaveCount(2);
+  await expect(row(page, "Visible Layer")).toBeVisible();
+  await expect(row(page, "Hidden Layer")).toBeVisible();
+
+  const probe = await probeViewer(page);
+  const byName = Object.fromEntries(probe.layers.map((l) => [l.name, l]));
+  expect(byName["Visible Layer"]?.visible).toBe(true);
+  // Default visibility comes from the file's /OFF list, not from the viewer.
+  expect(byName["Hidden Layer"]?.visible).toBe(false);
 });
 
 test("a PDF reports points as its unit in the measure readout", async ({ page }) => {

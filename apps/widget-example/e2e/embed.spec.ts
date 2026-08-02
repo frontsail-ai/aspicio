@@ -87,3 +87,16 @@ test("the PDF config renders the PDF's vector content in the widget", async ({ p
   // leave anything but "loaded" and hide the canvas behind the state card.
   await expect(widget(page).locator("#root")).toHaveAttribute("data-state", "loaded");
 });
+
+// PDF-7: a PDF's optional-content groups reach the in-chat viewer's panel
+// too, not just the demo's — one implementation of the classification, two
+// surfaces (isEmptyLayer).
+test("the widget lists a PDF's optional-content groups as layers", async ({ page }) => {
+  await open(page, "inline-pdf-layers");
+  await expect(widget(page).locator("canvas")).toBeVisible();
+  // Two declared groups; the chip counts them.
+  await expect(widget(page).locator("#chip")).toHaveText(/^2 LAYERS/);
+  const names = widget(page).locator(".layer-rows .name");
+  await expect(names.first()).toHaveText("Visible Layer");
+  await expect(names.nth(1)).toHaveText("Hidden Layer");
+});
