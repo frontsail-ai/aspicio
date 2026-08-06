@@ -174,3 +174,25 @@ view when that source is already open); an empty or malformed hash never
 disturbs the current drawing. The `src` value is validated as `http(s)` on
 decode — a `javascript:`/`data:`/`file:` value is ignored — and only remote
 URLs (never local files) are written.
+
+### DEMO-19: Analytics consent
+
+The demo asks once, before measuring anything. Google Analytics is loaded with
+Consent Mode v2 defaults of `denied` for `ad_storage`, `ad_user_data`,
+`ad_personalization` and `analytics_storage`, so no analytics cookies exist
+until the visitor accepts; the denial is queued ahead of `config`, so even the
+first pageview is covered. A bottom-anchored banner names Google Analytics,
+says it sets cookies, restates that drawings never leave the browser, and links
+to the privacy policy. Accept queues `consent update` with
+`analytics_storage: granted` (ad storage stays denied — the demo runs no ads);
+Decline stores the refusal and never asks again. The choice persists in
+localStorage; an unrecognised or missing value re-asks rather than granting, and
+a private-mode store that throws leaves the page working. The banner sits above
+the paste toast but below the Open dialog and drop overlay, because it is
+persistent rather than modal.
+
+The tag itself loads only on the exact production host
+(`aspicio.frontsail.app`) — never on localhost, Vercel preview aliases, or a
+lookalike domain — so dev servers and the Playwright suites never report.
+`?asp_consent_ui=1` renders the banner off-host for review and e2e without ever
+loading the tag.

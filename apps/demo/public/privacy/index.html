@@ -63,7 +63,7 @@
     <main>
       <h1>Privacy Policy</h1>
       <p class="meta">
-        Aspicio · effective July 21, 2026 · <a href="/">demo</a> · <a href="/terms/">terms</a>
+        Aspicio · effective August 6, 2026 · <a href="/">demo</a> · <a href="/terms/">terms</a>
       </p>
 
       <p>
@@ -78,7 +78,17 @@
       <ul>
         <li>
           No personal data. There are no accounts or sign-ups, so we never see names or email
-          addresses. We run no analytics and set no cookies.
+          addresses.
+        </li>
+        <li>
+          Analytics, only if you say yes. The demo site asks once whether it may count visits with
+          Google Analytics. Until you accept, no analytics cookies are set and no measurement data
+          is collected; if you decline, we remember that and never ask again. Accepting lets Google
+          Analytics set its own cookies and receive standard usage data (pages viewed, approximate
+          location, device and browser) as our processor. It never receives your drawings — those
+          are parsed in your browser and are not part of any analytics event. Your choice is stored
+          locally in your browser, so clearing site data resets the question. The hosted API and the
+          MCP server carry no analytics at all.
         </li>
         <li>
           Drawings you submit are processed in memory. When you (or your AI assistant) send a DXF to
@@ -104,6 +114,10 @@
       <ul>
         <li>Cloudflare operates the infrastructure the hosted services run on.</li>
         <li>
+          Google Analytics receives demo-site usage data, but only from visitors who accepted
+          analytics. Decline and it receives nothing.
+        </li>
+        <li>
           When you use Aspicio through an AI assistant (ChatGPT, Claude, or any MCP client),
           <em>your assistant</em> relays the results we return to its model provider under that
           provider's terms. We send nothing to model providers ourselves.
@@ -119,6 +133,10 @@
 
       <h2>Your controls</h2>
       <ul>
+        <li>
+          Change your mind about analytics at any time by clearing this site's data in your browser
+          — the demo will ask again on your next visit, and declining leaves it off.
+        </li>
         <li>
           Don't send sensitive drawings to the hosted services. For local files, use the local
           server (<code>npx -y @aspicio/mcp</code>), which reads files in-process and never uploads

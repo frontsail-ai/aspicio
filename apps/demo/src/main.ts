@@ -15,6 +15,9 @@ import { FetchError, fetchWithProgress, isHttpUrl } from "./fetch-progress.ts";
 import type { FetchErrorKind, FetchProgress } from "./fetch-progress.ts";
 import { clearRecents, loadRecents, pushRecent } from "./recents.ts";
 import { formatBytes } from "./format.ts";
+import { loadConsent, saveConsent } from "./consent.ts";
+import type { ConsentChoice } from "./consent.ts";
+import { bannerForced, bannerVisible, grantConsent, loadTag, tagEnabled } from "./analytics.ts";
 
 /* ---------- SVG fragments ---------- */
 
@@ -319,6 +322,21 @@ app.innerHTML = `
         </div>
       </div>
       <button id="paste-close" class="paste-close" type="button">${icons.close(16)}</button>
+    </div>
+  </div>
+  <div id="consent-banner" class="consent-banner" role="region" aria-label="Analytics consent" hidden>
+    <div class="consent-card">
+      <div class="consent-content">
+        <div class="consent-title">Analytics</div>
+        <p class="consent-body">
+          We'd like to count visits with Google Analytics. It sets cookies. Your drawings
+          are never uploaded either way — <a href="/privacy/">privacy policy</a>.
+        </p>
+      </div>
+      <div class="consent-actions">
+        <button id="consent-decline" class="consent-decline" type="button">Decline</button>
+        <button id="consent-accept" class="consent-accept" type="button">Accept</button>
+      </div>
     </div>
   </div>
 `;
@@ -1641,6 +1659,28 @@ openFromLink(decodeView(location.hash), true);
 // address bar, or back/forward between shared links. Our own writes go through
 // history.replaceState, which never fires hashchange, so this can't loop.
 window.addEventListener("hashchange", () => openFromLink(decodeView(location.hash), false));
+
+/* ---------- analytics consent (DEMO-19) ---------- */
+
+// The tag is host-gated, so dev and the Playwright suites never report. The
+// banner follows the tag, except when ?asp_consent_ui=1 forces it for review.
+{
+  const stored = loadConsent();
+  const tag = tagEnabled(location.hostname);
+  if (tag) loadTag(stored);
+
+  if (bannerVisible({ stored, tag, forced: bannerForced(location.search) })) {
+    const banner = $("#consent-banner");
+    const answer = (choice: ConsentChoice): void => {
+      saveConsent(choice);
+      if (choice === "granted" && tag) grantConsent();
+      banner.hidden = true;
+    };
+    $("#consent-accept").addEventListener("click", () => answer("granted"));
+    $("#consent-decline").addEventListener("click", () => answer("denied"));
+    banner.hidden = false;
+  }
+}
 
 /* Test hook: lets e2e tests observe viewer + demo interaction state. */
 declare global {
