@@ -2265,3 +2265,116 @@ button {
     flex: 1;
   }
 }
+
+/* ===================== CONSENT BANNER ===================== */
+
+.consent-banner {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  /* Above the paste toast (90) but below the Open dialog (100) and the drop
+     overlay (110): the banner is persistent, not modal, so an interaction the
+     user just started must stay on top of it. */
+  z-index: 95;
+  width: min(640px, calc(100% - 24px));
+  animation: asp-toast-in 180ms ease;
+}
+
+.consent-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  background: #12161d;
+  border: 1px solid var(--hairline2);
+  border-left: 3px solid var(--crease);
+  border-radius: 5px;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 50%);
+}
+
+.consent-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.consent-title {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 5px;
+}
+
+.consent-body {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text2);
+}
+
+.consent-body a {
+  color: var(--crease);
+  text-decoration: none;
+}
+
+.consent-body a:hover {
+  text-decoration: underline;
+}
+
+.consent-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-self: center;
+}
+
+.consent-accept {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--crease);
+  background: var(--crease);
+  color: #fff;
+  border-radius: 3px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.consent-accept:hover {
+  filter: brightness(1.08);
+}
+
+.consent-decline {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--hairline2);
+  background: transparent;
+  color: var(--text2);
+  border-radius: 3px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: color 120ms;
+}
+
+.consent-decline:hover {
+  color: var(--text);
+}
+
+@media (width <= 720px) {
+  .consent-card {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .consent-actions {
+    align-self: stretch;
+  }
+
+  .consent-accept,
+  .consent-decline {
+    flex: 1;
+  }
+}
