@@ -35,12 +35,12 @@
     "dxf-parser": "^1.1.2"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
-    "@types/three": "^0.185.1",
+    "@types/node": "^26.1.2",
+    "@types/three": "^0.185.3",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "@vitest/coverage-v8": "4.1.10",
     "bumpp": "^11.1.0",
-    "happy-dom": "^20.10.6",
+    "happy-dom": "^20.11.1",
     "three": "^0.185.1",
     "typescript": "^7.0.2",
     "vite-plus": "catalog:"

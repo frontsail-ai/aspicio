@@ -17,8 +17,8 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
-    "@types/node": "^26.1.1",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.1.2",
     "@types/pngjs": "^6.0.5",
     "pngjs": "^7.0.0",
     "typescript": "~6.0.2",
