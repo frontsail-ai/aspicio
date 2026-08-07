@@ -20,7 +20,7 @@
     "@playwright/test": "^1.62.1",
     "@sveltejs/vite-plugin-svelte": "^7.2.0",
     "@types/node": "^26.1.2",
-    "typescript": "~6.0.2",
+    "typescript": "~7.0.2",
     "vite-plus": "catalog:"
   }
 }
