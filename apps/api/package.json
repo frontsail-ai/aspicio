@@ -13,8 +13,8 @@
     "@aspicio/agent-tools": "workspace:*",
     "@aspicio/core": "workspace:*",
     "@aspicio/widget": "workspace:*",
-    "@modelcontextprotocol/ext-apps": "^1.7.4",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "three": "^0.185.1",
     "zod": "^4.4.3"
   },

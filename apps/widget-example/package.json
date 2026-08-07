@@ -11,11 +11,11 @@
   },
   "dependencies": {
     "@aspicio/widget": "workspace:*",
-    "@modelcontextprotocol/ext-apps": "^1.7.4"
+    "@modelcontextprotocol/ext-apps": "^1.7.5"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
-    "@types/node": "^26.1.1",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.1.2",
     "typescript": "~6.0.2",
     "vite-plus": "catalog:"
   }
