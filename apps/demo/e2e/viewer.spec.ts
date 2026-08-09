@@ -1093,6 +1093,21 @@ test("opens a PDF and renders its vector content", async ({ page }) => {
   expect(probe.segmentCount).toBeGreaterThan(2);
 });
 
+// PDF-3: spot colours resolve through their Separation tint transforms. The
+// fixture is a dieline in miniature — cut strokes and a fill in one spot ink,
+// crease strokes in another, after a white `1 g 1 G` prelude. When resolution
+// regresses to the component-count guess, every tint of 1 reads as white and
+// both buckets drop to zero (INV-8 for PDF).
+test("a PDF's spot colours render as their ink colours, not white", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#file").setInputFiles(fixture("spot.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("spot.pdf");
+
+  const colors = await canvasColors(page);
+  expect(colors.red).toBeGreaterThan(100); // cutting strokes + fill
+  expect(colors.green).toBeGreaterThan(100); // creasing strokes
+});
+
 // PDF-7: optional-content groups become layers, and the panel is where a
 // user sees them. The renderer and its panel are verified end-to-end (INV-7).
 test("a PDF's optional-content groups appear as layers in the panel", async ({ page }) => {

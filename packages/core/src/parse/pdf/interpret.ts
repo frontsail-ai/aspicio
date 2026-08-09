@@ -18,6 +18,8 @@ import type {
 } from "../../model/types.ts";
 import { isStream } from "./document.ts";
 import type { PdfDocument } from "./document.ts";
+import { cmykToRgb, grayToRgb, resolveColorSpace, rgb } from "./color-space.ts";
+import type { ColorSpaceModel } from "./color-space.ts";
 import { PdfLexer, isKeyword, isName, isRef, isString, toNumber } from "./objects.ts";
 import { buildFontDecoder } from "./text.ts";
 import type { FontDecoder } from "./text.ts";
@@ -69,15 +71,7 @@ export function matrixScale(m: Matrix): number {
 
 /* ---------- colour ---------- */
 
-const clamp255 = (v: number): number => Math.max(0, Math.min(255, Math.round(v * 255)));
-const rgb = (r: number, g: number, b: number): number =>
-  (clamp255(r) << 16) | (clamp255(g) << 8) | clamp255(b);
-
-/** Naive CMYK → RGB, which is what a viewer without colour management can do. */
-export const cmykToRgb = (c: number, m: number, y: number, k: number): number =>
-  rgb((1 - c) * (1 - k), (1 - m) * (1 - k), (1 - y) * (1 - k));
-
-export const grayToRgb = (g: number): number => rgb(g, g, g);
+export { cmykToRgb, grayToRgb } from "./color-space.ts";
 
 /* ---------- graphics state ---------- */
 
@@ -87,6 +81,9 @@ interface GraphicsState {
   fillColor: number;
   lineWidth: number;
   dash: number[];
+  /** Resolved `cs`/`CS` spaces; absent means the arity heuristic decides. */
+  fillSpace?: ColorSpaceModel;
+  strokeSpace?: ColorSpaceModel;
   /** Selected font resource name, inherited by forms this state invokes. */
   fontName?: string;
   fontSize: number;
@@ -367,30 +364,43 @@ class Interpreter {
         case "g":
           state.fillColor = grayToRgb(num(1));
           break;
+        case "cs":
+        case "CS": {
+          // The resolved model decides what `sc`/`scn` operands mean; absent
+          // (device names, Pattern, nothing resolvable) the arity heuristic
+          // below still applies, which is exactly right for device spaces.
+          const model = await resolveColorSpace(this.doc, operands[operands.length - 1], resources);
+          if (value.op === "CS") state.strokeSpace = model;
+          else state.fillSpace = model;
+          break;
+        }
         case "SC":
         case "SCN":
         case "sc":
         case "scn": {
-          // Component counts identify the space well enough to colour with;
-          // a pattern operand names a pattern instead, which we count.
           const stroking = value.op === "SC" || value.op === "SCN";
           const nums = operands.filter((o) => typeof o === "number") as number[];
+          const space = stroking ? state.strokeSpace : state.fillSpace;
+          let c: number | undefined;
+          // A pattern operand names a pattern instead of components (PDF-8).
           if (operands.some((o) => isName(o))) this.count("PatternFill");
-          else if (nums.length === 1) {
-            const c = grayToRgb(nums[0] as number);
-            if (stroking) state.strokeColor = c;
-            else state.fillColor = c;
-          } else if (nums.length === 3) {
-            const c = rgb(nums[0] as number, nums[1] as number, nums[2] as number);
-            if (stroking) state.strokeColor = c;
-            else state.fillColor = c;
-          } else if (nums.length === 4) {
-            const c = cmykToRgb(
+          else if (space) {
+            c = space.toRgb(nums);
+            if (space.counted) this.count(space.counted);
+          }
+          // Without a resolved space the component count identifies the
+          // device space — the only spaces `sc` may be used with anyway.
+          else if (nums.length === 1) c = grayToRgb(nums[0] as number);
+          else if (nums.length === 3)
+            c = rgb(nums[0] as number, nums[1] as number, nums[2] as number);
+          else if (nums.length === 4)
+            c = cmykToRgb(
               nums[0] as number,
               nums[1] as number,
               nums[2] as number,
               nums[3] as number,
             );
+          if (c !== undefined) {
             if (stroking) state.strokeColor = c;
             else state.fillColor = c;
           }
