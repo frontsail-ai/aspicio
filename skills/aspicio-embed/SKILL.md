@@ -33,12 +33,14 @@ import { pdfParser } from "@aspicio/core/pdf";
 That indirection is what keeps a DXF app from shipping the PDF parser, and
 vice versa (INV-11) — import only the formats you open.
 
-A PDF is read as vector line work and text: paths, strokes, fills, and glyphs,
-the content a PDF/X-4 artwork or dieline carries. Images, shadings, and
-transparency are counted as skipped rather than drawn, so a render shows line
-work rather than a page facsimile, and a scanned PDF shows almost nothing.
-Content arrives on a single "Content" layer, pages become spaces, and
-measurements are in points, because a PDF carries no drawing scale.
+A PDF is read as vector line work, text, and raster images: paths, strokes,
+fills, glyphs, and the flattened artwork a PDF/X-4 file carries — a print
+PDF whose art is one big image still shows its artwork under the dieline.
+Shadings, transparency, and images in codecs outside the decoded set (JPEG
+2000, JBIG2, CCITT fax) are counted as skipped rather than drawn.
+Optional-content groups become layers ("Content" holds anything ungrouped),
+pages become spaces, and measurements are in points, because a PDF carries
+no drawing scale.
 
 ## React: one component
 
