@@ -49,9 +49,11 @@ const CORPUS: Record<string, Expectation> = {
   // XObject-level /OC on images: declared, drawing nothing, correctly empty.
   "issue17679.pdf": { layers: { red: 3, green: 1 } },
   "issue17679_2.pdf": { layers: { red: 3, green: 1 } },
-  // One group across 27 pages. It is an image XObject, so it draws nothing —
-  // declared-but-empty is the correct report, not a missing layer (PDF-8).
-  "issue14824.pdf": { layers: { Content: 11778 }, totalLayers: 2 },
+  // One group across 27 pages, carried by an image XObject. Since images
+  // draw (PDF-9) the group holds one entity per page — a single decode
+  // placed 27 times (the document-scoped cache) — and five ungrouped images
+  // land on Content. Six images stay counted: their codecs are out of scope.
+  "issue14824.pdf": { layers: { Content: 11783, Stamp: 27 }, totalLayers: 2 },
   // 35 groups, 3 ordered, 33 hidden by /OFF — all 35 still present.
   "issue12007_reduced.pdf": { totalLayers: 36 },
   // Pure /VE memberships: not evaluated, content stays on Content (PDF-7).

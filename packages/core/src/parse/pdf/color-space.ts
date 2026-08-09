@@ -53,15 +53,25 @@ export interface ColorSpaceModel {
   readonly toRgb: (nums: readonly number[]) => number | undefined;
   /** PDF-8 kind to count each time this space colours content. */
   readonly counted?: string;
+  /**
+   * Components one colour takes, when the family defines it — what the
+   * image decoder needs to unpack packed samples (PDF-9). Absent for
+   * spaces that never colour (`UNSUPPORTED`).
+   */
+  readonly components?: number;
 }
 
 const at = (nums: readonly number[], i: number): number =>
   typeof nums[i] === "number" ? (nums[i] as number) : 0;
 
-const DEVICE_GRAY: ColorSpaceModel = { toRgb: (n) => grayToRgb(at(n, 0)) };
-const DEVICE_RGB: ColorSpaceModel = { toRgb: (n) => rgb(at(n, 0), at(n, 1), at(n, 2)) };
+const DEVICE_GRAY: ColorSpaceModel = { toRgb: (n) => grayToRgb(at(n, 0)), components: 1 };
+const DEVICE_RGB: ColorSpaceModel = {
+  toRgb: (n) => rgb(at(n, 0), at(n, 1), at(n, 2)),
+  components: 3,
+};
 const DEVICE_CMYK: ColorSpaceModel = {
   toRgb: (n) => cmykToRgb(at(n, 0), at(n, 1), at(n, 2), at(n, 3)),
+  components: 4,
 };
 
 const UNSUPPORTED: ColorSpaceModel = { toRgb: () => undefined, counted: CS_UNSUPPORTED };
@@ -141,11 +151,13 @@ export async function resolveColorSpace(
         return {
           toRgb: (nums) => grayToRgb(1 - at(nums, 0)),
           counted: CS_TINT_TRANSFORM,
+          components: 1,
         };
       }
       return {
         toRgb: (nums) => alternate.toRgb(transform(at(nums, 0))),
         ...(alternate.counted ? { counted: alternate.counted } : {}),
+        components: 1,
       };
     }
     default:

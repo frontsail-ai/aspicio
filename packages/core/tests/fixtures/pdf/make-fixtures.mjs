@@ -42,6 +42,48 @@ function classic(objects, trailerExtra = "") {
 }
 
 const catalog = [1, "<< /Type /Catalog /Pages 2 0 R >>"];
+
+/* Baseline JPEGs for the DCTDecode fixtures, committed as data so fixture
+ * generation stays dependency-free. Provenance: a 16×16 PNG of four solid
+ * quadrants (TL red, TR green, BL blue, BR yellow) converted once with
+ * macOS sips 16.x — `sips -s format jpeg -s formatOptions 90` for the RGB
+ * one; `sips -s format jpeg --matchTo "Generic CMYK Profile"` plus APP0-13
+ * segment stripping for the Adobe CMYK one (SOF0, APP14 transform 0). */
+const JPEG_RGB_QUAD = Buffer.from(
+  "/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAA" +
+    "A6ABAAMAAAABAAEAAKACAAQAAAABAAAAEKADAAQAAAABAAAAEAAAAAD/7QA4UGhvdG9zaG9wIDMu" +
+    "MAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgAEAAQAwEiAAIR" +
+    "AQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAAB" +
+    "fQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5" +
+    "OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeo" +
+    "qaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMB" +
+    "AQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYS" +
+    "QVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNU" +
+    "VVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5" +
+    "usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAQEBAQEBAgEBAgMCAgID" +
+    "BAMDAwMEBQQEBAQEBQYFBQUFBQUGBgYGBgYGBgcHBwcHBwgICAgICQkJCQkJCQkJCf/bAEMBAQEB" +
+    "AgICBAICBAkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJ" +
+    "CQkJCf/dAAQAAf/aAAwDAQACEQMRAD8A/F+v6UK/g3r/AGKK/gH/AEhf6DP/ABKh/qh/wqf2p/an" +
+    "17/lz9W9l9W+p/8AT3Ec/P8AWP7nLyfa5vd+o/aucSf8Txf2B7n9i/2L9Z6/XPbfXPq/lhfZ+z+q" +
+    "/wDTzn9p9nl97//Z",
+  "base64",
+);
+const JPEG_CMYK_QUAD = Buffer.from(
+  "/9j/7gAOQWRvYmUAZAAAAAAA/8AAFAgAEAAQBAERAAIRAQMRAQQRAf/EAB8AAAEFAQEBAQEBAAAA" +
+    "AAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQy" +
+    "gZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVm" +
+    "Z2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS" +
+    "09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYH" +
+    "CAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1Lw" +
+    "FWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5" +
+    "eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj" +
+    "5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwUDAwMFBgUFBQUGCAYGBgYGCAoICAgICAgK" +
+    "CgoKCgoKCgwMDAwMDA4ODg4ODw8PDw8PDw8PD//bAEMBAgMDBAQEBwQEBxALCQsQEBAQEBAQEBAQ" +
+    "EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEP/dAAQAAv/aAA4EAQACEQMR" +
+    "BBEAPwD9+K/ynP8AD8/30Pxbr/tUP9WDoP/Q/Hev5HP9/D/fw/tIr/q0P+T8D//Z",
+  "base64",
+);
+
 const pagesNode = (kids) => [
   2,
   `<< /Type /Pages /Kids [${kids}] /Count ${kids.split("0 R").length - 1} >>`,
@@ -961,4 +1003,309 @@ console.log("wrote gate-path fixtures");
   );
 
   console.log("wrote optional-content fixtures");
+}
+
+/* ----------------------------------------------------------------------- */
+/* Raster images (PDF-9). Each isolates one decode path.                   */
+
+{
+  const page = () => [2, `<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 100 100] >>`];
+  /** A page whose content places /Im0 into a w×h rectangle at (x, y). */
+  const pageObj = (extraResources = "") => [
+    3,
+    `<< /Type /Page /Parent 2 0 R /Contents 4 0 R ` +
+      `/Resources << /XObject << /Im0 5 0 R >> ${extraResources}>> >>`,
+  ];
+  const placed = (w, h, x = 10, y = 10, extra = "") => [
+    4,
+    streamBody(`q ${w} 0 0 ${h} ${x} ${y} cm${extra} /Im0 Do Q\n`),
+  ];
+  const streamBody = (text) =>
+    Buffer.concat([enc(`<< /Length ${text.length} >>\nstream\n`), enc(text), enc("\nendstream")]);
+  const imageObj = (num, dictBody, data) => [
+    num,
+    Buffer.concat([
+      enc(`<< /Type /XObject /Subtype /Image ${dictBody} /Length ${data.length} >>\nstream\n`),
+      data,
+      enc("\nendstream"),
+    ]),
+  ];
+  const flate = (bytes) => deflateSync(Buffer.from(bytes));
+
+  // 1. 2×2 DeviceRGB, distinct corners — orientation-sensitive by design:
+  //    row 0 of the samples is the image's TOP edge (red, green).
+  writeFileSync(
+    "image-flate-rgb.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 2 /Height 2 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode",
+        flate([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]),
+      ),
+    ]),
+  );
+
+  // 2. DeviceGray ramp.
+  writeFileSync(
+    "image-flate-gray.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 4 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode",
+        flate([0, 85, 170, 255]),
+      ),
+    ]),
+  );
+
+  // 3. DeviceCMYK with an SMask — the flattened-prepress shape (the RCA
+  //    file is exactly this): 2×2 pure C, M, Y, K under a mask that hides
+  //    the right column.
+  writeFileSync(
+    "image-flate-cmyk-smask.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 2 /Height 2 /ColorSpace /DeviceCMYK /BitsPerComponent 8 " +
+          "/Filter /FlateDecode /SMask 6 0 R",
+        flate([255, 0, 0, 0, 0, 255, 0, 0, 0, 0, 255, 0, 0, 0, 0, 255]),
+      ),
+      imageObj(
+        6,
+        "/Width 2 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode",
+        flate([255, 0, 255, 0]),
+      ),
+    ]),
+  );
+
+  // 4. Indexed over DeviceRGB: palette of red/green/blue, 8bpc indices.
+  writeFileSync(
+    "image-flate-indexed.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 2 /Height 2 /ColorSpace [/Indexed /DeviceRGB 2 6 0 R] " +
+          "/BitsPerComponent 8 /Filter /FlateDecode",
+        flate([0, 1, 2, 0]),
+      ),
+      [
+        6,
+        Buffer.concat([
+          enc(`<< /Length 9 >>\nstream\n`),
+          Buffer.from([255, 0, 0, 0, 255, 0, 0, 0, 255]),
+          enc("\nendstream"),
+        ]),
+      ],
+    ]),
+  );
+
+  // 5. 1-bit gray checkerboard: sub-byte sample unpacking, row-aligned.
+  //    8×2: rows 0b10101010 (0xAA) and 0b01010101 (0x55).
+  writeFileSync(
+    "image-1bpc.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 8 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /FlateDecode",
+        flate([0xaa, 0x55]),
+      ),
+    ]),
+  );
+
+  // 6. 16-bit gray: the high byte carries the value.
+  writeFileSync(
+    "image-16bpc.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 2 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 16 /Filter /FlateDecode",
+        flate([0x00, 0x12, 0xff, 0xee]),
+      ),
+    ]),
+  );
+
+  // 7. Decode [1 0] inverts a gray ramp — two corpus DCT images do this.
+  writeFileSync(
+    "image-decode-invert.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 2 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 " +
+          "/Decode [1 0] /Filter /FlateDecode",
+        flate([0, 255]),
+      ),
+    ]),
+  );
+
+  // 8. Stencil mask: 1bpc, sample 0 paints the current fill colour (red).
+  writeFileSync(
+    "image-stencil-mask.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      [4, streamBody(`q 1 0 0 rg 40 0 0 40 10 10 cm /Im0 Do Q\n`)],
+      // Rows are byte-aligned: row 0 = 0b01000000 ((0,0) paints, (1,0) is
+      // clear), row 1 = 0b00000000 (both paint).
+      imageObj(5, "/Width 2 /Height 2 /ImageMask true /Filter /FlateDecode", flate([0x40, 0x00])),
+    ]),
+  );
+
+  // 9. Separation tint ramp: tint is ink coverage, so 1 renders dark —
+  //    the K-only photograph convention (PDF-9).
+  writeFileSync(
+    "image-separation-tint.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 2 /Height 1 /ColorSpace [/Separation /Black /DeviceCMYK 6 0 R] " +
+          "/BitsPerComponent 8 /Filter /FlateDecode",
+        flate([0, 255]),
+      ),
+      // A tint-transform function object; present for validity, never run.
+      [6, `<< /FunctionType 2 /Domain [0 1] /C0 [0 0 0 0] /C1 [0 0 0 1] /N 1 >>`],
+    ]),
+  );
+
+  // 10. An image XObject carrying /OC: its pixels belong to that layer.
+  writeFileSync(
+    "image-oc-layer.pdf",
+    classic([
+      [
+        1,
+        "<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [6 0 R] /D << /Order [6 0 R] >> >> >>",
+      ],
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 1 /Height 1 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /OC 6 0 R",
+        flate([0, 128, 255]),
+      ),
+      [6, `<< /Type /OCG /Name (Artwork) >>`],
+    ]),
+  );
+
+  // 11. Baseline JPEG (DCTDecode), YCbCr: 16×16 quadrants TL red, TR green,
+  //     BL blue, BR yellow. Bytes generated once with macOS sips from a
+  //     lossless PNG (see the base64 provenance note below) — committed as
+  //     data because fixture generation must not depend on sips.
+  writeFileSync(
+    "image-jpeg.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 16 /Height 16 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode",
+        JPEG_RGB_QUAD,
+      ),
+    ]),
+  );
+
+  // 12. The same quadrants as an Adobe CMYK JPEG (APP14 transform 0,
+  //     inverted samples — the classic Photoshop convention): produced by
+  //     sips --matchTo "Generic CMYK", ICC APP2 segments stripped.
+  writeFileSync(
+    "image-jpeg-cmyk-adobe.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      placed(40, 40),
+      imageObj(
+        5,
+        "/Width 16 /Height 16 /ColorSpace /DeviceCMYK /BitsPerComponent 8 /Filter /DCTDecode",
+        JPEG_CMYK_QUAD,
+      ),
+    ]),
+  );
+
+  // 13. The dieline-over-artwork flagship (DEMO e2e loads this): a CMYK
+  //     raster with an SMask fading the right edge, under two spot-style
+  //     dieline strokes — cut (red) and crease (green) — that must always
+  //     read over the artwork.
+  {
+    const art = [];
+    for (let i = 0; i < 16; i++) art.push(0, 200, 220, 0); // warm orange CMYK
+    const mask = [];
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) mask.push(x < 3 ? 255 : 80);
+    const content =
+      "q 80 0 0 60 10 20 cm /Im0 Do Q\n" +
+      "1 0 0 RG 3 w 10 20 m 90 20 l 90 80 l 10 80 l 10 20 l S\n" +
+      "0 1 0 RG 1 w 50 20 m 50 80 l S\n";
+    writeFileSync(
+      "artwork-dieline.pdf",
+      classic([
+        catalog,
+        page(),
+        pageObj(),
+        [4, streamBody(content)],
+        imageObj(
+          5,
+          "/Width 4 /Height 4 /ColorSpace /DeviceCMYK /BitsPerComponent 8 " +
+            "/Filter /FlateDecode /SMask 6 0 R",
+          flate(art),
+        ),
+        imageObj(
+          6,
+          "/Width 4 /Height 4 /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode",
+          flate(mask),
+        ),
+      ]),
+    );
+  }
+
+  // 14. One XObject drawn twice: the document-scoped cache must hand both
+  //     placements the same decoded pixels (proven by identity in tests).
+  writeFileSync(
+    "image-shared-twice.pdf",
+    classic([
+      catalog,
+      page(),
+      pageObj(),
+      [4, streamBody(`q 30 0 0 30 5 5 cm /Im0 Do Q\nq 30 0 0 30 60 60 cm /Im0 Do Q\n`)],
+      imageObj(
+        5,
+        "/Width 1 /Height 1 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode",
+        flate([12, 34, 56]),
+      ),
+    ]),
+  );
+
+  console.log("wrote raster-image fixtures");
 }

@@ -142,13 +142,16 @@ that drew nothing has none.
 
 ### PDF-8: What this viewer does not draw is counted, never fatal
 
-Images, shadings, soft masks, non-normal blend modes, patterned fills,
-clipping paths, and glyph drawing procedures are skipped and reported per kind
-(INV-3), so a describe answers honestly about what was left out. Three
-optional-content cases are counted the same way (PDF-7): a membership
-dictionary simplified to its first group, a visibility expression left
-unevaluated, and a group whose print visibility differs from the screen state
-that was used.
+Shadings, soft masks (the graphics-state kind — an image's own soft mask
+draws, PDF-9), non-normal blend modes, patterned fills, clipping paths, and
+glyph drawing procedures are skipped and reported per kind (INV-3), so a
+describe answers honestly about what was left out. An image outside PDF-9's
+decodable set — JPEG 2000, JBIG2, CCITT fax, a progressive JPEG, an exotic
+colour space — is counted as `Image`, the same key as before images drew, so
+a count consumer needs no migration. Three optional-content cases are
+counted the same way (PDF-7): a membership dictionary simplified to its
+first group, a visibility expression left unevaluated, and a group whose
+print visibility differs from the screen state that was used.
 
 Glyph drawing procedures are counted where embedded typefaces are not, because
 they are vector artwork this pipeline could otherwise interpret — the count
@@ -172,3 +175,37 @@ of counted because they affect shapes that do draw: ignored clipping lets fills
 escape a region the producer meant to crop, and the single fill convention of
 PDF-3 approximates both of PDF's fill rules, so a self-intersecting or
 multiply-nested path may fill differently than intended.
+
+### PDF-9: Raster images draw
+
+Image XObjects decode to pixels and draw as image entities, placed by the
+transformation matrix like every other construct and landing on the layer
+their context dictates — a marked-content group or the XObject's own `/OC`
+(PDF-7). One object referenced from many pages or many operators decodes
+once; every placement shares the pixels. Inline images (`BI … EI`) remain
+counted.
+
+What decodes: Flate samples at 1, 2, 4, 8, and 16 bits per component (16
+keeps the high byte), and baseline JPEG through an own decoder — including
+the Adobe conventions real prepress files use, where four-component data is
+stored inverted. Pixels colour through the same resolved spaces as vector
+colour (PDF-3) — one resolver for pixels and paths, evaluated tint
+transforms and counted fallbacks included — plus Indexed through its base
+space, which is layered onto the image side because palettes occur in
+images while vector colour counts them. A colour simplification in an image
+counts once per decode, never per pixel. `/Decode` arrays remap; an image's
+`/SMask` becomes its alpha; a stencil mask paints the current fill colour.
+Anything else — JPEG 2000, JBIG2, CCITT fax, progressive JPEG — is counted
+(PDF-8).
+
+Decoded pixels are capped at 2048 on the long side, box-filtered down: a
+viewer never needs a 300-dpi press raster at full resolution, and the cap
+bounds memory and export payloads. The cap is a quality floor to revisit,
+not a contract.
+
+Draw order is approximated in layers rather than stream order: images under
+fills, fills under strokes — the existing fills-under-lines approximation
+extended one level. For the files this exists for, that ordering is the
+correct one: artwork below, dieline above, always. A file relying on paint
+order between an image and a fill may differ from a reference viewer, the
+same documented trade the fill convention makes (PDF-3).

@@ -10,6 +10,7 @@ import type { DrawingDocument, Entity, LayerInfo, LineTypeDef, Layout } from "..
 import { PDF_FORMAT, PdfDocument, pdfError } from "./document.ts";
 import { checkStrictGate } from "./gate.ts";
 import { CONTENT_LAYER, IDENTITY, interpretContent, multiply } from "./interpret.ts";
+import type { ImageCache } from "./image.ts";
 import { readOptionalContent } from "./optional-content.ts";
 import type { InterpretOptions, Matrix } from "./interpret.ts";
 import { toNumber } from "./objects.ts";
@@ -48,6 +49,8 @@ export async function parsePdfBytes(
   // Read once for the document: a group referenced from several pages is one
   // layer, not one per page (PDF-7).
   const optionalContent = await readOptionalContent(doc, await doc.catalog(), unsupported);
+  // One decode per image object across all pages (PDF-9).
+  const imageCache: ImageCache = new Map();
 
   for (const [index, page] of pages.entries()) {
     const content = await doc.pageContent(page);
@@ -67,7 +70,7 @@ export async function parsePdfBytes(
         doc,
         content,
         resources,
-        { ...options, optionalContent },
+        { ...options, optionalContent, imageCache },
         await pageMatrix(doc, page),
       );
     } catch {

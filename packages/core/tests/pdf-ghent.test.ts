@@ -228,7 +228,11 @@ describe.skipIf(!available)("Ghent PDF Output Suite V5.0", () => {
     expect(byColor.get(0xffffff) ?? 0).toBe(6);
     expect(byColor.get(0x000000) ?? 0).toBeGreaterThan(800);
     // What still approximates says so (PDF-8) — nothing falls back silently.
-    expect(doc.unsupported.TintTransform).toBe(14);
+    // 14 from vector scn applications; 5 more since PDF-9, one per decoded
+    // image whose Separation space carries a sampled/PostScript tint
+    // transform (counted once per decode). ColorSpace is unchanged: Indexed
+    // images decode through their palettes rather than counting.
+    expect(doc.unsupported.TintTransform).toBe(19);
     expect(doc.unsupported.ColorSpace).toBe(21);
   }, 300_000);
 
