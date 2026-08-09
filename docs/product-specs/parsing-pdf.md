@@ -46,9 +46,20 @@ resources and page geometry from their ancestors.
 
 Painted paths become geometry: strokes become polylines, fills become filled
 regions, and curves flatten at the same resolution as the rest of the
-pipeline. Stroke width, dash pattern, and color survive — CMYK and grayscale
-convert to RGB, and widths carry across as real lineweights, so a heavy line
-still reads as heavy. Nested form content draws in its parent's placement.
+pipeline. Stroke width, dash pattern, and color survive — widths carry across
+as real lineweights, so a heavy line still reads as heavy. Nested form content
+draws in its parent's placement.
+
+Color follows the file's color spaces. Device gray, RGB, and CMYK convert to
+RGB directly; an ICCBased space reads as the device space its component count
+names, the alternate the PDF specification itself prescribes for a viewer
+without color management. A Separation — a spot ink, such as a dieline's
+/Cutting — and a single-colorant DeviceN evaluate their tint transform into
+the alternate space, so spot-colored content keeps its intended color rather
+than reading a full tint as "gray 1", which is white. A tint transform this
+viewer cannot evaluate colors by ink coverage instead — full ink is dark,
+never white — and is counted; a space it cannot convert leaves the current
+color standing and is counted (PDF-8).
 
 Fills follow the path's own subpaths under one convention: the first subpath
 is the outer boundary and the rest are holes, the same convention DXF fills
@@ -145,6 +156,13 @@ records drawing that was skipped, never text that was lost, which is extracted
 regardless (PDF-4). Embedded typefaces are not counted because DXF does not
 count them either: both substitute the stroke font, and one policy covers both
 formats.
+
+Two color simplifications are counted the same way, because they change a
+color rather than omit a shape: a tint transform this viewer cannot evaluate
+falls back to ink coverage, and a color space it cannot convert — Indexed,
+Lab, a multi-colorant DeviceN, or a name that resolves to nothing — leaves
+the current color in place (PDF-3). The count is what keeps a changed color
+from passing as a faithful one.
 
 A file made mostly of these constructs loads to a nearly empty drawing. That is
 a correct report about the file, not a failure.
