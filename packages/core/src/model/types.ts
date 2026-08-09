@@ -188,6 +188,32 @@ export interface HatchEntity extends EntityBase {
   solid: boolean;
 }
 
+/** Decoded raster pixels carried by an IMAGE entity. */
+export interface RasterImage {
+  /** Pixel dimensions. */
+  width: number;
+  height: number;
+  /**
+   * RGBA bytes, 4 per pixel, rows top-to-bottom (row 0 is the image's top
+   * edge), pixels left-to-right. Alpha is straight, not premultiplied.
+   */
+  rgba: Uint8ClampedArray;
+}
+
+/**
+ * A placed raster image (PDF image XObjects; DXF IMAGE is future work).
+ *
+ * Placement follows PDF's convention: the image occupies the unit square in
+ * its own space — (0,0) bottom-left, (1,1) top-right, so the top pixel row
+ * lies along v=1 — and `transform` maps that square into drawing space.
+ */
+export interface ImageEntity extends EntityBase {
+  type: "IMAGE";
+  /** Unit square → drawing space. */
+  transform: Affine2D;
+  image: RasterImage;
+}
+
 export type Entity =
   | LineEntity
   | PolylineEntity
@@ -200,7 +226,8 @@ export type Entity =
   | SolidEntity
   | PointEntity
   | DimensionEntity
-  | HatchEntity;
+  | HatchEntity
+  | ImageEntity;
 
 export type EntityType = Entity["type"];
 

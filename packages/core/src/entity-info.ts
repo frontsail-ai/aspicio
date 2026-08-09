@@ -122,6 +122,12 @@ export function describeEntity(entity: Entity): EntityInfo {
     case "POINT":
     case "DIMENSION":
       return { ...base, position: entity.position };
+    case "IMAGE": {
+      // Anchor at the placed bottom-left corner; area of the parallelogram
+      // the unit square maps to (the image's footprint in drawing units).
+      const [a, b, c, d, tx, ty] = entity.transform;
+      return { ...base, position: { x: tx, y: ty }, area: Math.abs(a * d - b * c) };
+    }
     default:
       return base;
   }

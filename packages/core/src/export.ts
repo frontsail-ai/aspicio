@@ -1,3 +1,4 @@
+import { encodePng, toBase64 } from "./png.ts";
 import type { Tessellation } from "./tessellate/tessellate.ts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -54,9 +55,23 @@ export function tessellationToSvg(
 
   const fillPaths = new Map<string, string[]>(); // color → triangle path data
   const linePaths = new Map<string, { stroke: string; width: number; d: string[] }>();
+  const images: string[] = [];
 
   for (const [name, geo] of tessellation.layers) {
     if (!isVisible(name)) continue;
+
+    for (const placed of geo.images) {
+      const [a, b, c, d, tx, ty] = placed.transform;
+      // The placement maps the unit square with v up and the top pixel row
+      // at v=1; SVG's <image> space runs y-down from the top-left. Compose
+      // with (u, w) -> (u, 1 - w) so the rows land upright.
+      const matrix = [a, b, -c, -d, c + tx, d + ty].map(n).join(" ");
+      const href = `data:image/png;base64,${toBase64(encodePng(placed.image))}`;
+      images.push(
+        `<image width="1" height="1" preserveAspectRatio="none" ` +
+          `transform="matrix(${matrix})" href="${href}"/>`,
+      );
+    }
 
     const fp = geo.fillPositions;
     const fc = geo.fillColors;
@@ -80,8 +95,8 @@ export function tessellationToSvg(
     }
   }
 
-  const parts: string[] = [];
-  // Fills first (under the lines), then strokes.
+  const parts: string[] = [...images];
+  // Images sit under everything; fills next (under the lines), then strokes.
   for (const [color, ds] of fillPaths) {
     parts.push(`<path fill="${color}" stroke="none" d="${ds.join("")}"/>`);
   }

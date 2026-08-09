@@ -13,6 +13,7 @@ import type {
   EntityType,
   Layout,
   Point2,
+  RasterImage,
 } from "../model/types.ts";
 import { layoutText } from "../text/layout.ts";
 
@@ -21,6 +22,24 @@ type Affine = Affine2D;
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
 /** Block recursion bound, shared by rendering and text collection. */
 export const MAX_INSERT_DEPTH = 16;
+
+/**
+ * A raster image placed in tessellation coordinates (the shared offset
+ * already subtracted, like every position array).
+ *
+ * `transform` maps the unit square — (0,0) bottom-left, (1,1) top-right,
+ * the image's top pixel row along v=1 — into recentered drawing space.
+ * `corners` are the transformed unit-square corners (bl, br, tr, tl),
+ * precomputed because every consumer (WebGL quad, SVG placement, bounds)
+ * needs them.
+ */
+export interface PlacedImage {
+  image: RasterImage;
+  transform: Affine2D;
+  corners: [Point2, Point2, Point2, Point2];
+  /** Top-level entity index (parallels `segmentIds` / `fillIds`). */
+  entityId: number;
+}
 
 /** Batched line-segment (and optional filled-triangle) geometry for one layer. */
 export interface LayerGeometry {
@@ -38,6 +57,8 @@ export interface LayerGeometry {
   fillColors: Float32Array;
   /** Top-level entity index, one value per triangle (parallel to `fillPositions`). */
   fillIds: Int32Array;
+  /** Raster images on this layer, in draw order (under fills and lines). */
+  images: PlacedImage[];
 }
 
 export interface Tessellation {
@@ -47,6 +68,8 @@ export interface Tessellation {
   offset: Point2;
   /** Total line segments emitted. */
   segmentCount: number;
+  /** Total raster images placed. */
+  imageCount: number;
   /**
    * Colors actually drawn per layer (24-bit RGB → segment count). Unlike the
    * layer-table color, this reflects per-entity overrides, ByBlock
@@ -65,6 +88,12 @@ export interface TessellationContext {
   addFill(rings: Point2[][]): void;
   /** Recurse into a block for INSERT-like entities. */
   addBlock(blockName: string, transform: Affine, layer: string, color: number | null): void;
+  /**
+   * Place a raster image. `local` maps the unit square — (0,0) bottom-left,
+   * top pixel row along v=1 — into entity-local coordinates; the walk
+   * transform is applied on top.
+   */
+  addImage(image: RasterImage, local: Affine2D): void;
   readonly curveSegments: number;
 }
 
@@ -168,6 +197,11 @@ registerEntityHandler("HATCH", (e, ctx) => {
   }
 });
 
+registerEntityHandler("IMAGE", (e, ctx) => {
+  if (e.type !== "IMAGE") return;
+  ctx.addImage(e.image, e.transform);
+});
+
 /** POINT marker half-size in drawing units. */
 const POINT_MARK = 0.6;
 
@@ -225,6 +259,8 @@ interface Accumulator {
   fillPositions: number[];
   fillColors: number[];
   fillIds: number[];
+  /** Placed images with world-space transforms; recentered in finalize. */
+  images: PlacedImage[];
 }
 
 export interface TessellateOptions {
@@ -259,6 +295,7 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
   let maxX = -Infinity;
   let maxY = -Infinity;
   let segmentCount = 0;
+  let imageCount = 0;
 
   const layerColor = (name: string): number => doc.layers.get(name)?.color ?? 0xffffff;
 
@@ -318,6 +355,7 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
             fillPositions: [],
             fillColors: [],
             fillIds: [],
+            images: [],
           };
           accumulators.set(layer, acc);
         }
@@ -432,6 +470,26 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
             clip,
           );
         },
+        addImage(image, local) {
+          // Viewport-framed model content would need quad clipping plus UV
+          // rework; no current producer emits images there, so skip (PDF
+          // pages carry no viewports).
+          if (clip) return;
+          const m = multiply(entityTransform, local);
+          const corner = (u: number, v: number): Point2 => ({
+            x: m[0] * u + m[2] * v + m[4],
+            y: m[1] * u + m[3] * v + m[5],
+          });
+          const corners: [Point2, Point2, Point2, Point2] = [
+            corner(0, 0),
+            corner(1, 0),
+            corner(1, 1),
+            corner(0, 1),
+          ];
+          for (const p of corners) track(p.x, p.y);
+          getAcc().images.push({ image, transform: m, corners, entityId });
+          imageCount += 1;
+        },
       };
 
       handlers.get(entity.type)?.(entity, ctx);
@@ -454,6 +512,24 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
       return out;
     };
 
+    const recenterImage = (img: PlacedImage): PlacedImage => ({
+      ...img,
+      transform: [
+        img.transform[0],
+        img.transform[1],
+        img.transform[2],
+        img.transform[3],
+        img.transform[4] - offset.x,
+        img.transform[5] - offset.y,
+      ],
+      corners: img.corners.map((p) => ({ x: p.x - offset.x, y: p.y - offset.y })) as [
+        Point2,
+        Point2,
+        Point2,
+        Point2,
+      ],
+    });
+
     const layers = new Map<string, LayerGeometry>();
     for (const [name, acc] of accumulators) {
       layers.set(name, {
@@ -464,10 +540,11 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
         fillPositions: recenter(acc.fillPositions),
         fillColors: new Float32Array(acc.fillColors),
         fillIds: Int32Array.from(acc.fillIds),
+        images: acc.images.map(recenterImage),
       });
     }
 
-    return { layers, bounds, offset, segmentCount, layerColors };
+    return { layers, bounds, offset, segmentCount, imageCount, layerColors };
   };
 
   return { walk, finalize };
