@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vite-plus/test";
 import { PdfDocument, isStream } from "../src/parse/pdf/document.ts";
+import { parsePdfBytes } from "../src/parse/pdf/parse.ts";
 import { checkStrictGate } from "../src/parse/pdf/gate.ts";
 import { interpretContent } from "../src/parse/pdf/interpret.ts";
 import { isUndecoded } from "../src/parse/pdf/filters.ts";
@@ -22,9 +23,10 @@ import { PdfLexer, isKeyword, isName, latin1 } from "../src/parse/pdf/objects.ts
  * of the suite will legitimately differ.
  */
 
-const dir = fileURLToPath(
-  new URL("../../../tmp/Ghent_PDF_Output_Suite_V50_Testpages/", import.meta.url),
-);
+// The suite's default home; GHENT_CORPUS_DIR points at a copy elsewhere.
+const dir =
+  process.env.GHENT_CORPUS_DIR?.replace(/\/?$/, "/") ??
+  fileURLToPath(new URL("../../../tmp/Ghent_PDF_Output_Suite_V50_Testpages/", import.meta.url));
 const X4 = `${dir}Ghent_PDF-Output-Test-V50_ALL_X4.pdf`;
 const REFERENCE = `${dir}Ghent_PDF-Output-Test-V50_ALL_REFERENCE.pdf`;
 const available = existsSync(X4) && existsSync(REFERENCE);
@@ -209,6 +211,25 @@ describe.skipIf(!available)("Ghent PDF Output Suite V5.0", () => {
     expect(counts).toHaveLength(6);
     // Every page draws something; a zero would mean a page silently failed.
     for (const count of counts) expect(count).toBeGreaterThan(0);
+  }, 300_000);
+
+  // The X4 file colours most of its vector content through Separation spaces
+  // (37 of them; 223 scn applications). Before tint transforms were
+  // evaluated, a full tint read as "gray 1" and 797 of these entities came
+  // out white — invisible on paper-white. The exact counts below were
+  // measured against V5.0 with the resolver in place.
+  test("spot-coloured content keeps its intended colours, not white", async () => {
+    const doc = await parsePdfBytes(new Uint8Array(readFileSync(X4)));
+    const byColor = new Map<number, number>();
+    for (const entity of doc.entities) {
+      const color = entity.color ?? -1;
+      byColor.set(color, (byColor.get(color) ?? 0) + 1);
+    }
+    expect(byColor.get(0xffffff) ?? 0).toBe(6);
+    expect(byColor.get(0x000000) ?? 0).toBeGreaterThan(800);
+    // What still approximates says so (PDF-8) — nothing falls back silently.
+    expect(doc.unsupported.TintTransform).toBe(14);
+    expect(doc.unsupported.ColorSpace).toBe(21);
   }, 300_000);
 
   test("a real page yields geometry and readable text", async () => {
