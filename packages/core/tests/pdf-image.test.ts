@@ -143,10 +143,14 @@ test("the dieline always reads over its artwork (PDF-9)", async () => {
   expect(kinds.filter((k) => k === "IMAGE")).toHaveLength(1);
   expect(kinds.filter((k) => k === "POLYLINE")).toHaveLength(2);
 
-  const image = doc.entities.find((e): e is ImageEntity => e.type === "IMAGE");
+  const image = doc.entities.find((e): e is ImageEntity => e.type === "IMAGE") as ImageEntity;
+  // The artwork sits on its own group; the dieline strokes stay on Content.
+  expect(image.layer).toBe("Artwork");
+  // Cyan-ish CMYK through the naive conversion, exactly.
+  expect(px(image, 0, 0).slice(0, 3)).toEqual([46, 215, 215]);
   // The SMask fades the right column: alpha 255 on the left, 80 there.
-  expect(px(image as ImageEntity, 0, 0)[3]).toBe(255);
-  expect(px(image as ImageEntity, 3, 0)[3]).toBe(80);
+  expect(px(image, 0, 0)[3]).toBe(255);
+  expect(px(image, 3, 0)[3]).toBe(80);
   expect(doc.unsupported["Image"]).toBeUndefined();
 });
 

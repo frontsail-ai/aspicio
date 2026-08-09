@@ -1255,13 +1255,13 @@ console.log("wrote gate-path fixtures");
     ]),
   );
 
-  // 13. The dieline-over-artwork flagship (DEMO e2e loads this): a CMYK
-  //     raster with an SMask fading the right edge, under two spot-style
-  //     dieline strokes — cut (red) and crease (green) — that must always
-  //     read over the artwork.
+  // 13. The dieline-over-artwork flagship (the demo e2e loads this): a
+  //     cyan-ish CMYK raster with an SMask fading the right edge, on its
+  //     own "Artwork" group (/OC), under two dieline strokes — cut (red)
+  //     and crease (green) — that must always read over the artwork.
   {
     const art = [];
-    for (let i = 0; i < 16; i++) art.push(0, 200, 220, 0); // warm orange CMYK
+    for (let i = 0; i < 16; i++) art.push(200, 0, 0, 40); // cyan-ish CMYK
     const mask = [];
     for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) mask.push(x < 3 ? 255 : 80);
     const content =
@@ -1271,14 +1271,17 @@ console.log("wrote gate-path fixtures");
     writeFileSync(
       "artwork-dieline.pdf",
       classic([
-        catalog,
+        [
+          1,
+          "<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [7 0 R] /D << /Order [7 0 R] >> >> >>",
+        ],
         page(),
         pageObj(),
         [4, streamBody(content)],
         imageObj(
           5,
           "/Width 4 /Height 4 /ColorSpace /DeviceCMYK /BitsPerComponent 8 " +
-            "/Filter /FlateDecode /SMask 6 0 R",
+            "/Filter /FlateDecode /SMask 6 0 R /OC 7 0 R",
           flate(art),
         ),
         imageObj(
@@ -1286,6 +1289,7 @@ console.log("wrote gate-path fixtures");
           "/Width 4 /Height 4 /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode",
           flate(mask),
         ),
+        [7, `<< /Type /OCG /Name (Artwork) >>`],
       ]),
     );
   }

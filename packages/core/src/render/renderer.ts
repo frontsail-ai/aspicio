@@ -176,6 +176,12 @@ export class SceneRenderer {
     });
     const mesh = new Mesh(geometry, material);
     mesh.frustumCulled = false;
+    // renderOrder alone cannot put a transparent quad under opaque lines —
+    // three.js draws the transparent pass after the opaque pass regardless.
+    // Sitting slightly behind the z=0 plane lets the lines' and fills'
+    // depth buffer cull the image where they drew, which is what "under"
+    // means here (PDF-9).
+    mesh.position.z = -0.1;
     mesh.renderOrder = -1;
     this.scene.add(mesh);
     return mesh;

@@ -8,8 +8,10 @@
  * they live in gitignored `tmp/pdf-samples/`. CI fetches them from a
  * private corpus store; locally they are copied in once. The skip is
  * guarded twice: it may only fire when the directory is genuinely absent,
- * and never in CI — a corpus that silently stopped running would turn this
- * suite into decoration.
+ * and never when the workflow fetched the corpus (PDF_CORPUS_REQUIRED) — a
+ * corpus that silently stopped running would turn this suite into
+ * decoration. Forks have no corpus token, so their CI skips rather than
+ * fails.
  *
  * Every number is pinned exactly. A decoder regression shows up as a
  * changed count, not a vague "fewer things drew".
@@ -51,8 +53,8 @@ const CORPUS: Record<string, Expectation> = {
 };
 
 test("the corpus is present, or genuinely absent — and never absent in CI", () => {
-  if (process.env.CI) {
-    expect(present, "tmp/pdf-samples must exist in CI (the workflow fetches it)").toBe(true);
+  if (process.env.PDF_CORPUS_REQUIRED) {
+    expect(present, "the workflow fetched the corpus, yet tmp/pdf-samples is missing").toBe(true);
   }
   if (!present) return;
   for (const name of Object.keys(CORPUS)) {
