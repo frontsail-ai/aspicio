@@ -36,6 +36,23 @@ const DEFAULT_LINEWEIGHT_SCALE = 5;
 /** Selection overlay colours. */
 const SELECT_COLOR = 0x8fc8ff;
 
+/*
+ * Render-order bands. Three.js draws the opaque pass first, then the
+ * transparent pass; renderOrder is the primary sort key *within* each pass
+ * and cannot order across them. Raster images are transparent-pass content,
+ * so anything that must draw above them has to sit in the transparent pass
+ * with a higher renderOrder — being "later" in the opaque pass is not
+ * enough. And `depthTest: false` cannot substitute: disabling the GL depth
+ * test also disables depth *writes*, so an opaque-pass overlay leaves no
+ * depth for a later image fragment to fail against (issue #169).
+ *
+ *   -1  raster images        (transparent pass — alpha from SMasks)
+ *    0  fills                (opaque pass)
+ *    1  lines                (opaque pass)
+ *  10+  overlays             (transparent pass — highlight, selection;
+ *                             VIEW-6/VIEW-8: bold *on top of all content*)
+ */
+
 /** Three.js-backed renderer drawing batched per-layer line segments. */
 export class SceneRenderer {
   private readonly renderer: WebGLRenderer;
@@ -70,15 +87,19 @@ export class SceneRenderer {
     this.renderer.setClearColor(this.clearColor, this.clearAlpha);
     this.camera.position.z = 10;
     this.lineWeightScale = options.lineWeightScale ?? DEFAULT_LINEWEIGHT_SCALE;
+    // Overlays are transparent on purpose — see the render-band contract
+    // above: it is what puts them in the pass that draws after images.
     this.highlightMaterial = new LineMaterial({
       vertexColors: true,
       linewidth: options.highlightWidth ?? 4,
       depthTest: false,
+      transparent: true,
     });
     this.selectLineMaterial = new LineMaterial({
       color: SELECT_COLOR,
       linewidth: 4,
       depthTest: false,
+      transparent: true,
     });
     this.selectFillMaterial = new MeshBasicMaterial({
       color: SELECT_COLOR,
@@ -263,7 +284,7 @@ export class SceneRenderer {
       geo.setAttribute("position", new BufferAttribute(fillPositions, 3));
       const mesh = new Mesh(geo, this.selectFillMaterial);
       mesh.frustumCulled = false;
-      mesh.renderOrder = 2;
+      mesh.renderOrder = 11;
       this.scene.add(mesh);
       this.selectFillObject = mesh;
     }
@@ -272,7 +293,7 @@ export class SceneRenderer {
       geo.setPositions(linePositions);
       const object = new LineSegments2(geo, this.selectLineMaterial);
       object.frustumCulled = false;
-      object.renderOrder = 3;
+      object.renderOrder = 12;
       this.scene.add(object);
       this.selectLineObject = object;
     }

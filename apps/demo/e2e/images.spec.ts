@@ -13,6 +13,7 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { PNG } from "pngjs";
 import { canvasColors, probeViewer } from "./helpers.ts";
 
 const fixture = (name: string): string =>
@@ -49,6 +50,55 @@ test("artwork renders under the dieline: raster below, strokes on top", async ({
   // …and the green crease runs entirely *inside* the artwork: it is only
   // visible if strokes draw over the image. Z-order regressions erase it.
   expect(colors.green).toBeGreaterThan(20);
+});
+
+test("hover highlight thickens lines above the artwork (VIEW-6, #169)", async ({ page }) => {
+  await loadDieline(page);
+  const before = await canvasColors(page);
+
+  // Hover the Content row: the dieline strokes redraw bold. The crease runs
+  // entirely inside the artwork, so the thickened pixels only appear if the
+  // overlay draws above the raster — the depth-write trap this test pins.
+  await row(page, "Content").hover();
+  await page.waitForTimeout(250);
+  const hovered = await canvasColors(page);
+  expect(hovered.green).toBeGreaterThan(before.green * 1.5);
+});
+
+test("selection overlay stays above the artwork (VIEW-8, #169)", async ({ page }) => {
+  await loadDieline(page);
+  const canvas = page.locator("#viewer canvas");
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("canvas has no bounding box");
+
+  // Select the crease polyline (mid-canvas, inside the artwork), then count
+  // selection-blue pixels with the artwork shown vs hidden. Equal counts
+  // mean the overlay is not being swallowed; before the fix the visible
+  // half was only the sliver protected by the base line's depth.
+  const selectionBlue = async (): Promise<number> => {
+    const shot = PNG.sync.read(await canvas.screenshot());
+    let n = 0;
+    for (let i = 0; i < shot.data.length; i += 4) {
+      const r = shot.data[i];
+      const g = shot.data[i + 1];
+      const b = shot.data[i + 2];
+      if (r > 110 && r < 180 && g > 170 && g < 230 && b > 230) n += 1;
+    }
+    return n;
+  };
+
+  await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  await page.waitForTimeout(300);
+  await expect(page.locator("#info-type")).toHaveText("POLYLINE");
+  const withArtwork = await selectionBlue();
+
+  await row(page, "Artwork").locator(".layer-check").click();
+  await page.waitForTimeout(250);
+  const withoutArtwork = await selectionBlue();
+
+  expect(withArtwork).toBeGreaterThan(0);
+  // Allow a whisker of anti-aliasing drift where the overlay meets the raster.
+  expect(Math.abs(withArtwork - withoutArtwork)).toBeLessThan(withoutArtwork * 0.05);
 });
 
 test("toggling the Artwork layer hides the raster but keeps the dieline", async ({ page }) => {
