@@ -14,7 +14,8 @@ the window. The picker accepts every format the app has opted into (DXF
 and PDF); drag-and-drop and URLs are format-agnostic, because what a source
 is gets decided from its bytes (PARSE-13), never from its extension. While
 loading, a status line shows the file name; on success the top bar shows
-name, entity count, and segment count.
+name, entity count, and segment count — both counts for the space on screen
+(VIEW-16), redrawn when the space changes (DEMO-14).
 
 ### DEMO-2: Unsupported-entity report
 
@@ -112,7 +113,10 @@ the viewport — on narrow screens it wraps rather than pushing actions
 ### DEMO-14: Paper-space tabs
 
 When the drawing has layouts, tabs above the canvas switch between Model
-and each layout; the switcher is absent for model-only drawings.
+and each layout; the switcher is absent for model-only drawings. Switching
+redraws the header counts and the layer panel, because both describe the
+space on screen (VIEW-16) — a layer's count changes with the page, and a
+layer holding nothing on the new space moves into the empty-layers group.
 
 ### DEMO-15: Crawlable page shell
 
@@ -199,20 +203,31 @@ loading the tag.
 
 ### DEMO-20: Empty-result notice
 
-A load can succeed and still draw nothing — a file whose entire content is
-constructs the pipeline counts instead of draws (PDF-8), or a valid file with
-no 2D geometry at all. A silently empty canvas under full viewer chrome reads
-as a failure, so a completed load with zero drawable entities explains itself:
-a notice in the canvas area says the file parsed but has nothing to draw,
+A silently empty canvas under full viewer chrome reads as a failure, so an
+empty canvas explains itself. It has two causes, and they get different
+answers.
+
+The whole drawing can be undrawable — a file whose entire content is constructs
+the pipeline counts instead of draws (PDF-8), or a valid file with no 2D
+geometry at all. The notice then says the file parsed but has nothing to draw,
 names the skipped counts when any exist, and offers the open-another-file and
 sample actions. When nothing was skipped the copy says the file contains no
 drawable geometry and claims nothing about skipping.
 
+Or the space on screen can be empty while the drawing is not — an ordinary
+state for a multi-page PDF. The notice then names the space on screen, names
+the spaces that do hold content, and offers to go to the first of them. The
+file is fine, so the open and sample actions are not what this reader needs and
+are not shown. Reporting only the document-level case left this one an
+unexplained blank canvas with the answer one tab away, which is the worse
+failure of the two.
+
+The notice describes the space on screen (VIEW-16) and is re-evaluated on every
+space switch (DEMO-14).
+
 The notice adds to the DEMO-2 chip rather than replacing it, and error
 handling is unchanged: a _failed_ load still shows the DEMO-3 toast over
-whatever was loaded before, including a previous empty result. The notice is
-document-level — a single empty page of a multi-page document does not
-trigger it, because the page tabs already make that emptiness navigable.
+whatever was loaded before, including a previous empty result.
 
 ### DEMO-21: Transient surfaces dismiss uniformly
 

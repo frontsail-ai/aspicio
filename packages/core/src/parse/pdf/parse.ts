@@ -8,6 +8,7 @@
 
 import type { DrawingDocument, Entity, LayerInfo, LineTypeDef, Layout } from "../../model/types.ts";
 import { PDF_FORMAT, PdfDocument, pdfError } from "./document.ts";
+import { countEntitiesByLayer } from "../../layers.ts";
 import { checkStrictGate } from "./gate.ts";
 import { CONTENT_LAYER, IDENTITY, interpretContent, multiply } from "./interpret.ts";
 import type { ImageCache } from "./image.ts";
@@ -102,12 +103,16 @@ export async function parsePdfBytes(
   if (doc.truncatedStreams > 0) unsupported["TruncatedStream"] = doc.truncatedStreams;
 
   // Entity counts per layer; every group gets a row even when nothing drew on
-  // it, so the panel reports what the file declares (PDF-7).
-  const counts = new Map<string, number>();
-  for (const entity of entities) counts.set(entity.layer, (counts.get(entity.layer) ?? 0) + 1);
+  // it, so the panel reports what the file declares (PDF-7). Layer *identity*
+  // spans the whole document — one group referenced from four pages is one row
+  // — but the count is per-space, seeded here with page 1 and re-derived on
+  // each activation, so the row and the total beside it always agree.
+  const counts = countEntitiesByLayer(entities);
+  // Whether a layer exists is a document-wide question, so a group that draws
+  // only on page 4 still earns a row — at 0 while page 1 is shown.
+  const drawnAnywhere = new Set(counts.keys());
   for (const layout of layouts)
-    for (const entity of layout.entities)
-      counts.set(entity.layer, (counts.get(entity.layer) ?? 0) + 1);
+    for (const entity of layout.entities) drawnAnywhere.add(entity.layer);
 
   const layers = new Map<string, LayerInfo>();
   const addLayer = (name: string, visible: boolean): void => {
@@ -126,8 +131,7 @@ export async function parsePdfBytes(
   // quantity — three corpus files are entirely unmarked. It appears when it
   // holds something, or when nothing else does, so a fully-layered file does
   // not gain a row the file never declared and a drawing always has a layer.
-  const unmarked = counts.get(CONTENT_LAYER) ?? 0;
-  if (!layers.has(CONTENT_LAYER) && (unmarked > 0 || layers.size === 0))
+  if (!layers.has(CONTENT_LAYER) && (drawnAnywhere.has(CONTENT_LAYER) || layers.size === 0))
     addLayer(CONTENT_LAYER, true);
 
   return {

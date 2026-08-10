@@ -88,8 +88,15 @@ for an info panel — reused by the demo and the React bindings.
 
 A layout renders its own sheet geometry plus each viewport's model content,
 transformed to the sheet scale and clipped to the window — all baked into
-one paper-space tessellation (`tessellateLayout`). Entity picking is limited
-to model space. `document.layouts` holds the parsed `Layout[]`.
+one paper-space tessellation (`tessellateLayout`, or `tessellateSpace(doc,
+name)` to pick a space by name). Entity picking is limited to model space.
+`document.layouts` holds the parsed `Layout[]`.
+
+`stats.entityCount`, `stats.segmentCount`, and every layer's `entityCount`
+describe the space on screen and change when it does (VIEW-16); a sheet counts
+the model layers its viewports draw, so nothing reads zero while it is visible.
+`stats.documentEntityCount` is the whole drawing, for "did anything load at
+all".
 
 ### Camera
 

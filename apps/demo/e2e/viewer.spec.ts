@@ -548,6 +548,96 @@ test("paper-space layouts appear as tabs and switch model ↔ sheet", async ({ p
   expect((await canvasColors(page)).green).toBeGreaterThan(100); // model inside the viewport
 });
 
+// DEMO-1 + DEMO-14 + VIEW-16: the header and the layer rows describe the space
+// on screen, and move together when it changes. They used to be computed from
+// different scopes, so a layer could report more entities than the header said
+// the drawing had (issue #161).
+test("header counts and layer rows agree, in every space", async ({ page }) => {
+  const sumOfRows = async (): Promise<number> => {
+    const counts = await page.locator(".layer-row .layer-count").allTextContents();
+    return counts.reduce((n, t) => n + Number(t), 0);
+  };
+  const headerEntities = async (): Promise<number> =>
+    Number((await page.locator("#stats").textContent())!.match(/^(\d+) ENT/)![1]);
+
+  await page.locator("#file").setInputFiles(fixture("layout.dxf"));
+  await expect(page.locator("#file-chip")).toHaveText("layout.dxf");
+
+  // Model space: 4 entities on MODEL, nothing yet on the sheet's layer.
+  await expect(page.locator("#stats")).toHaveText("4 ENT · 78 SEG");
+  expect(await sumOfRows()).toBe(await headerEntities());
+  await expect(row(page, "MODEL").locator(".layer-count")).toHaveText("4");
+  await expect(row(page, "SHEET").locator(".layer-count")).toHaveText("0");
+
+  // The sheet draws its border and — through its viewport — model space, so
+  // MODEL is still counted here. Both numbers change; neither goes stale.
+  await page.locator(".space-tab", { hasText: "Layout1" }).click();
+  await expect(page.locator("#stats")).toHaveText("7 ENT · 128 SEG");
+  expect(await sumOfRows()).toBe(await headerEntities());
+  await expect(row(page, "SHEET").locator(".layer-count")).toHaveText("3");
+  await expect(row(page, "MODEL").locator(".layer-count")).toHaveText("4");
+});
+
+// PDF-5 + VIEW-16: pages are spaces, and each page's counts are its own. The
+// header used to show page 1's figures whatever page was drawn.
+test("each PDF page reports its own counts", async ({ page }) => {
+  await page.locator("#file").setInputFiles(fixture("three-pages-varied.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("three-pages-varied.pdf");
+  await expect(page.locator(".space-tab")).toHaveCount(3);
+
+  // The fixture draws a different number of lines per page precisely so a
+  // readout left over from page 1 is visible rather than coincidentally right.
+  for (const [space, n] of [
+    ["Model", 1],
+    ["Page 2", 2],
+    ["Page 3", 3],
+  ] as const) {
+    await page.locator(".space-tab", { hasText: space }).click();
+    await expect(page.locator(".space-tab.active")).toHaveText(space);
+    await expect(page.locator("#stats")).toHaveText(`${n} ENT · ${n} SEG`);
+    // One document-wide "Content" row (PDF-7), counting this page (VIEW-16).
+    await expect(row(page, "Content").locator(".layer-count")).toHaveText(String(n));
+  }
+});
+
+// DEMO-20: an empty *space* is not an empty file, and neither is silent.
+test("an empty page says so and offers the page that has content", async ({ page }) => {
+  await page.locator("#file").setInputFiles(fixture("blank-first-page.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("blank-first-page.pdf");
+
+  // Page 1 draws nothing, but pages 2 and 3 do — so this is not "no drawable
+  // content", and it must not be silent either (the answer is one tab away).
+  await expect(page.locator("#stats")).toHaveText("0 ENT · 0 SEG");
+  await expect(page.locator("#empty-result")).toBeVisible();
+  await expect(page.locator("#empty-result-title")).toHaveText("Nothing to draw on Model");
+  await expect(page.locator("#empty-result-body")).toContainText("Page 2 and Page 3");
+  // The file is fine, so these are not the actions this reader needs.
+  await expect(page.locator("#empty-result-open")).toBeHidden();
+  await expect(page.locator("#empty-result-sample")).toBeHidden();
+
+  // The offer works, and the notice clears once there is something to draw.
+  await expect(page.locator("#empty-result-space")).toHaveText("Go to Page 2");
+  await page.locator("#empty-result-space").click();
+  await expect(page.locator(".space-tab.active")).toHaveText("Page 2");
+  await expect(page.locator("#stats")).toHaveText("1 ENT · 1 SEG");
+  await expect(page.locator("#empty-result")).toBeHidden();
+
+  // Switching back re-evaluates it rather than leaving the canvas unexplained.
+  await page.locator(".space-tab", { hasText: "Model" }).click();
+  await expect(page.locator("#empty-result")).toBeVisible();
+});
+
+// The whole-drawing case keeps its own copy and its own actions.
+test("a file with nothing drawable anywhere still reports the file, not a page", async ({
+  page,
+}) => {
+  await page.locator("#file").setInputFiles(fixture("shading-only.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("shading-only.pdf");
+  await expect(page.locator("#empty-result-title")).toHaveText("This file has no drawable content");
+  await expect(page.locator("#empty-result-space")).toBeHidden();
+  await expect(page.locator("#empty-result-open")).toBeVisible();
+});
+
 test("parse separates model entities from the layout's paper geometry", async ({ page }) => {
   await page.locator("#file").setInputFiles(fixture("layout.dxf"));
   await expect(page.locator("#file-chip")).toHaveText("layout.dxf");

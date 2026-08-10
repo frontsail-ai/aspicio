@@ -124,13 +124,23 @@ Parse, describe, and render with no browser at all (server-side
 previews, thumbnails, pipelines):
 
 ```ts
-import { parseWith, tessellate, describeDrawing, tessellationToSvg } from "@aspicio/core";
+import {
+  describeDrawing,
+  parseWith,
+  tessellate,
+  tessellateSpace,
+  tessellationToSvg,
+} from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
 
 const doc = await parseWith([dxfParser], bytes); // ASCII or binary DXF
-const drawing = tessellate(doc);
-const summary = describeDrawing(doc, drawing); // units, bounds, layers, texts…
-const svg = tessellationToSvg(drawing);
+const summary = describeDrawing(doc); // units, bounds, layers, texts, spaces…
+const svg = tessellationToSvg(tessellate(doc)); // model space (a PDF's page 1)
+
+// Multi-page PDFs and multi-sheet DXFs: describe covers all of them, and
+// either verb can be scoped to one.
+const page3 = describeDrawing(doc, { space: "Page 3" });
+const sheet = tessellationToSvg(tessellateSpace(doc, "Layout1"));
 ```
 
 What you get: WebGL rendering batched to one draw call per layer (large

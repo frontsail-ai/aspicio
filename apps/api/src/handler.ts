@@ -1,4 +1,10 @@
-import { describeDrawing, parseWith, tessellate, tessellationToSvg } from "@aspicio/core";
+import {
+  UnknownSpaceError,
+  describeDrawing,
+  parseWith,
+  tessellateSpace,
+  tessellationToSvg,
+} from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
 import { pdfParser } from "@aspicio/core/pdf";
 import { fetchDrawing, HttpError, MAX_BYTES } from "./fetch.ts";
@@ -80,12 +86,23 @@ async function resolveDxf(req: Request, url: URL): Promise<Uint8Array> {
   return fetchDrawing(src);
 }
 
+/**
+ * `space` names one page/layout to work on; absent means the whole drawing for
+ * describe and the first space for render. An unknown name is a 400 rather
+ * than a silent fallback — a caller asking for page 7 of a 6-page file has a
+ * bug, and answering with page 1 hides it (AGT-5).
+ */
+function spaceParam(url: URL): string | undefined {
+  return url.searchParams.get("space") ?? undefined;
+}
+
 async function handleDescribe(
   bytes: Uint8Array,
+  url: URL,
   parsers: readonly (typeof dxfParser)[],
 ): Promise<Response> {
   const doc = await parseFor(parsers, bytes, "describe");
-  return json(describeDrawing(doc, tessellate(doc, {})));
+  return json(describeDrawing(doc, { space: spaceParam(url) }));
 }
 
 async function handleRender(
@@ -104,7 +121,11 @@ async function handleRender(
   const background = bgParam === "none" ? undefined : (bgParam ?? DEFAULT_BG);
 
   const doc = await parseFor(parsers, bytes, "render");
-  const svg = tessellationToSvg(tessellate(doc, {}), undefined, background ? { background } : {});
+  const svg = tessellationToSvg(
+    tessellateSpace(doc, spaceParam(url)),
+    undefined,
+    background ? { background } : {},
+  );
 
   if (format === "svg")
     return new Response(svg, {
@@ -185,11 +206,11 @@ export async function handleRequest(
         // for Claude.ai and other web clients.
         return await handleMcp(req, renderPng, widgetHtml);
       case "/describe":
-        return await handleDescribe(await resolveDxf(req, url), DXF_ONLY);
+        return await handleDescribe(await resolveDxf(req, url), url, DXF_ONLY);
       case "/describe-pdf":
-        return await handleDescribe(await resolveDxf(req, url), PDF_ONLY);
+        return await handleDescribe(await resolveDxf(req, url), url, PDF_ONLY);
       case "/describe-doc":
-        return await handleDescribe(await resolveDxf(req, url), ANY_FORMAT);
+        return await handleDescribe(await resolveDxf(req, url), url, ANY_FORMAT);
       case "/render":
         // `await` matters: without it a rejection inside handleRender would
         // escape this try/catch and surface as an unhandled 500.
@@ -202,6 +223,9 @@ export async function handleRequest(
         return json({ error: "not found" }, 404);
     }
   } catch (err) {
+    // Naming a space the drawing lacks is a bad request, not a broken file —
+    // 422 ("could not process") would send the caller looking at their PDF.
+    if (err instanceof UnknownSpaceError) return json({ error: err.message }, 400);
     if (err instanceof HttpError) {
       const res = json({ error: err.message }, err.status);
       // Well-behaved clients back off on this; 60 = the bucket period.

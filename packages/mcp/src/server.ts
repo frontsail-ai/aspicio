@@ -8,6 +8,7 @@ import {
   DRAWING_SUMMARY_SHAPE,
   READ_ONLY_HINTS,
   sourceDescription,
+  spaceSchema,
   TOOLS,
   widthSchema,
 } from "@aspicio/agent-tools";
@@ -60,11 +61,11 @@ export function createServer(): McpServer {
           title: tool.title,
           annotations: READ_ONLY_HINTS,
           description: tool.description,
-          inputSchema: { source: z.string().describe(SOURCE_DESC) },
+          inputSchema: { source: z.string().describe(SOURCE_DESC), space: spaceSchema },
           outputSchema: DRAWING_SUMMARY_SHAPE,
         },
-        async ({ source }) => {
-          const summary = await describeFor[tool.format](await loadDrawing(source));
+        async ({ source, space }) => {
+          const summary = await describeFor[tool.format](await loadDrawing(source), space);
           return {
             content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
             structuredContent: summary as unknown as Record<string, unknown>,
@@ -79,10 +80,14 @@ export function createServer(): McpServer {
           // No outputSchema on purpose: the result IS the image, not data.
           annotations: READ_ONLY_HINTS,
           description: tool.description,
-          inputSchema: { source: z.string().describe(SOURCE_DESC), width: widthSchema },
+          inputSchema: {
+            source: z.string().describe(SOURCE_DESC),
+            width: widthSchema,
+            space: spaceSchema,
+          },
         },
-        async ({ source, width }) => {
-          const png = await renderFor[tool.format](await loadDrawing(source), width);
+        async ({ source, width, space }) => {
+          const png = await renderFor[tool.format](await loadDrawing(source), width, space);
           return {
             content: [
               { type: "image", data: Buffer.from(png).toString("base64"), mimeType: "image/png" },

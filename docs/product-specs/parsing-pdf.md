@@ -101,6 +101,12 @@ a form or image XObject; both occur in real files. Layer identity is
 document-wide: a group referenced from several pages is one layer across the
 spaces of PDF-5, not one per page.
 
+A layer's _count_, unlike its identity, is scoped to one space (VIEW-16,
+INV-13): the row for a group carrying content on four pages reports what the
+page on screen holds, and changes as pages change. A row whose count spans the
+document while the total beside it spans one page are not two views of one
+number, and disagreed by thousands on real files.
+
 Content belonging to no group stays on a layer named "Content", which remains
 for that purpose rather than disappearing — real files range from fully layered
 to fully unlayered. It is listed when it holds something, or when nothing else

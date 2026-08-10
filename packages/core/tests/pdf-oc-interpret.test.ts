@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vite-plus/test";
 import { parsePdfBytes } from "../src/parse/pdf/parse.ts";
+import { tessellateSpace } from "../src/tessellate/tessellate.ts";
 
 const parse = async (name: string) =>
   parsePdfBytes(
@@ -74,12 +75,19 @@ test("an XObject's own /OC layers its content, and cannot leak (PDF-7)", async (
 
 test("one group carrying content on two pages is one layer (PDF-7)", async () => {
   const doc = await parse("ocg-multipage-shared.pdf");
-  // Page 1 is model space, page 2 a layout (PDF-5) — but layer identity is
-  // document-wide, so this is one row whose count spans both, not two rows.
+  // Page 1 is model space, page 2 a layout (PDF-5) — but layer *identity* is
+  // document-wide, so this is one row, not two.
   expect([...doc.layers.keys()]).toEqual(["Shared Across Pages"]);
-  expect(doc.layers.get("Shared Across Pages")?.entityCount).toBe(3);
   expect(doc.layouts?.length).toBe(1);
   expect(onLayer(doc, "Shared Across Pages")).toBe(3);
+
+  // The row's *count* is per-space, and always accounts for exactly the space
+  // it describes: one entity on page 1, two on page 2. It used to report 3 on
+  // both, which is a number no space has (issue #161).
+  expect(doc.layers.get("Shared Across Pages")?.entityCount).toBe(1);
+  expect(doc.entities.length).toBe(1);
+  expect(tessellateSpace(doc, "Page 2").entityCounts.get("Shared Across Pages")).toBe(2);
+  expect(doc.layouts?.[0].entities.length).toBe(2);
 });
 
 test("a declared group that draws nothing is still a layer with no entities", async () => {

@@ -4,6 +4,8 @@ import { ocsToWcs } from "../geom/ocs.ts";
 import { sampleSpline } from "../geom/spline.ts";
 import { triangulate } from "../geom/triangulate.ts";
 import { clipPolygon, clipSegment, viewportRect, viewportTransform } from "../geom/viewport.ts";
+import { countEntitiesByLayer } from "../layers.ts";
+import { MODEL_SPACE, UnknownSpaceError, layoutEntities, spaceNames } from "../spaces.ts";
 import type { Rect } from "../geom/viewport.ts";
 import type {
   Affine2D,
@@ -76,6 +78,15 @@ export interface Tessellation {
    * inheritance, and block layer rules — what the viewer really shows.
    */
   layerColors: Map<string, Map<number, number>>;
+  /**
+   * Top-level entities per layer *in this space*, and nothing outside it.
+   *
+   * It rides on the tessellation because a tessellation is exactly one space:
+   * a count read from here cannot have come from a different space than the
+   * geometry beside it, which is how the panel's rows and the total above them
+   * stay two views of one number. Summing the values gives the space's total.
+   */
+  entityCounts: Map<string, number>;
 }
 
 export interface TessellationContext {
@@ -283,7 +294,12 @@ interface Tessellator {
     entityIdOverride: number | null,
     clip: Rect | null,
   ): void;
-  finalize(): Tessellation;
+  /**
+   * Everything but `entityCounts`, which the space entry points add: only they
+   * know which entity lists make up the space (a sheet's own geometry plus
+   * whatever its windows borrow from model space).
+   */
+  finalize(): Omit<Tessellation, "entityCounts">;
 }
 
 function createTessellator(doc: DrawingDocument, options: TessellateOptions): Tessellator {
@@ -496,7 +512,7 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
     }
   }
 
-  const finalize = (): Tessellation => {
+  const finalize = (): Omit<Tessellation, "entityCounts"> => {
     const bounds: Bounds | null = minX <= maxX ? { minX, minY, maxX, maxY } : null;
     const offset: Point2 = bounds
       ? { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
@@ -554,7 +570,31 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
 export function tessellate(doc: DrawingDocument, options: TessellateOptions = {}): Tessellation {
   const t = createTessellator(doc, options);
   t.walk(doc.entities, IDENTITY, null, null, 0, null, null, null);
-  return t.finalize();
+  return { ...t.finalize(), entityCounts: countEntitiesByLayer(doc.entities) };
+}
+
+/**
+ * Tessellate a space by name — model space when `name` is omitted or
+ * {@link MODEL_SPACE}, otherwise the layout that carries it.
+ *
+ * Every caller that renders or describes goes through here, so "which space"
+ * is decided once rather than re-decided at each call site. It used to be
+ * re-decided at ten of them, every one hardcoding model space, which is why no
+ * agent surface could reach page 2 of a PDF.
+ *
+ * @throws UnknownSpaceError for a name the drawing does not have. The viewer
+ * does not come through here — it ignores unknown names (VIEW-14) — so nothing
+ * is served by a silent fallback that would quietly render the wrong sheet.
+ */
+export function tessellateSpace(
+  doc: DrawingDocument,
+  name?: string,
+  options: TessellateOptions = {},
+): Tessellation {
+  if (name === undefined || name === MODEL_SPACE) return tessellate(doc, options);
+  const layout = doc.layouts?.find((l) => l.name === name);
+  if (!layout) throw new UnknownSpaceError(name, spaceNames(doc));
+  return tessellateLayout(doc, layout, options);
 }
 
 /**
@@ -573,5 +613,5 @@ export function tessellateLayout(
   for (const vp of layout.viewports) {
     t.walk(doc.entities, viewportTransform(vp), null, null, 0, null, null, viewportRect(vp));
   }
-  return t.finalize();
+  return { ...t.finalize(), entityCounts: countEntitiesByLayer(layoutEntities(doc, layout)) };
 }

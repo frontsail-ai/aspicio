@@ -473,3 +473,121 @@ test("no PDF-only endpoint mentions DXF anywhere in its prose (AGT-16)", async (
     all.length,
   );
 });
+
+/* ---------- spaces (AGT-1, AGT-2) ---------- */
+
+// Model space plus a paper sheet, so "the drawing" and "one space" differ.
+const TWO_SPACES = [
+  "0",
+  "SECTION",
+  "2",
+  "ENTITIES",
+  "0",
+  "LINE",
+  "8",
+  "MODEL",
+  "10",
+  "0",
+  "20",
+  "0",
+  "11",
+  "1",
+  "21",
+  "1",
+  "0",
+  "LINE",
+  "8",
+  "SHEET",
+  "67",
+  "1",
+  "10",
+  "0",
+  "20",
+  "0",
+  "11",
+  "10",
+  "21",
+  "4",
+  "0",
+  "ENDSEC",
+  "0",
+  "EOF",
+].join("\n");
+
+test("/describe covers the whole drawing, and `space` scopes it", async () => {
+  const whole = (await (await handleRequest(post("/describe", TWO_SPACES), noPng)).json()) as {
+    space: string | null;
+    entityCount: number;
+    spaces: { name: string; entityCount: number }[];
+    layers: { entityCount: number }[];
+  };
+  expect(whole.space).toBeNull();
+  expect(whole.entityCount).toBe(2);
+  expect(whole.spaces.map((s) => s.name)).toEqual(["Model", "Layout1"]);
+  expect(whole.layers.reduce((n, l) => n + l.entityCount, 0)).toBe(whole.entityCount);
+
+  const sheet = (await (
+    await handleRequest(post("/describe?space=Layout1", TWO_SPACES), noPng)
+  ).json()) as { space: string | null; entityCount: number; layers: { entityCount: number }[] };
+  expect(sheet.space).toBe("Layout1");
+  expect(sheet.entityCount).toBe(1);
+  expect(sheet.layers.reduce((n, l) => n + l.entityCount, 0)).toBe(sheet.entityCount);
+});
+
+test("/render draws the space asked for", async () => {
+  const svg = async (query: string): Promise<string> =>
+    (await handleRequest(post(`/render?format=svg${query}`, TWO_SPACES), noPng)).text();
+  // The sheet's line is ten times the model's, so the two spaces cannot
+  // render to the same picture.
+  const model = await svg("");
+  expect(await svg("&space=Model")).toBe(model); // the default is model space
+  expect(await svg("&space=Layout1")).not.toBe(model);
+});
+
+test("an unknown space is a 400, not a silent page one (AGT-5)", async () => {
+  for (const path of ["/describe?space=Nope", "/render?space=Nope"]) {
+    const res = await handleRequest(post(path, TWO_SPACES), noPng);
+    expect(res.status, path).toBe(400);
+    // The message names what the drawing does have, so a caller can recover.
+    expect(((await res.json()) as { error: string }).error).toContain('"Model", "Layout1"');
+  }
+});
+
+test("the OpenAPI document offers `space` on every describe and render operation", async () => {
+  const doc = (await (await handleRequest(get("/openapi.json"), noPng)).json()) as {
+    paths: Record<string, Record<string, { parameters?: { $ref?: string; name?: string }[] }>>;
+    components: {
+      parameters: Record<string, unknown>;
+      schemas: Record<string, { required?: string[]; properties?: Record<string, unknown> }>;
+    };
+  };
+  expect(doc.components.parameters["space"]).toBeDefined();
+
+  // Both input forms of all six endpoints — the generated variants included.
+  // A parameter added to the DXF operations only would leave `/describe-pdf`
+  // unable to reach page 2, which is the whole point of the argument.
+  for (const [path, ops] of Object.entries(doc.paths)) {
+    if (!path.startsWith("/describe") && !path.startsWith("/render")) continue;
+    for (const [verb, op] of Object.entries(ops)) {
+      const names = (op.parameters ?? []).map((p) => p.$ref ?? p.name);
+      expect(names, `${verb.toUpperCase()} ${path}`).toContain("#/components/parameters/space");
+    }
+  }
+
+  const summary = doc.components.schemas["DrawingSummary"]!;
+  expect(summary.required).toContain("spaces");
+  expect(doc.components.schemas["SpaceSummary"]).toBeDefined();
+});
+
+// The summary contract lives in three hand-maintained copies: the TypeScript
+// interface, the zod shape the MCP servers publish, and the JSON schema in the
+// OpenAPI document. Adding a field to two of them is the documented failure
+// mode in this repo, so the third is pinned against the second here.
+test("the OpenAPI summary schema and the MCP output schema describe one shape", async () => {
+  const { DRAWING_SUMMARY_SHAPE } = await import("@aspicio/agent-tools");
+  const doc = (await (await handleRequest(get("/openapi.json"), noPng)).json()) as {
+    components: { schemas: Record<string, { properties?: Record<string, unknown> }> };
+  };
+  const published = Object.keys(doc.components.schemas["DrawingSummary"]!.properties ?? {}).sort();
+  expect(published).toEqual(Object.keys(DRAWING_SUMMARY_SHAPE).sort());
+});
