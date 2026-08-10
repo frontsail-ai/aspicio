@@ -2,12 +2,15 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  DataTexture,
   DoubleSide,
+  LinearFilter,
   LineBasicMaterial,
   LineSegments,
   Mesh,
   MeshBasicMaterial,
   OrthographicCamera,
+  RGBAFormat,
   Scene,
   WebGLRenderer,
 } from "three";
@@ -48,6 +51,8 @@ export class SceneRenderer {
   private readonly lineWeightScale: number;
   private layerObjects = new Map<string, (LineSegments | LineSegments2)[]>();
   private fillObjects = new Map<string, Mesh>();
+  /** Textured quads for raster images, per layer. Own material + texture each. */
+  private imageObjects = new Map<string, Mesh[]>();
   private highlightObject: LineSegments2 | null = null;
   private selectLineObject: LineSegments2 | null = null;
   private selectFillObject: Mesh | null = null;
@@ -105,7 +110,15 @@ export class SceneRenderer {
     this.clearGeometry();
     this.tessellation = tessellation;
     for (const [name, layer] of tessellation.layers) {
-      // Fills draw first (renderOrder 0), lines on top (renderOrder 1).
+      // Images draw under everything (renderOrder -1), fills next (0),
+      // lines on top (1) — the fills-under-lines approximation extended one
+      // level, so a dieline always reads over its artwork (PDF-9).
+      if (layer.images.length > 0) {
+        this.imageObjects.set(
+          name,
+          layer.images.map((placed) => this.buildImageObject(placed)),
+        );
+      }
       if (layer.fillPositions.length > 0) {
         const fillGeo = new BufferGeometry();
         fillGeo.setAttribute("position", new BufferAttribute(layer.fillPositions, 3));
@@ -119,6 +132,59 @@ export class SceneRenderer {
         this.layerObjects.set(name, this.buildLineObjects(layer));
       }
     }
+  }
+
+  /** One textured two-triangle quad on the placed corners. */
+  private buildImageObject(placed: {
+    image: { width: number; height: number; rgba: Uint8ClampedArray };
+    corners: readonly { x: number; y: number }[];
+  }): Mesh {
+    const { image, corners } = placed;
+    const texture = new DataTexture(
+      new Uint8Array(image.rgba.buffer, image.rgba.byteOffset, image.rgba.byteLength),
+      image.width,
+      image.height,
+      RGBAFormat,
+    );
+    // Left at the default color space on purpose: vertex colors pass through
+    // unconverted, and the artwork must get the identical treatment or it
+    // would not match the vectors drawn from the same file.
+    texture.minFilter = LinearFilter;
+    texture.magFilter = LinearFilter;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+
+    const [bl, br, tr, tl] = corners;
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new BufferAttribute(
+        new Float32Array([bl.x, bl.y, 0, br.x, br.y, 0, tr.x, tr.y, 0, tl.x, tl.y, 0]),
+        3,
+      ),
+    );
+    // Texture row 0 (the image's top edge) sits at GL v=0, so the top
+    // corners take v=0 and the bottom corners v=1.
+    geometry.setAttribute("uv", new BufferAttribute(new Float32Array([0, 1, 1, 1, 1, 0, 0, 0]), 2));
+    geometry.setIndex([0, 1, 2, 0, 2, 3]);
+
+    const material = new MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: DoubleSide,
+      depthWrite: false,
+    });
+    const mesh = new Mesh(geometry, material);
+    mesh.frustumCulled = false;
+    // renderOrder alone cannot put a transparent quad under opaque lines —
+    // three.js draws the transparent pass after the opaque pass regardless.
+    // Sitting slightly behind the z=0 plane lets the lines' and fills'
+    // depth buffer cull the image where they drew, which is what "under"
+    // means here (PDF-9).
+    mesh.position.z = -0.1;
+    mesh.renderOrder = -1;
+    this.scene.add(mesh);
+    return mesh;
   }
 
   /**
@@ -177,6 +243,7 @@ export class SceneRenderer {
     for (const object of this.layerObjects.get(name) ?? []) object.visible = visible;
     const fill = this.fillObjects.get(name);
     if (fill) fill.visible = visible;
+    for (const mesh of this.imageObjects.get(name) ?? []) mesh.visible = visible;
   }
 
   /** Highlight a single entity: its line segments and any filled interior. */
@@ -288,8 +355,18 @@ export class SceneRenderer {
       this.scene.remove(fill);
       fill.geometry.dispose();
     }
+    for (const meshes of this.imageObjects.values()) {
+      for (const mesh of meshes) {
+        this.scene.remove(mesh);
+        mesh.geometry.dispose();
+        const material = mesh.material as MeshBasicMaterial;
+        material.map?.dispose();
+        material.dispose();
+      }
+    }
     this.layerObjects = new Map();
     this.fillObjects = new Map();
+    this.imageObjects = new Map();
     this.tessellation = null;
   }
 

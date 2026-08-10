@@ -20,6 +20,8 @@ import { isStream } from "./document.ts";
 import type { PdfDocument } from "./document.ts";
 import { cmykToRgb, grayToRgb, resolveColorSpace, rgb } from "./color-space.ts";
 import type { ColorSpaceModel } from "./color-space.ts";
+import { decodeImage } from "./image.ts";
+import type { ImageCache } from "./image.ts";
 import { PdfLexer, isKeyword, isName, isRef, isString, toNumber } from "./objects.ts";
 import { buildFontDecoder } from "./text.ts";
 import type { FontDecoder } from "./text.ts";
@@ -125,6 +127,11 @@ export interface InterpretOptions {
   curveSegments?: number;
   /** Optional-content model; absent leaves everything on "Content" (PDF-7). */
   optionalContent?: OptionalContent;
+  /**
+   * Shared image-decode cache. Pass one per document: an image XObject
+   * referenced from several pages decodes once (PDF-9).
+   */
+  imageCache?: ImageCache;
 }
 
 /**
@@ -144,6 +151,7 @@ export async function interpretContent(
     doc,
     options.curveSegments ?? DEFAULT_CURVE_SEGMENTS,
     options.optionalContent,
+    options.imageCache,
   );
   await run.execute(content, resources, baseCtm, 0);
   return { entities: run.entities, lineTypes: run.lineTypes, unsupported: run.unsupported };
@@ -163,6 +171,7 @@ class Interpreter {
   private readonly doc: PdfDocument;
   private readonly curveSegments: number;
   private readonly oc: OptionalContent | undefined;
+  private readonly imageCache: ImageCache;
   /**
    * One entry per open `BDC`/`BMC`, holding the layer it opened or undefined.
    *
@@ -179,10 +188,11 @@ class Interpreter {
   // Explicit fields rather than constructor parameter properties: the example
   // apps compile core from source under `erasableSyntaxOnly`, which rejects
   // the shorthand.
-  constructor(doc: PdfDocument, curveSegments: number, oc?: OptionalContent) {
+  constructor(doc: PdfDocument, curveSegments: number, oc?: OptionalContent, images?: ImageCache) {
     this.doc = doc;
     this.curveSegments = curveSegments;
     this.oc = oc;
+    this.imageCache = images ?? new Map();
   }
 
   /**
@@ -849,7 +859,36 @@ class Interpreter {
 
     const subtype = object.dict.get("Subtype");
     if (isName(subtype) && subtype.name === "Image") {
-      this.count("Image");
+      // An image XObject may carry `/OC` itself, exactly like a form.
+      const ocLayer = await this.ocLayerFor(object.dict.get("OC"));
+      // Stencil masks paint with the current fill colour, so their pixels —
+      // and therefore their cache slot — depend on it.
+      const isStencil = object.dict.get("ImageMask") === true || object.dict.get("IM") === true;
+      const key = isRef(ref)
+        ? isStencil
+          ? `${ref.num}/${state.fillColor}`
+          : `${ref.num}`
+        : undefined;
+      let image = key === undefined ? undefined : this.imageCache.get(key);
+      if (image === undefined) {
+        image =
+          (await decodeImage(this.doc, object, state.fillColor, true, (kind) =>
+            this.count(kind),
+          )) ?? null;
+        if (key !== undefined) this.imageCache.set(key, image);
+      }
+      if (image === null) {
+        // Still undrawable — JPX, JBIG2, CCITT, exotic colour spaces (PDF-8).
+        this.count("Image");
+        return;
+      }
+      this.entities.push({
+        type: "IMAGE",
+        layer: ocLayer ?? this.currentLayer(),
+        color: null,
+        transform: [...state.ctm],
+        image,
+      });
       return;
     }
     if (!isName(subtype) || subtype.name !== "Form") return;

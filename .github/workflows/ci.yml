@@ -32,6 +32,25 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # The PDF acceptance corpus (Ghent V5.0 + PDFX-ready X4) is licensed
+      # for workflow testing but not public redistribution, so it lives in a
+      # private repo rather than this one. Forks have no token: the step
+      # degrades to a notice and the acceptance tests skip; in-org runs set
+      # PDF_CORPUS_REQUIRED so a silently missing corpus fails loudly.
+      - name: Fetch the PDF acceptance corpus
+        env:
+          GH_TOKEN: ${{ secrets.CORPUS_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::No CORPUS_TOKEN (fork?) — PDF acceptance tests will skip"
+            exit 0
+          fi
+          mkdir -p tmp/pdf-samples
+          gh release download corpus-v1 --repo frontsail-ai/test-corpora \
+            --pattern 'pdf-samples.zip' --output /tmp/pdf-samples.zip
+          unzip -o -j /tmp/pdf-samples.zip -d tmp/pdf-samples
+          echo "PDF_CORPUS_REQUIRED=1" >> "$GITHUB_ENV"
+
       - name: Format, lint, type-check
         run: bunx vp check
 
@@ -61,6 +80,25 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      # The PDF acceptance corpus (Ghent V5.0 + PDFX-ready X4) is licensed
+      # for workflow testing but not public redistribution, so it lives in a
+      # private repo rather than this one. Forks have no token: the step
+      # degrades to a notice and the acceptance tests skip; in-org runs set
+      # PDF_CORPUS_REQUIRED so a silently missing corpus fails loudly.
+      - name: Fetch the PDF acceptance corpus
+        env:
+          GH_TOKEN: ${{ secrets.CORPUS_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::No CORPUS_TOKEN (fork?) — PDF acceptance tests will skip"
+            exit 0
+          fi
+          mkdir -p tmp/pdf-samples
+          gh release download corpus-v1 --repo frontsail-ai/test-corpora \
+            --pattern 'pdf-samples.zip' --output /tmp/pdf-samples.zip
+          unzip -o -j /tmp/pdf-samples.zip -d tmp/pdf-samples
+          echo "PDF_CORPUS_REQUIRED=1" >> "$GITHUB_ENV"
 
       - name: Cache Playwright browsers
         uses: actions/cache@v5

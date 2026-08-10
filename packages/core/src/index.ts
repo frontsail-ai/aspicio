@@ -44,6 +44,7 @@ export type {
   TessellateOptions,
   EntityHandler,
   LayerGeometry,
+  PlacedImage,
 } from "./tessellate/tessellate.ts";
 
 export { Camera2D } from "./camera/camera2d.ts";
@@ -84,4 +85,6 @@ export type {
   PointEntity,
   DimensionEntity,
   HatchEntity,
+  ImageEntity,
+  RasterImage,
 } from "./model/types.ts";

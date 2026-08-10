@@ -53,11 +53,12 @@ discovering mid-answer:
 - **Measurements are in points** (1/72 inch). A PDF carries no drawing
   scale, so "how big is this part" can only be answered in page units
   unless the drawing labels its own scale.
-- **Renders show line work and text, not the page.** Images, shadings, and
-  transparency are counted in the summary's skipped list rather than
-  drawn, so a PDF that is mostly a scan renders nearly blank — that is an
-  accurate report about the file, not a failed render. Check the skipped
-  counts before concluding a drawing is empty.
+- **Renders include raster artwork.** Flattened prepress files draw their
+  images under the vector line work, so a print PDF renders as its page.
+  Shadings, transparency, and images in codecs outside the decoded set
+  (JPEG 2000, JBIG2, CCITT fax) are counted in the summary's skipped list
+  rather than drawn — check those counts before concluding a drawing is
+  missing content.
 
 Use `describe_doc` / `render_doc` when the format is unknown; the reply's
 `format` field names what was read.
