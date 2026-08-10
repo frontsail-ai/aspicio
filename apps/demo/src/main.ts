@@ -5,7 +5,13 @@ import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
 import "./style.css";
-import { DrawingViewer, attachShortcuts, niceLength, partitionLayers } from "@aspicio/core";
+import {
+  DrawingViewer,
+  attachShortcuts,
+  niceLength,
+  partitionLayers,
+  spaceEntities,
+} from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
 import { pdfParser } from "@aspicio/core/pdf";
 import type { EntityInfo, LayerInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
@@ -162,10 +168,11 @@ app.innerHTML = `
       </div>
       <div id="empty-result" class="empty-state" hidden>
         <div class="empty-inner">
-          <div class="empty-kicker empty-kicker-warn">NOTHING TO DRAW</div>
-          <h2 class="empty-title">This file has no drawable content</h2>
+          <div id="empty-result-kicker" class="empty-kicker empty-kicker-warn">NOTHING TO DRAW</div>
+          <h2 id="empty-result-title" class="empty-title">This file has no drawable content</h2>
           <div id="empty-result-body" class="empty-body"></div>
           <div class="empty-actions">
+            <button id="empty-result-space" class="btn-primary" type="button" hidden></button>
             <button id="empty-result-open" class="btn-primary" type="button">Open another file</button>
             <button id="empty-result-sample" class="btn-ghost" type="button">Load sample</button>
           </div>
@@ -372,6 +379,9 @@ const viewer = new DrawingViewer(viewerEl, { background: null, parsers: [dxfPars
 let mode: Mode = "empty";
 let currentName = "";
 let soloLayer: string | null = null;
+/** Space the empty-result notice offers to jump to, or null when it isn't
+ *  offering one (the whole drawing is empty, not just this space). */
+let emptySpaceTarget: string | null = null;
 let hoveredLayer: string | null = null;
 let hoverSource: "row" | "canvas" | null = null;
 let baselineZoom = 1;
@@ -909,6 +919,7 @@ function setSpace(name: string): void {
   // Leaving them alone showed page 1's figures over page 3's drawing.
   buildLayerPanel();
   showStats();
+  showEmptyResult();
 }
 
 /* ---------- status / readout ---------- */
@@ -919,6 +930,64 @@ function showStats(): void {
   $("#stats").textContent = `${entityCount} ENT · ${segmentCount} SEG`;
 }
 
+/** "A", "A and B", "A, B and C". */
+function joinNames(names: readonly string[]): string {
+  if (names.length < 2) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** Spaces holding something to draw, in tab order (VIEW-16). */
+function spacesWithContent(): string[] {
+  const doc = viewer.document;
+  if (!doc) return [];
+  return viewer.getSpaces().filter((name) => (spaceEntities(doc, name)?.length ?? 0) > 0);
+}
+
+/**
+ * Explain an empty canvas (DEMO-20), for whichever of the two reasons applies.
+ *
+ * The whole drawing can be undrawable — a file of constructs the pipeline
+ * counts instead of draws (PDF-8), or one with no 2D geometry at all. Or just
+ * the space on screen can be empty while the rest of the file is fine, which
+ * is ordinary in a multi-page PDF; that one names the spaces that do hold
+ * content and offers to go there, because an unexplained blank canvas with the
+ * answer one tab away is the worse failure.
+ */
+function showEmptyResult(): void {
+  const { entityCount, documentEntityCount } = viewer.stats;
+  const jump = $<HTMLButtonElement>("#empty-result-space");
+  if (entityCount > 0) {
+    $("#empty-result").hidden = true;
+    return;
+  }
+
+  const elsewhere = spacesWithContent().filter((name) => name !== viewer.activeSpaceName);
+  $("#empty-result").hidden = false;
+  emptySpaceTarget = documentEntityCount > 0 && elsewhere.length > 0 ? elsewhere[0] : null;
+  jump.hidden = emptySpaceTarget === null;
+  $("#empty-result-open").hidden = emptySpaceTarget !== null;
+  $("#empty-result-sample").hidden = emptySpaceTarget !== null;
+
+  if (emptySpaceTarget !== null) {
+    jump.textContent = `Go to ${emptySpaceTarget}`;
+    $("#empty-result-kicker").textContent = "NOTHING TO DRAW HERE";
+    $("#empty-result-title").textContent = `Nothing to draw on ${viewer.activeSpaceName}`;
+    $("#empty-result-body").textContent =
+      `This part of the drawing is empty. The rest is on ${joinNames(elsewhere)}.`;
+    return;
+  }
+
+  const skippedTotal = Object.values(viewer.stats.unsupported).reduce((n, v) => n + v, 0);
+  $("#empty-result-kicker").textContent = "NOTHING TO DRAW";
+  $("#empty-result-title").textContent = "This file has no drawable content";
+  $("#empty-result-body").textContent =
+    skippedTotal > 0
+      ? "This file parsed, but everything in it is content Aspicio doesn't " +
+        `draw yet — ${skippedTotal} skipped (${$("#skipped-detail").textContent}). ` +
+        "Drawings with vector geometry or raster images display normally."
+      : "This file parsed but contains no drawable 2D geometry.";
+}
+
 viewer.on("loaded", () => {
   soloLayer = null;
   setHover(null, null);
@@ -926,7 +995,7 @@ viewer.on("loaded", () => {
   buildLayerPanel();
   buildSpaceTabs();
 
-  const { documentEntityCount, unsupported } = viewer.stats;
+  const { unsupported } = viewer.stats;
   $("#file-chip").textContent = currentName;
   showStats();
 
@@ -939,19 +1008,7 @@ viewer.on("loaded", () => {
 
   setMode("loaded");
 
-  // A parse can succeed and still draw nothing — a file made only of
-  // constructs this viewer skips, or one with no 2D geometry at all. Silent
-  // chrome around an empty canvas reads as a failure, so the emptiness
-  // explains itself instead (DEMO-20). Composes with the chip (DEMO-2).
-  // The whole file, not the space on screen: a PDF whose first page is blank
-  // has five more to offer, and the tabs are right there.
-  $("#empty-result").hidden = documentEntityCount > 0;
-  $("#empty-result-body").textContent =
-    skippedTotal > 0
-      ? "This file parsed, but everything in it is content Aspicio doesn't " +
-        `draw yet — ${skippedTotal} skipped (${$("#skipped-detail").textContent}). ` +
-        "Drawings with vector geometry or raster images display normally."
-      : "This file parsed but contains no drawable 2D geometry.";
+  showEmptyResult();
 
   // Restore a deep-linked view once, after the panel/tabs exist. Only valid for
   // the sample (the source the link implicitly refers to).
@@ -1445,6 +1502,12 @@ for (const id of ["#open", "#empty-open", "#error-open", "#empty-result-open"]) 
 for (const id of ["#load-sample", "#empty-sample", "#error-sample", "#empty-result-sample"]) {
   $(id).addEventListener("click", loadSample);
 }
+
+// Bound once; the notice re-points the target rather than re-binding, so
+// repeated space switches can't stack listeners.
+$("#empty-result-space").addEventListener("click", () => {
+  if (emptySpaceTarget !== null) setSpace(emptySpaceTarget);
+});
 
 $("#error-dismiss").addEventListener("click", () => {
   $("#error-toast").hidden = true;

@@ -203,22 +203,31 @@ loading the tag.
 
 ### DEMO-20: Empty-result notice
 
-A load can succeed and still draw nothing — a file whose entire content is
-constructs the pipeline counts instead of draws (PDF-8), or a valid file with
-no 2D geometry at all. The question is asked of the whole drawing, not the
-space on screen: a PDF whose first page is blank has its other pages a tab
-away, and calling that file empty would be wrong. A silently empty canvas under full viewer chrome reads
-as a failure, so a completed load with zero drawable entities explains itself:
-a notice in the canvas area says the file parsed but has nothing to draw,
+A silently empty canvas under full viewer chrome reads as a failure, so an
+empty canvas explains itself. It has two causes, and they get different
+answers.
+
+The whole drawing can be undrawable — a file whose entire content is constructs
+the pipeline counts instead of draws (PDF-8), or a valid file with no 2D
+geometry at all. The notice then says the file parsed but has nothing to draw,
 names the skipped counts when any exist, and offers the open-another-file and
 sample actions. When nothing was skipped the copy says the file contains no
 drawable geometry and claims nothing about skipping.
 
+Or the space on screen can be empty while the drawing is not — an ordinary
+state for a multi-page PDF. The notice then names the space on screen, names
+the spaces that do hold content, and offers to go to the first of them. The
+file is fine, so the open and sample actions are not what this reader needs and
+are not shown. Reporting only the document-level case left this one an
+unexplained blank canvas with the answer one tab away, which is the worse
+failure of the two.
+
+The notice describes the space on screen (VIEW-16) and is re-evaluated on every
+space switch (DEMO-14).
+
 The notice adds to the DEMO-2 chip rather than replacing it, and error
 handling is unchanged: a _failed_ load still shows the DEMO-3 toast over
-whatever was loaded before, including a previous empty result. The notice is
-document-level — a single empty page of a multi-page document does not
-trigger it, because the page tabs already make that emptiness navigable.
+whatever was loaded before, including a previous empty result.
 
 ### DEMO-21: Transient surfaces dismiss uniformly
 
