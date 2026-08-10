@@ -44,7 +44,7 @@
     "happy-dom": "^20.11.1",
     "typescript": "^7.0.2",
     "vite-plus": "catalog:",
-    "vue": "^3.5.0"
+    "vue": "^3.5.41"
   },
   "peerDependencies": {
     "three": ">=0.184.0 <1.0.0",
