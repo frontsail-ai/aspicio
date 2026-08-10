@@ -56,14 +56,16 @@ function buildHuffman(counts: Uint8Array, values: Uint8Array): HuffmanTable {
 /* ---------- bit reader with byte stuffing ---------- */
 
 class BitReader {
+  // Explicit fields rather than constructor parameter properties: the
+  // example apps compile core from source under `erasableSyntaxOnly`,
+  // which rejects the shorthand (same lesson as the interpreter).
+  private readonly data: Uint8Array;
   private pos: number;
   private buffer = 0;
   private bits = 0;
 
-  constructor(
-    private readonly data: Uint8Array,
-    start: number,
-  ) {
+  constructor(data: Uint8Array, start: number) {
+    this.data = data;
     this.pos = start;
   }
 
