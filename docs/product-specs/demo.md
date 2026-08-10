@@ -196,3 +196,20 @@ The tag itself loads only on the exact production host
 lookalike domain — so dev servers and the Playwright suites never report.
 `?asp_consent_ui=1` renders the banner off-host for review and e2e without ever
 loading the tag.
+
+### DEMO-20: Empty-result notice
+
+A load can succeed and still draw nothing — a file whose entire content is
+constructs the pipeline counts instead of draws (PDF-8), or a valid file with
+no 2D geometry at all. A silently empty canvas under full viewer chrome reads
+as a failure, so a completed load with zero drawable entities explains itself:
+a notice in the canvas area says the file parsed but has nothing to draw,
+names the skipped counts when any exist, and offers the open-another-file and
+sample actions. When nothing was skipped the copy says the file contains no
+drawable geometry and claims nothing about skipping.
+
+The notice adds to the DEMO-2 chip rather than replacing it, and error
+handling is unchanged: a _failed_ load still shows the DEMO-3 toast over
+whatever was loaded before, including a previous empty result. The notice is
+document-level — a single empty page of a multi-page document does not
+trigger it, because the page tabs already make that emptiness navigable.
