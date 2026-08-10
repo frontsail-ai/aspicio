@@ -101,7 +101,7 @@ jobs:
           echo "PDF_CORPUS_REQUIRED=1" >> "$GITHUB_ENV"
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
