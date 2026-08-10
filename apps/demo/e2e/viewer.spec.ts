@@ -459,6 +459,69 @@ test("exports the drawing as a downloadable SVG and PNG", async ({ page }) => {
   expect(png.suggestedFilename()).toBe("sample.png");
 });
 
+// DEMO-21 (#129): transient surfaces close on Escape and yield to modals — no
+// menu may float above a modal backdrop. Every assertion below is driven by a
+// keypress, or by a click that no click-outside listener would act on, so it
+// fails when a surface leaves the dismissal registry rather than passing on
+// the pre-existing click-outside path.
+test("Escape closes the export menu and the skipped popover", async ({ page }) => {
+  await loadSample(page);
+
+  await page.locator("#export-btn").click();
+  await expect(page.locator("#export-pop")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#export-pop")).toBeHidden();
+
+  await page.locator("#skipped-btn").click();
+  await expect(page.locator("#skipped-pop")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#skipped-pop")).toBeHidden();
+
+  // Escape still reaches the surfaces behind the light layer afterwards.
+  await page.keyboard.press("?");
+  await expect(page.locator("#shortcuts")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#shortcuts")).toBeHidden();
+});
+
+test("opening the shortcuts modal closes an open light surface", async ({ page }) => {
+  await loadSample(page);
+
+  for (const [button, pop] of [
+    ["#export-btn", "#export-pop"],
+    ["#skipped-btn", "#skipped-pop"],
+  ] as const) {
+    await page.locator(button).click();
+    await expect(page.locator(pop)).toBeVisible();
+    await page.keyboard.press("?"); // a keypress, so click-outside cannot be what closes it
+    await expect(page.locator("#shortcuts")).toBeVisible();
+    await expect(page.locator(pop)).toBeHidden();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#shortcuts")).toBeHidden();
+  }
+});
+
+test("mobile viewport: Escape and the Open dialog both close the layer drawer", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loadSample(page);
+  const panel = page.locator("#panel");
+
+  await page.locator("#toggle-layers").click();
+  await expect(panel).toHaveClass(/open/);
+  await page.keyboard.press("Escape");
+  await expect(panel).not.toHaveClass(/open/);
+
+  // The drawer closes only via its own button or backdrop, so opening the
+  // dialog proves the registry rather than an incidental click-outside.
+  await page.locator("#toggle-layers").click();
+  await expect(panel).toHaveClass(/open/);
+  await page.locator("#open").click();
+  await expect(page.locator("#open-dialog")).toBeVisible();
+  await expect(panel).not.toHaveClass(/open/);
+});
+
 test("model-only files show no space tabs", async ({ page }) => {
   await loadSample(page);
   expect(await page.evaluate(() => window.__aspicio!.getSpaces())).toEqual(["Model"]);
