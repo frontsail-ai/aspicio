@@ -1135,3 +1135,35 @@ test("a PDF reports points as its unit in the measure readout", async ({ page })
   // PDF-6: pt, carried through unchanged.
   await expect(page.locator("#scale-label")).toContainText("pt");
 });
+
+// DEMO-20: a parse can succeed and draw nothing — a file made only of
+// constructs this viewer skips. Silent chrome around an empty canvas reads
+// as a failure, so the emptiness explains itself, alongside (not instead
+// of) the DEMO-2 chip.
+test("a file with nothing drawable explains itself instead of a blank canvas", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#file").setInputFiles(fixture("shading-only.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("shading-only.pdf");
+
+  await expect(page.locator("#empty-result")).toBeVisible();
+  await expect(page.locator("#empty-result-body")).toContainText("1 skipped");
+  await expect(page.locator("#empty-result-body")).toContainText("1 Shading");
+  await expect(page.locator("#skipped-btn")).toBeVisible();
+
+  // A drawable file clears the notice.
+  await page.locator("#file").setInputFiles(fixture("spot.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("spot.pdf");
+  await expect(page.locator("#empty-result")).toBeHidden();
+});
+
+// DEMO-20: the notice also covers a valid file with no geometry at all —
+// nothing was skipped, so the copy must not claim anything was.
+test("a valid but geometry-free file explains itself without a skip count", async ({ page }) => {
+  await loadSample(page);
+  await page.locator("#file").setInputFiles(fixture("empty.dxf"));
+  await expect(page.locator("#file-chip")).toHaveText("empty.dxf");
+
+  await expect(page.locator("#empty-result")).toBeVisible();
+  await expect(page.locator("#empty-result-body")).toContainText("no drawable 2D geometry");
+  await expect(page.locator("#skipped-btn")).toBeHidden(); // nothing skipped, no chip (DEMO-2)
+});

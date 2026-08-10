@@ -1276,6 +1276,10 @@ button {
   margin-bottom: 12px;
 }
 
+.empty-kicker-warn {
+  color: var(--amber);
+}
+
 .empty-title {
   font-size: 19px;
   font-weight: 600;

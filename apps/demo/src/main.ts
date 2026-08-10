@@ -160,6 +160,17 @@ app.innerHTML = `
           </nav>
         </div>
       </div>
+      <div id="empty-result" class="empty-state" hidden>
+        <div class="empty-inner">
+          <div class="empty-kicker empty-kicker-warn">NOTHING TO DRAW</div>
+          <h2 class="empty-title">This file has no drawable content</h2>
+          <div id="empty-result-body" class="empty-body"></div>
+          <div class="empty-actions">
+            <button id="empty-result-open" class="btn-primary" type="button">Open another file</button>
+            <button id="empty-result-sample" class="btn-ghost" type="button">Load sample</button>
+          </div>
+        </div>
+      </div>
       <div id="error-toast" class="error-toast" hidden>
         <div class="error-card">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--err)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
@@ -407,6 +418,7 @@ function setMode(next: Mode): void {
   if (!loaded) $("#export-pop").hidden = true;
   if (!loaded) $("#space-tabs").hidden = true;
   if (!loaded) $("#shortcuts").hidden = true;
+  if (!loaded) $("#empty-result").hidden = true;
   if (!loaded) {
     clearSelection();
     setMeasureActive(false);
@@ -917,6 +929,18 @@ viewer.on("loaded", () => {
 
   setMode("loaded");
 
+  // A parse can succeed and still draw nothing — a file made only of
+  // constructs this viewer skips, or one with no 2D geometry at all. Silent
+  // chrome around an empty canvas reads as a failure, so the emptiness
+  // explains itself instead (DEMO-20). Composes with the chip (DEMO-2).
+  $("#empty-result").hidden = entityCount > 0;
+  $("#empty-result-body").textContent =
+    skippedTotal > 0
+      ? "This file parsed, but everything in it is content Aspicio doesn't " +
+        `draw yet — ${skippedTotal} skipped (${$("#skipped-detail").textContent}). ` +
+        "Drawings with vector geometry or raster images display normally."
+      : "This file parsed but contains no drawable 2D geometry.";
+
   // Restore a deep-linked view once, after the panel/tabs exist. Only valid for
   // the sample (the source the link implicitly refers to).
   if (pendingLink && currentSourceLinkable) applyLink(pendingLink);
@@ -1401,10 +1425,10 @@ fileInput.addEventListener("change", () => {
 });
 
 // Every open control raises the same one-view dialog (dropzone + URL field).
-for (const id of ["#open", "#empty-open", "#error-open"]) {
+for (const id of ["#open", "#empty-open", "#error-open", "#empty-result-open"]) {
   $(id).addEventListener("click", () => openDialog());
 }
-for (const id of ["#load-sample", "#empty-sample", "#error-sample"]) {
+for (const id of ["#load-sample", "#empty-sample", "#error-sample", "#empty-result-sample"]) {
   $(id).addEventListener("click", loadSample);
 }
 
