@@ -437,9 +437,16 @@ export function parseDxf(text: string): DrawingDocument {
     }
     const entity = convertEntity(raw, unsupported);
     if (!entity) continue;
-    ensureLayer(entity.layer).entityCount += 1;
+    // A paper-space entity earns its layer a row but not a tally: counts are
+    // per-space (INV-13), seeded here with model space and re-derived on every
+    // activation. Counting both — as this did — made the rows sum past the
+    // model-space total the header showed beside them.
+    const layer = ensureLayer(entity.layer);
     if ((raw as { inPaperSpace?: boolean }).inPaperSpace) paperEntities.push(entity);
-    else entities.push(entity);
+    else {
+      entities.push(entity);
+      layer.entityCount += 1;
+    }
   }
 
   const blocks = new Map<string, BlockDef>();

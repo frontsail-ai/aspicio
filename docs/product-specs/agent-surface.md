@@ -16,11 +16,30 @@ counts, per-type skipped counts, and the drawing's text content — unique
 TEXT/MTEXT strings including those inside blocks reachable through
 inserts and dimensions. Identical semantics over HTTP and MCP.
 
+**Scope.** A describe covers the whole drawing, every space of PDF-5 and
+VIEW-14 included: a six-page PDF reports six pages' worth of entities, layers,
+and text. A `space` argument scopes the reply to one page or sheet, and it then
+reports exactly what the viewer shows on that tab. A name the drawing does not
+have is refused (AGT-5), never answered with the first space.
+
+A `spaces` list always accompanies the reply — every space by name, with its
+own entity and segment counts, bounds, and size — so a caller learns a file has
+six pages, and what size each is, without describing it six times. The list
+does not sum to the total: a DXF sheet's viewports re-show model geometry, so
+an entity can be drawn in two spaces while existing once (INV-13).
+
+Geometry cannot be summed across spaces, so an unscoped reply's `bounds` and
+`size` describe the first space — the one `render` returns — and `space` is
+null to say so.
+
 ### AGT-2: Render to image
 
-Rendering returns the whole drawing as an image: SVG (vector) or PNG at a
+Rendering returns the drawing as an image: SVG (vector) or PNG at a
 requested width (bounded, defaulting to 1200px), on a dark background by
-default. HTTP additionally accepts a hex background or "none"; anything
+default. It draws the first space unless a `space` argument names another, on
+the same terms as AGT-1 — the pages of a multi-page PDF are reachable without
+refetching the file, and an unknown name is refused rather than silently
+rendered as page one. HTTP additionally accepts a hex background or "none"; anything
 else is rejected, never interpolated into the SVG.
 
 ### AGT-3: HTTP input forms

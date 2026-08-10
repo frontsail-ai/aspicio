@@ -35,9 +35,22 @@ export { DrawingParseError } from "./parse/errors.ts";
 export { parseWith, toBytes } from "./parse/registry.ts";
 export type { DrawingParser, DrawingSource } from "./parse/registry.ts";
 export { describeDrawing } from "./describe.ts";
-export type { DrawingSummary, LayerSummary } from "./describe.ts";
-export { isEmptyLayer, partitionLayers } from "./layers.ts";
-export { tessellate, tessellateLayout, registerEntityHandler } from "./tessellate/tessellate.ts";
+export type { DescribeOptions, DrawingSummary, LayerSummary, SpaceSummary } from "./describe.ts";
+export { countEntitiesByLayer, isEmptyLayer, partitionLayers } from "./layers.ts";
+export {
+  registerEntityHandler,
+  tessellate,
+  tessellateLayout,
+  tessellateSpace,
+} from "./tessellate/tessellate.ts";
+export {
+  MODEL_SPACE,
+  UnknownSpaceError,
+  documentEntities,
+  documentEntityCount,
+  spaceEntities,
+  spaceNames,
+} from "./spaces.ts";
 export type {
   Tessellation,
   TessellationContext,

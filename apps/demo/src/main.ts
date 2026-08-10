@@ -904,10 +904,20 @@ function setSpace(name: string): void {
   for (const tab of $("#space-tabs").querySelectorAll<HTMLElement>(".space-tab")) {
     tab.classList.toggle("active", tab.textContent === name);
   }
-  syncPanel();
+  // Both readouts describe the space on screen (VIEW-16), so both are redrawn
+  // here: the counts change, and so does which layers have anything on them.
+  // Leaving them alone showed page 1's figures over page 3's drawing.
+  buildLayerPanel();
+  showStats();
 }
 
 /* ---------- status / readout ---------- */
+
+/** The header counts, for whichever space is on screen (DEMO-1, VIEW-16). */
+function showStats(): void {
+  const { entityCount, segmentCount } = viewer.stats;
+  $("#stats").textContent = `${entityCount} ENT · ${segmentCount} SEG`;
+}
 
 viewer.on("loaded", () => {
   soloLayer = null;
@@ -916,9 +926,9 @@ viewer.on("loaded", () => {
   buildLayerPanel();
   buildSpaceTabs();
 
-  const { entityCount, segmentCount, unsupported } = viewer.stats;
+  const { documentEntityCount, unsupported } = viewer.stats;
   $("#file-chip").textContent = currentName;
-  $("#stats").textContent = `${entityCount} ENT · ${segmentCount} SEG`;
+  showStats();
 
   const skipped = Object.entries(unsupported);
   const skippedTotal = skipped.reduce((n, [, v]) => n + v, 0);
@@ -933,7 +943,9 @@ viewer.on("loaded", () => {
   // constructs this viewer skips, or one with no 2D geometry at all. Silent
   // chrome around an empty canvas reads as a failure, so the emptiness
   // explains itself instead (DEMO-20). Composes with the chip (DEMO-2).
-  $("#empty-result").hidden = entityCount > 0;
+  // The whole file, not the space on screen: a PDF whose first page is blank
+  // has five more to offer, and the tabs are right there.
+  $("#empty-result").hidden = documentEntityCount > 0;
   $("#empty-result-body").textContent =
     skippedTotal > 0
       ? "This file parsed, but everything in it is content Aspicio doesn't " +

@@ -125,7 +125,10 @@ await viewer.loadUrl("/drawing.pdf"); // for URLs — don't pass a URL to load()
 `parseWith([dxfParser], bytes)` (or `parseDxf` / `parseDxfBytes` from
 `@aspicio/core/dxf` directly), `tessellate`, `tessellationToSvg`, and
 `describeDrawing` are pure and run in Node or Workers — parse and render SVG
-server-side without a canvas.
+server-side without a canvas. `describeDrawing(doc)` covers the whole drawing,
+every page of a multi-page PDF included, and lists them in `summary.spaces`;
+`describeDrawing(doc, { space })` and `tessellateSpace(doc, space)` scope a
+describe or a render to one page or sheet.
 
 ## Pitfalls
 

@@ -106,3 +106,21 @@ a callable function, which reads as external by any plain reading — but
 they appear in no manifest and reach importers only through a document
 re-fetched on every import, so they were renamed (`describeDxfPdf` →
 `describePdf`) while `view_dxf` was not.
+
+### INV-13: A count names its scope, and its parts sum to it
+
+Every entity count belongs to exactly one scope — one space, or the whole
+drawing — and any breakdown of it sums to it: a space's layer counts sum to
+that space's total, and a drawing's layer counts sum to the drawing's.
+
+Scope is carried by the artifact, not by convention. Per-space counts ride on
+the tessellation, which _is_ one space, so a count cannot be read beside
+geometry from a different one. Producers derive counts from one shared
+function rather than accumulating their own.
+
+This exists because three producers each chose a scope independently — the DXF
+parser counted model space plus the active sheet, the PDF parser counted every
+page, the viewer counted model space alone — and a layer reported more
+entities than the drawing contained. Every single-space drawing agreed, so the
+divergence was invisible until a six-page PDF showed a layer holding 6020
+entities in a drawing of 996.

@@ -14,7 +14,8 @@ the window. The picker accepts every format the app has opted into (DXF
 and PDF); drag-and-drop and URLs are format-agnostic, because what a source
 is gets decided from its bytes (PARSE-13), never from its extension. While
 loading, a status line shows the file name; on success the top bar shows
-name, entity count, and segment count.
+name, entity count, and segment count — both counts for the space on screen
+(VIEW-16), redrawn when the space changes (DEMO-14).
 
 ### DEMO-2: Unsupported-entity report
 
@@ -112,7 +113,10 @@ the viewport — on narrow screens it wraps rather than pushing actions
 ### DEMO-14: Paper-space tabs
 
 When the drawing has layouts, tabs above the canvas switch between Model
-and each layout; the switcher is absent for model-only drawings.
+and each layout; the switcher is absent for model-only drawings. Switching
+redraws the header counts and the layer panel, because both describe the
+space on screen (VIEW-16) — a layer's count changes with the page, and a
+layer holding nothing on the new space moves into the empty-layers group.
 
 ### DEMO-15: Crawlable page shell
 
@@ -201,7 +205,9 @@ loading the tag.
 
 A load can succeed and still draw nothing — a file whose entire content is
 constructs the pipeline counts instead of draws (PDF-8), or a valid file with
-no 2D geometry at all. A silently empty canvas under full viewer chrome reads
+no 2D geometry at all. The question is asked of the whole drawing, not the
+space on screen: a PDF whose first page is blank has its other pages a tab
+away, and calling that file empty would be wrong. A silently empty canvas under full viewer chrome reads
 as a failure, so a completed load with zero drawable entities explains itself:
 a notice in the canvas area says the file parsed but has nothing to draw,
 names the skipped counts when any exist, and offers the open-another-file and

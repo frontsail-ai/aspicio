@@ -23,7 +23,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vite-plus/test";
+import { countEntitiesByLayer } from "../src/layers.ts";
 import { parsePdfBytes } from "../src/parse/pdf/parse.ts";
+import { documentEntities } from "../src/spaces.ts";
 
 const DIR = fileURLToPath(new URL("../../../tmp/ocg-corpus/", import.meta.url));
 const present = existsSync(DIR);
@@ -31,8 +33,17 @@ const present = existsSync(DIR);
 /* Files whose entities all sit on groups carry no "Content" row: it appears
  * only when it holds unmarked content, or when nothing else does. */
 interface Expectation {
-  /** Layer name → entity count. A count of 0 means declared but empty. */
+  /**
+   * Layer name → entity count *in model space* (page 1), the scope a layer
+   * count carries (PDF-7). A count of 0 means declared but empty there.
+   */
   readonly layers?: Record<string, number>;
+  /**
+   * Layer name → entity count across every page, for the files where the
+   * cross-page total is the point. Pinning both scopes is deliberate: they
+   * used to be one number that silently meant whichever the reader assumed.
+   */
+  readonly documentLayers?: Record<string, number>;
   /** The file is refused by the strict gate, and this is the reason. */
   readonly gated?: RegExp;
   readonly totalLayers?: number;
@@ -53,7 +64,12 @@ const CORPUS: Record<string, Expectation> = {
   // draw (PDF-9) the group holds one entity per page — a single decode
   // placed 27 times (the document-scoped cache) — and five ungrouped images
   // land on Content. Six images stay counted: their codecs are out of scope.
-  "issue14824.pdf": { layers: { Content: 11783, Stamp: 27 }, totalLayers: 2 },
+  // Page 1 sees one Stamp placement; all 27 pages together see 27.
+  "issue14824.pdf": {
+    layers: { Content: 264, Stamp: 1 },
+    documentLayers: { Content: 11783, Stamp: 27 },
+    totalLayers: 2,
+  },
   // 35 groups, 3 ordered, 33 hidden by /OFF — all 35 still present.
   "issue12007_reduced.pdf": { totalLayers: 36 },
   // Pure /VE memberships: not evaluated, content stays on Content (PDF-7).
@@ -90,5 +106,14 @@ for (const [name, expected] of Object.entries(CORPUS)) {
       expect(doc.layers.get(layer), `${name} has no layer "${layer}"`).toBeDefined();
       expect(doc.layers.get(layer)?.entityCount, `${name} layer "${layer}"`).toBe(count);
     }
+
+    const wholeFile = countEntitiesByLayer(documentEntities(doc));
+    for (const [layer, count] of Object.entries(expected.documentLayers ?? {})) {
+      expect(wholeFile.get(layer), `${name} layer "${layer}" across all pages`).toBe(count);
+    }
+    // Whatever the scope, the rows account for every entity in it — the
+    // property that failed on multi-page files (issue #161).
+    const page1 = [...doc.layers.values()].reduce((n, l) => n + l.entityCount, 0);
+    expect(page1, `${name} page-1 rows sum to page-1 entities`).toBe(doc.entities.length);
   });
 }

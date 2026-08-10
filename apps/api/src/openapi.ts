@@ -57,6 +57,7 @@ export const openapi = {
             description: dxfSourceDescription,
             schema: { type: "string", format: "uri" },
           },
+          { $ref: "#/components/parameters/space" },
         ],
         responses: {
           "200": {
@@ -65,7 +66,9 @@ export const openapi = {
               "application/json": { schema: { $ref: "#/components/schemas/DrawingSummary" } },
             },
           },
-          "400": errorResponse("Bad input (missing/invalid src, private address refused)"),
+          "400": errorResponse(
+            "Bad input (missing/invalid src, unknown space, private address refused)",
+          ),
           "413": errorResponse("DXF exceeds the 8 MB limit"),
           "422": errorResponse("The file could not be parsed as DXF"),
           "429": errorResponse("Rate limit exceeded (per client IP)"),
@@ -76,6 +79,7 @@ export const openapi = {
         operationId: "describeDxfUpload",
         summary: "Describe an uploaded DXF drawing",
         description: "Same as GET /describe, but the DXF file is the request body.",
+        parameters: [{ $ref: "#/components/parameters/space" }],
         requestBody: {
           required: true,
           content: { "application/octet-stream": { schema: { type: "string", format: "binary" } } },
@@ -87,7 +91,7 @@ export const openapi = {
               "application/json": { schema: { $ref: "#/components/schemas/DrawingSummary" } },
             },
           },
-          "400": errorResponse("Empty request body"),
+          "400": errorResponse("Empty request body, or unknown space"),
           "413": errorResponse("DXF exceeds the 8 MB limit"),
           "422": errorResponse("The file could not be parsed as DXF"),
           "429": errorResponse("Rate limit exceeded (per client IP)"),
@@ -110,6 +114,7 @@ export const openapi = {
             description: dxfSourceDescription,
             schema: { type: "string", format: "uri" },
           },
+          { $ref: "#/components/parameters/space" },
           { $ref: "#/components/parameters/format" },
           { $ref: "#/components/parameters/width" },
           { $ref: "#/components/parameters/bg" },
@@ -122,7 +127,7 @@ export const openapi = {
               "image/svg+xml": { schema: { type: "string" } },
             },
           },
-          "400": errorResponse("Bad input (src, format, or bg invalid)"),
+          "400": errorResponse("Bad input (src, space, format, or bg invalid)"),
           "413": errorResponse("DXF exceeds the 8 MB limit"),
           "422": errorResponse("The file could not be parsed as DXF"),
           "429": errorResponse("Rate limit exceeded (per client IP)"),
@@ -134,6 +139,7 @@ export const openapi = {
         summary: "Render an uploaded DXF drawing to an image",
         description: "Same as GET /render, but the DXF file is the request body.",
         parameters: [
+          { $ref: "#/components/parameters/space" },
           { $ref: "#/components/parameters/format" },
           { $ref: "#/components/parameters/width" },
           { $ref: "#/components/parameters/bg" },
@@ -150,7 +156,7 @@ export const openapi = {
               "image/svg+xml": { schema: { type: "string" } },
             },
           },
-          "400": errorResponse("Bad input (format or bg invalid, empty body)"),
+          "400": errorResponse("Bad input (space, format or bg invalid, empty body)"),
           "413": errorResponse("DXF exceeds the 8 MB limit"),
           "422": errorResponse("The file could not be parsed as DXF"),
           "429": errorResponse("Rate limit exceeded (per client IP)"),
@@ -191,6 +197,13 @@ export const openapi = {
         description: "PNG width in pixels (default 1200)",
         schema: { type: "integer", minimum: 1, maximum: 4000, default: 1200 },
       },
+      space: {
+        name: "space",
+        in: "query",
+        description:
+          'Which space to work on: "Model" (a PDF\'s page 1, a DXF\'s model space) or a page/layout name as listed in a describe reply\'s "spaces". Describe omits it for the whole drawing; render defaults to the first space. A name the drawing does not have is a 400.',
+        schema: { type: "string" },
+      },
       bg: {
         name: "bg",
         in: "query",
@@ -204,6 +217,40 @@ export const openapi = {
         type: "object",
         required: ["error"],
         properties: { error: { type: "string", description: "Human-readable failure reason" } },
+      },
+      SpaceSummary: {
+        type: "object",
+        required: ["name", "entityCount", "segmentCount", "bounds", "size"],
+        properties: {
+          name: { type: "string", description: "Pass to the `space` parameter to scope to it" },
+          entityCount: { type: "integer" },
+          segmentCount: { type: "integer" },
+          bounds: {
+            oneOf: [
+              {
+                type: "object",
+                required: ["minX", "minY", "maxX", "maxY"],
+                properties: {
+                  minX: { type: "number" },
+                  minY: { type: "number" },
+                  maxX: { type: "number" },
+                  maxY: { type: "number" },
+                },
+              },
+              { type: "null" },
+            ],
+          },
+          size: {
+            oneOf: [
+              {
+                type: "object",
+                required: ["width", "height"],
+                properties: { width: { type: "number" }, height: { type: "number" } },
+              },
+              { type: "null" },
+            ],
+          },
+        },
       },
       LayerSummary: {
         type: "object",
@@ -226,8 +273,10 @@ export const openapi = {
           "units",
           "bounds",
           "size",
+          "space",
           "entityCount",
           "segmentCount",
+          "spaces",
           "layers",
           "entityTypes",
           "unsupported",
@@ -268,8 +317,19 @@ export const openapi = {
             ],
             description: "Bounding-box size in drawing units",
           },
+          space: {
+            oneOf: [{ type: "string" }, { type: "null" }],
+            description:
+              "Which space this summary is scoped to, or null when it covers the whole drawing (in which case bounds/size describe spaces[0], the space render returns)",
+          },
           entityCount: { type: "integer" },
           segmentCount: { type: "integer" },
+          spaces: {
+            type: "array",
+            items: { $ref: "#/components/schemas/SpaceSummary" },
+            description:
+              "Every space in the drawing (a PDF's pages, a DXF's model space and layouts), model space first. These do not sum to entityCount: a DXF sheet's viewports re-show model geometry, so an entity can be drawn in two spaces while existing once",
+          },
           layers: { type: "array", items: { $ref: "#/components/schemas/LayerSummary" } },
           entityTypes: {
             type: "object",

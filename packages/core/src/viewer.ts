@@ -10,11 +10,9 @@ import { pickEntity as pickEntityHit, pickLayer } from "./pick/pick.ts";
 import { SceneRenderer } from "./render/renderer.ts";
 import { buildSnapIndex } from "./snap/snap.ts";
 import type { SnapIndex, SnapResult } from "./snap/snap.ts";
+import { MODEL_SPACE, documentEntityCount, spaceNames } from "./spaces.ts";
 import { tessellate, tessellateLayout } from "./tessellate/tessellate.ts";
 import type { Tessellation } from "./tessellate/tessellate.ts";
-
-/** The model space's name in `getSpaces()` / `setActiveSpace()`. */
-const MODEL_SPACE = "Model";
 
 export interface DrawingViewerOptions {
   /**
@@ -38,7 +36,18 @@ export interface DrawingViewerOptions {
 }
 
 export interface ViewerStats {
+  /**
+   * Top-level entities in the space on screen — the same scope as
+   * `segmentCount`, and equal to the sum of the layer counts beside it
+   * (VIEW-16). Switching spaces changes it.
+   */
   entityCount: number;
+  /**
+   * Top-level entities across every space. Only the whole-drawing question
+   * needs this — chiefly "did anything at all load", which `entityCount`
+   * cannot answer for a drawing whose first space happens to be blank.
+   */
+  documentEntityCount: number;
   segmentCount: number;
   unsupported: Record<string, number>;
 }
@@ -153,6 +162,9 @@ export class DrawingViewer {
         layer.effectiveColors = counts
           ? [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([color]) => color)
           : [layer.color];
+        // Counts describe the space on screen, like the colors above them, so
+        // they are re-derived per activation rather than fixed at parse time.
+        layer.entityCount = tessellation.entityCounts.get(layer.name) ?? 0;
       }
     }
     // The snap index is expensive on huge drawings and only needed once the
@@ -169,7 +181,7 @@ export class DrawingViewer {
 
   /** Model space plus any paper-space layouts, by name (for a space switcher). */
   getSpaces(): string[] {
-    return [MODEL_SPACE, ...(this.document?.layouts ?? []).map((l) => l.name)];
+    return this.document ? spaceNames(this.document) : [MODEL_SPACE];
   }
 
   /** The currently displayed space (`"Model"` or a layout name). */
@@ -377,8 +389,11 @@ export class DrawingViewer {
   }
 
   get stats(): ViewerStats {
+    let entityCount = 0;
+    for (const n of this.tessellation?.entityCounts.values() ?? []) entityCount += n;
     return {
-      entityCount: this.document?.entities.length ?? 0,
+      entityCount,
+      documentEntityCount: this.document ? documentEntityCount(this.document) : 0,
       segmentCount: this.tessellation?.segmentCount ?? 0,
       unsupported: this.document?.unsupported ?? {},
     };

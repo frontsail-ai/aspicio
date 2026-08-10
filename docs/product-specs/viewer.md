@@ -97,6 +97,19 @@ re-tessellates, re-fits, and renders the layout's sheet geometry with each
 viewport's model content scaled and clipped to its window. Unknown names
 are ignored.
 
+### VIEW-16: Readouts describe the space on screen
+
+Entity and segment counts report the active space, not the document: switching
+spaces (VIEW-14) changes both, and a layer's entity count changes with them. A
+sheet counts the model-space layers its viewports draw, once however many
+windows show them, so no layer reads zero while its geometry is on screen
+(INV-2). Layer _rows_ stay document-wide — every layer the drawing declares is
+listed in every space — so a layer with nothing on the current space is listed
+with a count of zero and collapses under the shared `isEmptyLayer` rule.
+
+The whole-drawing total remains available for the one question that needs it:
+whether anything loaded at all (DEMO-20).
+
 ### VIEW-15: Loading requires a configured parser
 
 The viewer parses nothing by itself: `parsers` in `DrawingViewerOptions`

@@ -603,7 +603,9 @@ async function showDrawing(bytes: ArrayBuffer, byteLength: number, gen: number):
   if (gen !== generation) return;
   await viewer.load(bytes);
   if (gen !== generation) return;
-  if (viewer.stats.entityCount === 0) {
+  // The whole drawing: a multi-page PDF whose first page is blank is not an
+  // empty file, and saying so would be wrong (DEMO-20).
+  if (viewer.stats.documentEntityCount === 0) {
     showEmpty();
     reportStatus(
       "loaded: the drawing contains no drawable entities, so there is nothing to display. Use describe_dxf to inspect the file.",

@@ -107,3 +107,38 @@ test("URL sources are guarded: private hosts, redirect hops, and the size cap", 
     globalThis.fetch = realFetch;
   }
 });
+
+/* ---------- spaces (AGT-1, AGT-2) ---------- */
+
+// prettier-ignore
+const TWO_SPACES = [
+  "0", "SECTION", "2", "ENTITIES",
+  "0", "LINE", "8", "MODEL", "10", "0", "20", "0", "11", "1", "21", "1",
+  "0", "LINE", "8", "SHEET", "67", "1", "10", "0", "20", "0", "11", "10", "21", "4",
+  "0", "ENDSEC", "0", "EOF",
+].join("\n");
+
+test("the stdio tools describe the whole drawing, and scope to one space", async () => {
+  const bytes = new TextEncoder().encode(TWO_SPACES);
+
+  const whole = await describeDxf(bytes);
+  expect(whole.space).toBeNull();
+  expect(whole.entityCount).toBe(2);
+  expect(whole.spaces.map((s) => s.name)).toEqual(["Model", "Layout1"]);
+
+  const sheet = await describeDxf(bytes, "Layout1");
+  expect(sheet.space).toBe("Layout1");
+  expect(sheet.entityCount).toBe(1);
+  expect(sheet.layers.reduce((n, l) => n + l.entityCount, 0)).toBe(sheet.entityCount);
+
+  // Naming a space the drawing lacks is an error the caller sees (AGT-8), not
+  // a quiet fallback to page one.
+  await expect(describeDxf(bytes, "Nope")).rejects.toThrow(/"Model", "Layout1"/);
+});
+
+test("render reaches a space other than the first", async () => {
+  const bytes = new TextEncoder().encode(TWO_SPACES);
+  const model = await renderPng(bytes, 64);
+  const sheet = await renderPng(bytes, 64, "Layout1");
+  expect(Buffer.from(sheet).equals(Buffer.from(model))).toBe(false);
+});

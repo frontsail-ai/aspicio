@@ -189,8 +189,91 @@ test("setLayerVisible updates document and renderer", async () => {
 
 test("stats are empty before any load", () => {
   const { viewer } = makeViewer();
-  expect(viewer.stats).toEqual({ entityCount: 0, segmentCount: 0, unsupported: {} });
+  expect(viewer.stats).toEqual({
+    entityCount: 0,
+    documentEntityCount: 0,
+    segmentCount: 0,
+    unsupported: {},
+  });
   expect(viewer.getLayers()).toEqual([]);
+});
+
+test("stats and layer rows describe the active space and move together (VIEW-16)", async () => {
+  const { viewer } = makeViewer();
+  // Model space (2 lines on MODEL) plus a sheet (1 line on SHEET, no window).
+  await viewer.load(
+    [
+      "0",
+      "SECTION",
+      "2",
+      "ENTITIES",
+      "0",
+      "LINE",
+      "8",
+      "MODEL",
+      "10",
+      "0",
+      "20",
+      "0",
+      "11",
+      "1",
+      "21",
+      "1",
+      "0",
+      "LINE",
+      "8",
+      "MODEL",
+      "10",
+      "0",
+      "20",
+      "0",
+      "11",
+      "2",
+      "21",
+      "2",
+      "0",
+      "LINE",
+      "8",
+      "SHEET",
+      "67",
+      "1",
+      "10",
+      "0",
+      "20",
+      "0",
+      "11",
+      "1",
+      "21",
+      "1",
+      "0",
+      "ENDSEC",
+      "0",
+      "EOF",
+    ].join("\n"),
+  );
+
+  const rows = (): Record<string, number> =>
+    Object.fromEntries(viewer.getLayers().map((l) => [l.name, l.entityCount]));
+  const sumRows = (): number => viewer.getLayers().reduce((n, l) => n + l.entityCount, 0);
+
+  expect(viewer.getSpaces()).toEqual(["Model", "Layout1"]);
+  expect(rows()).toEqual({ MODEL: 2, SHEET: 0 });
+  expect(viewer.stats.entityCount).toBe(2);
+
+  viewer.setActiveSpace("Layout1");
+  expect(rows()).toEqual({ MODEL: 0, SHEET: 1 });
+  expect(viewer.stats.entityCount).toBe(1);
+
+  // The whole file, unchanged by which space is shown — what the empty-result
+  // notice asks about (DEMO-20).
+  expect(viewer.stats.documentEntityCount).toBe(3);
+
+  // The header total is the layer rows summed, in every space. It used to be
+  // `document.entities.length`, which is neither (issue #161).
+  for (const space of viewer.getSpaces()) {
+    viewer.setActiveSpace(space);
+    expect(viewer.stats.entityCount, `${space} total equals its rows`).toBe(sumRows());
+  }
 });
 
 test("fitView without a document is a no-op that still renders", () => {

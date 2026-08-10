@@ -1,7 +1,9 @@
 import { expect, test } from "vite-plus/test";
-import { describeDrawing } from "../src/index.ts";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { UnknownSpaceError, describeDrawing } from "../src/index.ts";
+import { parsePdfBytes } from "../src/parse/pdf/parse.ts";
 import { parseDxf, parseDxfBytes } from "../src/dxf.ts";
-import { tessellate } from "../src/tessellate/tessellate.ts";
 
 // A tiny drawing: mm units, one WALLS layer (ACI 3 = green), a LINE and a CIRCLE.
 const DXF = [
@@ -81,7 +83,7 @@ test("parseDxfBytes parses string, Uint8Array, and ArrayBuffer identically", () 
 
 test("describeDrawing summarizes units, bounds, layers, and entity types", () => {
   const doc = parseDxf(DXF);
-  const summary = describeDrawing(doc, tessellate(doc, {}));
+  const summary = describeDrawing(doc);
 
   expect(summary.units).toBe("mm");
   expect(summary.entityCount).toBe(2);
@@ -101,7 +103,7 @@ test("describeDrawing summarizes units, bounds, layers, and entity types", () =>
 
 test("describeDrawing reports an empty drawing as null bounds", () => {
   const empty = parseDxf(["0", "SECTION", "2", "ENTITIES", "0", "ENDSEC", "0", "EOF"].join("\n"));
-  const summary = describeDrawing(empty, tessellate(empty, {}));
+  const summary = describeDrawing(empty);
   expect(summary.bounds).toBeNull();
   expect(summary.size).toBeNull();
   expect(summary.entityCount).toBe(0);
@@ -190,7 +192,7 @@ test("layer color reflects entity overrides (dominant drawn color, not the table
     "EOF",
   ].join("\n");
   const doc = parseDxf(dxf);
-  const summary = describeDrawing(doc, tessellate(doc, {}));
+  const summary = describeDrawing(doc);
 
   const walls = summary.layers.find((l) => l.name === "WALLS");
   expect(walls!.color).toBe("#ff0000"); // entity override wins over the green table color
@@ -326,7 +328,7 @@ test("texts collects TEXT strings, including inside reachable blocks, deduped", 
     "EOF",
   ].join("\n");
   const doc = parseDxf(dxf);
-  const summary = describeDrawing(doc, tessellate(doc, {}));
+  const summary = describeDrawing(doc);
   // Top-level text first, block text once despite two inserts, unused block excluded.
   expect(summary.texts).toEqual(["ROOM A", "PART-42"]);
 });
@@ -367,7 +369,7 @@ test("texts surfaces decoded control codes, not the raw %%-sequences", () => {
     "EOF",
   ].join("\n");
   const doc = parseDxf(dxf);
-  const summary = describeDrawing(doc, tessellate(doc, {}));
+  const summary = describeDrawing(doc);
   expect(summary.texts).toEqual(["GREAT ROOM", "45° Ø30"]);
 });
 
@@ -435,7 +437,7 @@ test("texts includes dimension values (DIMENSION → its block) and MTEXT conten
     "EOF",
   ].join("\n");
   const doc = parseDxf(dxf);
-  const summary = describeDrawing(doc, tessellate(doc, {}));
+  const summary = describeDrawing(doc);
   // The dimension's value text comes from inside its *D1 block; the MTEXT
   // arrives with its format codes stripped by the parser.
   expect(summary.texts).toContain("100");
@@ -516,7 +518,136 @@ test("texts survives block reference cycles and respects the insert depth cap", 
     "EOF",
   ].join("\n");
   const doc = parseDxf(dxf);
-  const summary = describeDrawing(doc, tessellate(doc, {}));
+  const summary = describeDrawing(doc);
   expect(summary.texts).toContain("IN-A"); // the cycle terminated, text kept
   expect(summary.texts).not.toContain("TOO-DEEP"); // past the shared depth cap
+});
+
+/* ---------- spaces (AGT-1) ---------- */
+
+/** Model space (2 lines on MODEL, one carrying text) plus a sheet whose window
+ *  shows it — the shape where "the drawing" and "the page" diverge. */
+const TWO_SPACES = [
+  "0",
+  "SECTION",
+  "2",
+  "ENTITIES",
+  "0",
+  "LINE",
+  "8",
+  "MODEL",
+  "10",
+  "0",
+  "20",
+  "0",
+  "11",
+  "1",
+  "21",
+  "1",
+  "0",
+  "TEXT",
+  "8",
+  "MODEL",
+  "10",
+  "0",
+  "20",
+  "0",
+  "40",
+  "1",
+  "1",
+  "MODEL-TEXT",
+  "0",
+  "LINE",
+  "8",
+  "SHEET",
+  "67",
+  "1",
+  "10",
+  "0",
+  "20",
+  "0",
+  "11",
+  "1",
+  "21",
+  "1",
+  "0",
+  "TEXT",
+  "8",
+  "SHEET",
+  "67",
+  "1",
+  "10",
+  "0",
+  "20",
+  "0",
+  "40",
+  "1",
+  "1",
+  "SHEET-TEXT",
+  "0",
+  "ENDSEC",
+  "0",
+  "EOF",
+].join("\n");
+
+test("describe covers the whole drawing by default and lists its spaces", () => {
+  const summary = describeDrawing(parseDxf(TWO_SPACES));
+
+  expect(summary.space).toBeNull();
+  expect(summary.spaces.map((s) => s.name)).toEqual(["Model", "Layout1"]);
+  // Every entity, once — page 1 used to be the whole answer.
+  expect(summary.entityCount).toBe(4);
+  expect(summary.texts).toEqual(["MODEL-TEXT", "SHEET-TEXT"]);
+  expect(summary.entityTypes).toEqual({ LINE: 2, TEXT: 2 });
+
+  // The rows account for the same scope as the total beside them — the
+  // property that failed on multi-space drawings (issue #161).
+  expect(summary.layers.reduce((n, l) => n + l.entityCount, 0)).toBe(summary.entityCount);
+});
+
+test("describe scopes everything to a named space, matching the viewer", () => {
+  const doc = parseDxf(TWO_SPACES);
+  const sheet = describeDrawing(doc, { space: "Layout1" });
+
+  expect(sheet.space).toBe("Layout1");
+  expect(sheet.entityCount).toBe(2);
+  expect(sheet.texts).toEqual(["SHEET-TEXT"]);
+  expect(sheet.entityTypes).toEqual({ LINE: 1, TEXT: 1 });
+  expect(Object.fromEntries(sheet.layers.map((l) => [l.name, l.entityCount]))).toEqual({
+    MODEL: 0,
+    SHEET: 2,
+  });
+  expect(sheet.layers.reduce((n, l) => n + l.entityCount, 0)).toBe(sheet.entityCount);
+
+  // A scoped summary reports that space's own figures, which is what the
+  // viewer shows on that tab.
+  const listed = sheet.spaces.find((s) => s.name === "Layout1")!;
+  expect(listed.entityCount).toBe(sheet.entityCount);
+  expect(listed.segmentCount).toBe(sheet.segmentCount);
+  expect(listed.bounds).toEqual(sheet.bounds);
+});
+
+test("an unknown space is refused, not silently answered with page one", () => {
+  const doc = parseDxf(TWO_SPACES);
+  expect(() => describeDrawing(doc, { space: "Layout9" })).toThrow(UnknownSpaceError);
+  expect(() => describeDrawing(doc, { space: "Layout9" })).toThrow(/"Model", "Layout1"/);
+});
+
+test("every page of a multi-page PDF reaches describe (PDF-5)", async () => {
+  const bytes = readFileSync(
+    fileURLToPath(new URL("./fixtures/pdf/three-pages-varied.pdf", import.meta.url)),
+  );
+  const doc = await parsePdfBytes(new Uint8Array(bytes));
+
+  const whole = describeDrawing(doc);
+  expect(whole.spaces.map((s) => s.name)).toEqual(["Model", "Page 2", "Page 3"]);
+  expect(whole.entityCount).toBe(6); // 1 + 2 + 3 lines
+  expect(whole.layers.reduce((n, l) => n + l.entityCount, 0)).toBe(6);
+  // Pages partition a PDF, so here the spaces do sum to the total.
+  expect(whole.spaces.reduce((n, s) => n + s.entityCount, 0)).toBe(whole.entityCount);
+  expect(whole.segmentCount).toBe(whole.spaces.reduce((n, s) => n + s.segmentCount, 0));
+
+  const page3 = describeDrawing(doc, { space: "Page 3" });
+  expect(page3.entityCount).toBe(3);
+  expect(page3.layers.reduce((n, l) => n + l.entityCount, 0)).toBe(3);
 });

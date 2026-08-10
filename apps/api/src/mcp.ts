@@ -1,4 +1,4 @@
-import { describeDrawing, parseWith, tessellate, tessellationToSvg } from "@aspicio/core";
+import { describeDrawing, parseWith, tessellateSpace, tessellationToSvg } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
 import { pdfParser } from "@aspicio/core/pdf";
 import {
@@ -6,6 +6,7 @@ import {
   INLINE_PDF_REFUSAL,
   READ_ONLY_HINTS,
   sourceDescription,
+  spaceSchema,
   TOOLS,
   widthSchema,
 } from "@aspicio/agent-tools";
@@ -64,10 +65,16 @@ function toBase64(bytes: Uint8Array): string {
 /** A stateless HTTP link to the same render, for URL sources — chat UIs
  * that drop MCP image blocks from user display can still show a plain
  * image URL (AGT-9). Returns undefined for inline sources (nothing to link). */
-export function renderLink(origin: string, source: string, width: number): string | undefined {
+export function renderLink(
+  origin: string,
+  source: string,
+  width: number,
+  space?: string,
+): string | undefined {
   const s = source.trim();
   if (!/^https?:\/\//i.test(s)) return undefined;
-  return `${origin}/render?src=${encodeURIComponent(s)}&width=${width}`;
+  const query = space === undefined ? "" : `&space=${encodeURIComponent(space)}`;
+  return `${origin}/render?src=${encodeURIComponent(s)}&width=${width}${query}`;
 }
 
 /** Build the same describe/render tools as the local server, Worker-flavored,
@@ -144,12 +151,12 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
           title: tool.title,
           annotations: READ_ONLY_HINTS,
           description: hostedDescription(tool),
-          inputSchema: { source: z.string().describe(SOURCE_DESC) },
+          inputSchema: { source: z.string().describe(SOURCE_DESC), space: spaceSchema },
           outputSchema: DRAWING_SUMMARY_SHAPE,
         },
-        async ({ source }) => {
+        async ({ source, space }) => {
           const doc = await parseFor(parsers, await loadDrawing(source), "describe");
-          const summary = describeDrawing(doc, tessellate(doc, {}));
+          const summary = describeDrawing(doc, { space });
           return {
             content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
             structuredContent: summary as unknown as Record<string, unknown>,
@@ -163,13 +170,19 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
           title: tool.title,
           annotations: READ_ONLY_HINTS,
           description: hostedDescription(tool),
-          inputSchema: { source: z.string().describe(SOURCE_DESC), width: widthSchema },
+          inputSchema: {
+            source: z.string().describe(SOURCE_DESC),
+            width: widthSchema,
+            space: spaceSchema,
+          },
         },
-        async ({ source, width }) => {
+        async ({ source, width, space }) => {
           const doc = await parseFor(parsers, await loadDrawing(source), "render");
-          const svg = tessellationToSvg(tessellate(doc, {}), undefined, { background: DEFAULT_BG });
+          const svg = tessellationToSvg(tessellateSpace(doc, space), undefined, {
+            background: DEFAULT_BG,
+          });
           const png = await renderPng(svg, width ?? 1200);
-          const link = renderLink(origin, source, width ?? 1200);
+          const link = renderLink(origin, source, width ?? 1200, space);
           return {
             content: [
               { type: "image", data: toBase64(png), mimeType: "image/png" },
@@ -229,7 +242,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     async ({ source, allow_file_open }) => {
       const bytes = await loadDrawing(source);
       const doc = await parseWith([dxfParser, pdfParser], bytes);
-      const summary = describeDrawing(doc, tessellate(doc, {}));
+      const summary = describeDrawing(doc);
       const allowFilePicker = allow_file_open === true;
       const trimmed = source.trim();
       const isUrl = /^https?:\/\//i.test(trimmed);

@@ -4,7 +4,7 @@ import {
   type DrawingDocument,
   type DrawingSummary,
   parseWith,
-  tessellate,
+  tessellateSpace,
   tessellationToSvg,
 } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
@@ -125,42 +125,54 @@ async function parseFor(
 }
 
 /** Structured JSON summary of DXF bytes. */
-export async function describeDxf(bytes: Uint8Array): Promise<DrawingSummary> {
+export async function describeDxf(bytes: Uint8Array, space?: string): Promise<DrawingSummary> {
   const doc = await parseFor(DXF_ONLY, bytes, "");
-  return describeDrawing(doc, tessellate(doc, {}));
+  return describeDrawing(doc, { space });
 }
 
 /** Render DXF bytes to a PNG (SVG → resvg). */
-export async function renderPng(bytes: Uint8Array, width = DEFAULT_WIDTH): Promise<Uint8Array> {
+export async function renderPng(
+  bytes: Uint8Array,
+  width = DEFAULT_WIDTH,
+  space?: string,
+): Promise<Uint8Array> {
   const doc = await parseFor(DXF_ONLY, bytes, "");
-  return toPng(doc, width);
+  return toPng(doc, width, space);
 }
 
 /** Structured JSON summary of PDF bytes. */
-export async function describePdf(bytes: Uint8Array): Promise<DrawingSummary> {
+export async function describePdf(bytes: Uint8Array, space?: string): Promise<DrawingSummary> {
   const doc = await parseFor(PDF_ONLY, bytes, "");
-  return describeDrawing(doc, tessellate(doc, {}));
+  return describeDrawing(doc, { space });
 }
 
 /** Render PDF bytes to a PNG. */
-export async function renderPdfPng(bytes: Uint8Array, width = DEFAULT_WIDTH): Promise<Uint8Array> {
+export async function renderPdfPng(
+  bytes: Uint8Array,
+  width = DEFAULT_WIDTH,
+  space?: string,
+): Promise<Uint8Array> {
   const doc = await parseFor(PDF_ONLY, bytes, "");
-  return toPng(doc, width);
+  return toPng(doc, width, space);
 }
 
 /** Structured JSON summary of any supported drawing, detected from the bytes. */
-export async function describeDoc(bytes: Uint8Array): Promise<DrawingSummary> {
+export async function describeDoc(bytes: Uint8Array, space?: string): Promise<DrawingSummary> {
   const doc = await parseWith(ANY_FORMAT, bytes);
-  return describeDrawing(doc, tessellate(doc, {}));
+  return describeDrawing(doc, { space });
 }
 
 /** Render any supported drawing to a PNG, detected from the bytes. */
-export async function renderDocPng(bytes: Uint8Array, width = DEFAULT_WIDTH): Promise<Uint8Array> {
+export async function renderDocPng(
+  bytes: Uint8Array,
+  width = DEFAULT_WIDTH,
+  space?: string,
+): Promise<Uint8Array> {
   const doc = await parseWith(ANY_FORMAT, bytes);
-  return toPng(doc, width);
+  return toPng(doc, width, space);
 }
 
-function toPng(doc: DrawingDocument, width: number): Uint8Array {
-  const svg = tessellationToSvg(tessellate(doc, {}), undefined, { background: DEFAULT_BG });
+function toPng(doc: DrawingDocument, width: number, space?: string): Uint8Array {
+  const svg = tessellationToSvg(tessellateSpace(doc, space), undefined, { background: DEFAULT_BG });
   return new Resvg(svg, { fitTo: { mode: "width", value: width } }).render().asPng();
 }

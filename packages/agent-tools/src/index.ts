@@ -40,8 +40,29 @@ export const DRAWING_SUMMARY_SHAPE = {
     .object({ width: z.number(), height: z.number() })
     .nullable()
     .describe("Bounding-box size in drawing units, null when empty"),
+  space: z
+    .string()
+    .nullable()
+    .describe(
+      "Which space this summary is scoped to, or null when it covers the whole drawing (bounds/size then describe spaces[0], the space render returns)",
+    ),
   entityCount: z.number().int(),
   segmentCount: z.number().int(),
+  spaces: z
+    .array(
+      z.object({
+        name: z.string().describe("Pass as `space` to scope a describe or render to it"),
+        entityCount: z.number().int(),
+        segmentCount: z.number().int(),
+        bounds: z
+          .object({ minX: z.number(), minY: z.number(), maxX: z.number(), maxY: z.number() })
+          .nullable(),
+        size: z.object({ width: z.number(), height: z.number() }).nullable(),
+      }),
+    )
+    .describe(
+      "Every space in the drawing (a PDF's pages, a DXF's model space and layouts), model space first. These do not sum to entityCount: a DXF sheet's viewports re-show model geometry, so an entity can be drawn in two spaces while existing once",
+    ),
   layers: z.array(
     z.object({
       name: z.string(),
@@ -75,6 +96,16 @@ export interface ToolMeta {
 }
 
 /**
+ * How each verb handles a drawing with more than one page or sheet, said once
+ * so the six descriptions cannot drift on it. A caller who is never told the
+ * `space` argument exists will read page 1 and report it as the file.
+ */
+const DESCRIBE_SPACES =
+  " Covers the whole drawing by default, including every page of a multi-page PDF; pass `space` (a name from the reply's `spaces`) to scope it to one page or sheet.";
+const RENDER_SPACES =
+  " Renders the first page/sheet by default; pass `space` (a name from a describe reply's `spaces`) to render another one.";
+
+/**
  * The six tools, in the order they are registered.
  *
  * Descriptions carry the when-to-use guidance, because a client with no
@@ -87,7 +118,8 @@ export const TOOLS: readonly ToolMeta[] = [
     format: "dxf",
     kind: "describe",
     description:
-      "Return a structured JSON summary of a DXF drawing — units, bounding box, layers (with the color actually drawn), per-type entity counts, and any skipped/unsupported types. Use this to answer structural questions (what layers exist, how many parts, what size, is it to scale) without rendering an image. For a PDF use describe_pdf; if you do not know the format, use describe_doc.",
+      "Return a structured JSON summary of a DXF drawing — units, bounding box, layers (with the color actually drawn), per-type entity counts, and any skipped/unsupported types. Use this to answer structural questions (what layers exist, how many parts, what size, is it to scale) without rendering an image. For a PDF use describe_pdf; if you do not know the format, use describe_doc." +
+      DESCRIBE_SPACES,
   },
   {
     name: "render_dxf",
@@ -95,7 +127,8 @@ export const TOOLS: readonly ToolMeta[] = [
     format: "dxf",
     kind: "render",
     description:
-      "Render a DXF drawing to a PNG image you can look at. Use this to answer visual questions (what does it look like, where is a feature, does it look right) — it returns an image, not text. For structural facts, prefer describe_dxf. For a PDF use render_pdf; if you do not know the format, use render_doc.",
+      "Render a DXF drawing to a PNG image you can look at. Use this to answer visual questions (what does it look like, where is a feature, does it look right) — it returns an image, not text. For structural facts, prefer describe_dxf. For a PDF use render_pdf; if you do not know the format, use render_doc." +
+      RENDER_SPACES,
   },
   {
     name: "describe_pdf",
@@ -103,7 +136,8 @@ export const TOOLS: readonly ToolMeta[] = [
     format: "pdf",
     kind: "describe",
     description:
-      "Return a structured JSON summary of a PDF drawing — units (points), bounding box, layers, per-type entity counts, the text it contains, and what was skipped (images, shadings, transparency). Use this for structural questions about a PDF without rendering it. For a DXF use describe_dxf; if you do not know the format, use describe_doc.",
+      "Return a structured JSON summary of a PDF drawing — units (points), bounding box, layers, per-type entity counts, the text it contains, and what was skipped (images, shadings, transparency). Use this for structural questions about a PDF without rendering it. For a DXF use describe_dxf; if you do not know the format, use describe_doc." +
+      DESCRIBE_SPACES,
   },
   {
     name: "render_pdf",
@@ -111,7 +145,8 @@ export const TOOLS: readonly ToolMeta[] = [
     format: "pdf",
     kind: "render",
     description:
-      "Render a PDF drawing's vector content to a PNG you can look at. Images, shadings, and transparency are not drawn — they are reported by describe_pdf — so this shows line work and text, not a page facsimile. For a DXF use render_dxf; if you do not know the format, use render_doc.",
+      "Render a PDF drawing's vector content to a PNG you can look at. Images, shadings, and transparency are not drawn — they are reported by describe_pdf — so this shows line work and text, not a page facsimile. For a DXF use render_dxf; if you do not know the format, use render_doc." +
+      RENDER_SPACES,
   },
   {
     name: "describe_doc",
@@ -119,7 +154,8 @@ export const TOOLS: readonly ToolMeta[] = [
     format: "doc",
     kind: "describe",
     description:
-      "Return a structured JSON summary of a drawing in any supported format (DXF or PDF), detected from its bytes rather than its name. Use this when you do not know which format you have; the reply names the format that was read.",
+      "Return a structured JSON summary of a drawing in any supported format (DXF or PDF), detected from its bytes rather than its name. Use this when you do not know which format you have; the reply names the format that was read." +
+      DESCRIBE_SPACES,
   },
   {
     name: "render_doc",
@@ -127,7 +163,8 @@ export const TOOLS: readonly ToolMeta[] = [
     format: "doc",
     kind: "render",
     description:
-      "Render a drawing in any supported format (DXF or PDF) to a PNG you can look at, detected from its bytes rather than its name. Use this when you do not know which format you have.",
+      "Render a drawing in any supported format (DXF or PDF) to a PNG you can look at, detected from its bytes rather than its name. Use this when you do not know which format you have." +
+      RENDER_SPACES,
   },
 ];
 
@@ -168,6 +205,20 @@ export function sourceDescription(opts: { readonly paths: boolean }): string {
 export const INLINE_PDF_REFUSAL =
   "A PDF cannot be passed inline — it is binary, and an inline source is text. Pass an http(s) URL to the PDF instead" +
   " (or use the npx @aspicio/mcp local server, which reads files from disk).";
+
+/**
+ * The space argument every drawing tool accepts (AGT-1, AGT-2).
+ *
+ * Multi-page PDFs and multi-sheet DXFs are the norm, so both verbs need to say
+ * *which* page or sheet — describe defaults to the whole drawing, render to the
+ * first space, and this is how a caller narrows either.
+ */
+export const spaceSchema = z
+  .string()
+  .optional()
+  .describe(
+    'Which space to work on: "Model" (a PDF\'s page 1, a DXF\'s model space) or a page/layout name as listed in a describe reply\'s "spaces". Describe omits it for the whole drawing; render defaults to the first space.',
+  );
 
 /** The width argument every render tool accepts. */
 export const widthSchema = z
