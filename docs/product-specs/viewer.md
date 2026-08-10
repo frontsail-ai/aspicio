@@ -41,8 +41,9 @@ layers with nothing drawn.
 
 ### VIEW-6: Layer highlight
 
-One layer at a time can be emphasized (drawn bold on top). Highlighting a
-hidden layer is treated as clearing the highlight.
+One layer at a time can be emphasized (drawn bold on top of all content —
+raster images included). Highlighting a hidden layer is treated as clearing
+the highlight.
 
 ### VIEW-7: Entity picking and description
 
@@ -54,8 +55,9 @@ applicable). Picking is limited to model space.
 
 ### VIEW-8: Selection overlay
 
-The selected entity is drawn with a bright overlay (lines and fills);
-selecting `null` clears it. Selection resets on load and space switch.
+The selected entity is drawn with a bright overlay (lines and fills) above
+all content, raster images included; selecting `null` clears it. Selection
+resets on load and space switch.
 
 ### VIEW-9: Object snap
 
