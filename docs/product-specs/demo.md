@@ -213,3 +213,18 @@ handling is unchanged: a _failed_ load still shows the DEMO-3 toast over
 whatever was loaded before, including a previous empty result. The notice is
 document-level — a single empty page of a multi-page document does not
 trigger it, because the page tabs already make that emptiness navigable.
+
+### DEMO-21: Transient surfaces dismiss uniformly
+
+A transient surface — the export menu, the unsupported-entities popover, the
+mobile layer drawer — closes on Escape, and closes when a modal opens, so
+nothing light can sit above a modal's backdrop. Escape reaches these surfaces
+first: when one is open, Escape closes it and leaves the shortcuts overlay,
+measure points, and selection alone; a second Escape then continues down the
+usual order (DEMO-9, DEMO-10).
+
+The rule is deliberately about the whole class rather than each surface,
+because the failure it prevents is a surface being forgotten: a menu wired
+only for click-outside ignores the keyboard and outlives the overlays that
+supersede it, which reads as broken rather than deliberate. Modals keep their
+own documented behavior; this requirement governs what closes around them.
