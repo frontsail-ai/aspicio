@@ -1181,6 +1181,7 @@ function renderRecents(): void {
 }
 
 function openDialog(): void {
+  closeLightSurfaces();
   dialogOpen = true;
   dialogPhase = "idle";
   renderRecents();
@@ -1240,6 +1241,7 @@ function httpTip(status: number | undefined): string {
  *  file that downloaded fine but no parser claims. Keeps the user in the URL
  *  flow (Try again / Edit URL) instead of dropping them onto the file toast. */
 function showDialogError(url: string, kind: FetchErrorKind | "parse", status?: number): void {
+  closeLightSurfaces();
   dialogOpen = true;
   dialogPhase = "cors";
   urlInput.value = url;
@@ -1502,11 +1504,32 @@ $("#shortcuts-close").addEventListener("click", () => {
 
 function toggleShortcuts(): void {
   const s = $("#shortcuts");
+  if (s.hidden) closeLightSurfaces();
   s.hidden = !s.hidden;
 }
 
-/** Esc: close the help first, else back out of measure / selection. */
+/** Transient surfaces — menus, popovers, the mobile drawer. Every one closes
+ *  on Escape and yields when a modal opens (DEMO-21); a surface wired only
+ *  for click-outside repeats #129. Returns true when anything closed. */
+function closeLightSurfaces(): boolean {
+  let closed = false;
+  const surfaces: { isOpen: () => boolean; close: () => void }[] = [
+    { isOpen: () => !$("#export-pop").hidden, close: () => ($("#export-pop").hidden = true) },
+    { isOpen: () => !$("#skipped-pop").hidden, close: () => ($("#skipped-pop").hidden = true) },
+    { isOpen: () => panel.classList.contains("open"), close: () => setPanelOpen(false) },
+  ];
+  for (const surface of surfaces) {
+    if (surface.isOpen()) {
+      surface.close();
+      closed = true;
+    }
+  }
+  return closed;
+}
+
+/** Esc: light surfaces first, then help, then back out of measure / selection. */
 function onEscape(): void {
+  if (closeLightSurfaces()) return;
   if (!$("#shortcuts").hidden) {
     $("#shortcuts").hidden = true;
   } else if (measureActive && measurePoints.length > 0) {
