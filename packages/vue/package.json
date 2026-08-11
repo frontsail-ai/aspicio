@@ -41,10 +41,10 @@
   "devDependencies": {
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "@vue/test-utils": "^2.4.11",
-    "happy-dom": "^20.11.1",
+    "happy-dom": "^20.11.2",
     "typescript": "^7.0.2",
     "vite-plus": "catalog:",
-    "vue": "^3.5.0"
+    "vue": "^3.5.41"
   },
   "peerDependencies": {
     "three": ">=0.184.0 <1.0.0",

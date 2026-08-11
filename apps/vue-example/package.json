@@ -14,11 +14,11 @@
     "@aspicio/elements": "workspace:*",
     "@aspicio/vue": "workspace:*",
     "three": "^0.185.1",
-    "vue": "^3.5.0"
+    "vue": "^3.5.41"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "typescript": "~7.0.2",
     "vite-plus": "catalog:"
   }
