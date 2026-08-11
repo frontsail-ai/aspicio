@@ -1366,58 +1366,66 @@ button {
   font-size: 13.5px;
 }
 
-/* The ?src= offer (DEMO-23). Sits between the actions and the format list,
-   so it reads as a consequence of the link rather than a fourth way in. */
-.src-offer {
-  margin-top: 22px;
-  padding: 16px 18px;
-  max-width: 420px;
-  border: 1px solid var(--hairline2);
+/* The ?src= prompt (DEMO-23). Reuses the Open dialog's scrim and card so it
+   reads as the same kind of surface; it is modal because a link that fetches
+   from another site is a decision, and an inline card in the empty state was
+   easy to walk past. */
+.src-prompt {
+  align-items: center;
+  padding: 24px;
+}
+
+.src-prompt-card {
+  max-width: 460px;
+}
+
+.src-prompt-lede {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text2);
+}
+
+.src-prompt-target {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
   border-left: 2px solid var(--crease);
-  border-radius: 4px;
-  background: var(--panel);
-  text-align: left;
+  border-radius: 3px;
+  background: var(--panel2);
 }
 
-.src-offer-kicker {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  color: var(--text3);
-  margin-bottom: 8px;
-}
-
-.src-offer-name {
+.src-prompt-name {
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text);
   overflow-wrap: anywhere;
 }
 
-.src-offer-host {
+.src-prompt-host {
   font-family: var(--font-mono);
   font-size: 11.5px;
   color: var(--text2);
-  margin-top: 2px;
+  margin-top: 3px;
   overflow-wrap: anywhere;
 }
 
-.src-offer-actions {
-  display: flex;
-  gap: 8px;
+.src-prompt-note {
   margin-top: 14px;
-}
-
-.src-offer-note {
-  margin-top: 12px;
   font-size: 11.5px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--text3);
 }
 
-.src-offer-note code {
+.src-prompt-note code {
   font-family: var(--font-mono);
   color: var(--text2);
+}
+
+.src-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
 }
 
 .empty-supports {

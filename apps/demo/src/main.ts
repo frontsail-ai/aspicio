@@ -160,19 +160,6 @@ app.innerHTML = `
             <button id="empty-open" class="btn-primary" type="button">Open</button>
             <button id="empty-sample" class="btn-ghost" type="button">Load sample</button>
           </div>
-          <div id="src-offer" class="src-offer" hidden>
-            <div class="src-offer-kicker">THIS LINK POINTS AT A DRAWING</div>
-            <div id="src-offer-name" class="src-offer-name"></div>
-            <div id="src-offer-host" class="src-offer-host"></div>
-            <div class="src-offer-actions">
-              <button id="src-offer-load" class="btn-primary" type="button">Load it</button>
-              <button id="src-offer-dismiss" class="btn-ghost" type="button">Dismiss</button>
-            </div>
-            <div class="src-offer-note">
-              Aspicio fetches it in your browser. Share links use <code>#src=</code>, which
-              never reaches a server.
-            </div>
-          </div>
           <div class="empty-supports">OPENS · DXF · PDF<br>DXF ENTITIES · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · SPLINE · TEXT · MTEXT · INSERT · DIMENSION · HATCH · SOLID · POINT</div>
           <nav class="empty-links" aria-label="Project links">
             <a href="/docs/">Docs</a>
@@ -269,6 +256,29 @@ app.innerHTML = `
       <div class="shortcuts-grid">${SHORTCUTS.map(
         ([k, v]) => `<kbd class="sc-key">${k}</kbd><span class="sc-desc">${v}</span>`,
       ).join("")}</div>
+    </div>
+  </div>
+  <div id="src-prompt" class="od-scrim src-prompt" hidden role="dialog" aria-modal="true"
+       aria-labelledby="src-prompt-title">
+    <div class="od-card src-prompt-card">
+      <div class="od-head">
+        <div class="od-head-title" id="src-prompt-title">${icons.filePlus}<span>OPEN THIS DRAWING?</span></div>
+      </div>
+      <div class="od-body">
+        <div class="src-prompt-lede">This link asks Aspicio to fetch a drawing from another site.</div>
+        <div class="src-prompt-target">
+          <div id="src-prompt-name" class="src-prompt-name"></div>
+          <div id="src-prompt-host" class="src-prompt-host"></div>
+        </div>
+        <div class="src-prompt-note">
+          Nothing is fetched until you choose. Share links use <code>#src=</code>, which
+          stays in your browser and never reaches a server.
+        </div>
+        <div class="src-prompt-actions">
+          <button id="src-prompt-reject" class="btn-ghost" type="button">Don't open</button>
+          <button id="src-prompt-accept" class="btn-primary" type="button">Open drawing</button>
+        </div>
+      </div>
     </div>
   </div>
   <div id="open-dialog" class="od-scrim" hidden>
@@ -1862,14 +1872,25 @@ function clearSrcQuery(): void {
  * a choice. The hash form has neither property, so the offer names it.
  */
 function offerSrc(src: string): void {
-  const offer = $("#src-offer");
-  $("#src-offer-name").textContent = nameFromUrl(src);
-  $("#src-offer-host").textContent = hostOf(src);
-  offer.hidden = false;
+  const prompt = $("#src-prompt");
+  $("#src-prompt-name").textContent = nameFromUrl(src);
+  $("#src-prompt-host").textContent = hostOf(src);
   setMode("empty");
+  prompt.hidden = false;
+  // Focus the refusing button, not the accepting one: a stray Enter on a
+  // prompt the visitor has not read yet must not start a fetch.
+  $("#src-prompt-reject").focus();
 
-  $("#src-offer-load").addEventListener("click", () => {
-    offer.hidden = true;
+  const close = (): void => {
+    prompt.hidden = true;
+    window.removeEventListener("keydown", onKey);
+  };
+  const reject = (): void => {
+    close();
+    clearSrcQuery();
+  };
+  const accept = (): void => {
+    close();
     // Canonicalise to the hash *before* loading, so the share link the visitor
     // ends up with is the private form even though they arrived by the other.
     history.replaceState(
@@ -1882,11 +1903,21 @@ function offerSrc(src: string): void {
       { view: { center: { x: 0, y: 0 }, unitsPerPixel: 0, rotation: 0 }, src, spaceIndex: 0 },
       true,
     );
+  };
+  // Escape and a backdrop click both mean "no" rather than "ask me later"
+  // (DEMO-21 dismisses uniformly). Mapping an accidental dismissal to the
+  // safe outcome is the point: only a deliberate click fetches anything.
+  function onKey(e: KeyboardEvent): void {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    reject();
+  }
+  window.addEventListener("keydown", onKey);
+  prompt.addEventListener("click", (e) => {
+    if (e.target === prompt) reject();
   });
-  $("#src-offer-dismiss").addEventListener("click", () => {
-    offer.hidden = true;
-    clearSrcQuery();
-  });
+  $("#src-prompt-accept").addEventListener("click", accept);
+  $("#src-prompt-reject").addEventListener("click", reject);
 }
 
 const entry = resolveEntry(location.hash, location.search);

@@ -273,24 +273,30 @@ surround (VIEW-17): a page carries its own scale reference in its edge,
 and a repeating pattern running up to that edge competes with the one line
 the reader has to trust.
 
-### DEMO-23: A query-string source is offered, not followed
+### DEMO-23: A query-string source is confirmed, not followed
 
-`?src=<url>` is recognised and explained rather than silently ignored: the
-empty screen offers the drawing, naming its filename and its host, with
-Load and Dismiss.
+`?src=<url>` raises a modal prompt naming the drawing's filename and its
+host, with an accepting and a refusing action. It is modal on purpose: an
+inline notice on the empty screen is easy to walk past, and a link that
+fetches from another site is a decision rather than a notification.
 
-It is offered rather than loaded because the exposure has already happened
-by the time the page runs. A query string reaches the server, so the
-drawing's URL is in this site's access log on arrival, and a link that
+It is confirmed rather than loaded because the exposure has already
+happened by the time the page runs. A query string reaches the server, so
+the drawing's URL is in this site's access log on arrival, and a link that
 fetched on sight would make that a surprise instead of a choice. Naming
 the host is the point of asking — deciding whether to fetch means knowing
 who from.
 
+Focus opens on the refusing action, so a stray Enter cannot start a fetch.
+Escape and a backdrop click both refuse rather than defer (DEMO-21
+dismisses uniformly): mapping an accidental dismissal to the safe outcome
+is what makes a deliberate click the only path to a fetch.
+
 Accepting loads the drawing and rewrites the address to the hash form, so
 the link the visitor goes on to share is the private one even though they
-arrived by the other. Both answers drop `src` from the query, so a reload
-does not ask again; other parameters are left alone. An unsafe value is
-never offered at all, under the same guard the hash path applies
+arrived by the other. Either answer drops `src` from the query, so a
+reload does not ask again; other parameters are left alone. An unsafe
+value never prompts at all, under the same guard the hash path applies
 (DEMO-18).
 
 A hash link wins when both carriers are present, and still loads directly

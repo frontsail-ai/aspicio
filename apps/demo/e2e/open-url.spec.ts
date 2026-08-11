@@ -349,7 +349,7 @@ test("dragging a file over the open dialog shows the drop overlay on top", async
 
 const QUERY_LINK = `/?src=${encodeURIComponent(REMOTE)}`;
 
-test("a query src is offered, not followed", async ({ page }) => {
+test("a query src prompts before fetching, and blocks the app until answered", async ({ page }) => {
   await serveFixture(page);
   let fetched = false;
   await page.route(REMOTE, async (route) => {
@@ -358,49 +358,91 @@ test("a query src is offered, not followed", async ({ page }) => {
   });
 
   await page.goto(QUERY_LINK);
-  const offer = page.locator("#src-offer");
-  await expect(offer).toBeVisible();
+  const prompt = page.locator("#src-prompt");
+  await expect(prompt).toBeVisible();
   // The host is named, because deciding whether to fetch means knowing who
   // from — that is the whole point of asking.
-  await expect(page.locator("#src-offer-host")).toHaveText("remote.test");
-  await expect(page.locator("#src-offer-name")).toHaveText("box.dxf");
+  await expect(page.locator("#src-prompt-host")).toHaveText("remote.test");
+  await expect(page.locator("#src-prompt-name")).toHaveText("box.dxf");
 
-  // Nothing was fetched, and the drawing is not on screen.
+  // Modal for real: the scrim intercepts pointer events over the controls
+  // behind it. An inline card was missable; this cannot be walked past.
+  await expect(prompt).toHaveAttribute("aria-modal", "true");
+  const covered = await page.evaluate(() => {
+    const behind = document.querySelector("#empty-open")!.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      behind.left + behind.width / 2,
+      behind.top + behind.height / 2,
+    );
+    return hit?.closest("#src-prompt") !== null;
+  });
+  expect(covered, "the scrim must cover the controls behind it").toBe(true);
+
+  // Focus sits on the refusing button, so a stray Enter cannot start a fetch.
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe("src-prompt-reject");
+
   await page.waitForTimeout(400);
   expect(fetched, "must not fetch before the visitor agrees").toBe(false);
-  await expect(page.locator("#empty-state")).toBeVisible();
 });
 
-test("accepting the offer loads it and canonicalises to the hash", async ({ page }) => {
+test("accepting loads it and canonicalises to the hash", async ({ page }) => {
   await serveFixture(page);
   await page.goto(QUERY_LINK);
-  await page.locator("#src-offer-load").click();
+  await page.locator("#src-prompt-accept").click();
 
   await expect(page.locator("#file-chip")).toHaveText("box.dxf");
+  await expect(page.locator("#src-prompt")).toBeHidden();
   // The share link the visitor ends up with is the private form, even though
   // they arrived by the other one.
   await expect.poll(() => page.evaluate(() => location.search)).toBe("");
   expect(await page.evaluate(() => location.hash)).toContain("src=");
-  await expect(page.locator("#src-offer")).toBeHidden();
 });
 
-test("declining the offer clears src and leaves the drawing alone", async ({ page }) => {
+test("refusing clears src and leaves the drawing alone", async ({ page }) => {
   await serveFixture(page);
   await page.goto(`${QUERY_LINK}&consent=1`);
-  await page.locator("#src-offer-dismiss").click();
+  await page.locator("#src-prompt-reject").click();
 
-  await expect(page.locator("#src-offer")).toBeHidden();
+  await expect(page.locator("#src-prompt")).toBeHidden();
   await expect(page.locator("#empty-state")).toBeVisible();
-  // Only `src` is answered here; an unrelated parameter is none of this
-  // feature's business and survives.
+  // Only `src` is answered here; an unrelated parameter survives.
   expect(await page.evaluate(() => location.search)).toBe("?consent=1");
 });
 
-test("an unsafe query src is never offered", async ({ page }) => {
-  // The offer is a button someone will click, so an unsafe value must not
+test.describe("dismissing means no, not later", () => {
+  // An accidental dismissal must map to the safe outcome: only a deliberate
+  // click on the accepting button ever starts a fetch (DEMO-21, DEMO-23).
+  for (const [name, dismiss] of [
+    ["Escape", async (page: Page) => page.keyboard.press("Escape")],
+    [
+      "a backdrop click",
+      async (page: Page) => page.locator("#src-prompt").click({ position: { x: 8, y: 8 } }),
+    ],
+  ] as const) {
+    test(`${name} refuses`, async ({ page }) => {
+      await serveFixture(page);
+      let fetched = false;
+      await page.route(REMOTE, async (route) => {
+        fetched = true;
+        await route.fallback();
+      });
+
+      await page.goto(QUERY_LINK);
+      await expect(page.locator("#src-prompt")).toBeVisible();
+      await dismiss(page);
+
+      await expect(page.locator("#src-prompt")).toBeHidden();
+      expect(fetched).toBe(false);
+      await expect.poll(() => page.evaluate(() => location.search)).toBe("");
+    });
+  }
+});
+
+test("an unsafe query src never prompts at all", async ({ page }) => {
+  // The prompt is a button someone will click, so an unsafe value must not
   // reach it. Declining to offer is the protection (DEMO-18's guard).
   await page.goto(`/?src=${encodeURIComponent("javascript:alert(1)")}`);
-  await expect(page.locator("#src-offer")).toBeHidden();
+  await expect(page.locator("#src-prompt")).toBeHidden();
   await expect(page.locator("#empty-state")).toBeVisible();
 });
 
@@ -413,6 +455,6 @@ test("a hash link still loads directly, and wins over a query src", async ({ pag
     `/?src=${encodeURIComponent("https://remote.test/other.dxf")}#src=${encodeURIComponent(REMOTE)}`,
   );
   await expect(page.locator("#file-chip")).toHaveText("box.dxf");
-  await expect(page.locator("#src-offer")).toBeHidden();
+  await expect(page.locator("#src-prompt")).toBeHidden();
   expect(await page.evaluate(() => location.hash)).toContain(encodeURIComponent(REMOTE));
 });
