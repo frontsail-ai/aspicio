@@ -342,3 +342,77 @@ test("dragging a file over the open dialog shows the drop overlay on top", async
   );
   expect(topIsDrop).toBe(true);
 });
+
+/* --------------------------------------------------------------------------
+ * ?src= in the query string (DEMO-23, #193)
+ * ------------------------------------------------------------------------ */
+
+const QUERY_LINK = `/?src=${encodeURIComponent(REMOTE)}`;
+
+test("a query src is offered, not followed", async ({ page }) => {
+  await serveFixture(page);
+  let fetched = false;
+  await page.route(REMOTE, async (route) => {
+    fetched = true;
+    await route.fallback();
+  });
+
+  await page.goto(QUERY_LINK);
+  const offer = page.locator("#src-offer");
+  await expect(offer).toBeVisible();
+  // The host is named, because deciding whether to fetch means knowing who
+  // from — that is the whole point of asking.
+  await expect(page.locator("#src-offer-host")).toHaveText("remote.test");
+  await expect(page.locator("#src-offer-name")).toHaveText("box.dxf");
+
+  // Nothing was fetched, and the drawing is not on screen.
+  await page.waitForTimeout(400);
+  expect(fetched, "must not fetch before the visitor agrees").toBe(false);
+  await expect(page.locator("#empty-state")).toBeVisible();
+});
+
+test("accepting the offer loads it and canonicalises to the hash", async ({ page }) => {
+  await serveFixture(page);
+  await page.goto(QUERY_LINK);
+  await page.locator("#src-offer-load").click();
+
+  await expect(page.locator("#file-chip")).toHaveText("box.dxf");
+  // The share link the visitor ends up with is the private form, even though
+  // they arrived by the other one.
+  await expect.poll(() => page.evaluate(() => location.search)).toBe("");
+  expect(await page.evaluate(() => location.hash)).toContain("src=");
+  await expect(page.locator("#src-offer")).toBeHidden();
+});
+
+test("declining the offer clears src and leaves the drawing alone", async ({ page }) => {
+  await serveFixture(page);
+  await page.goto(`${QUERY_LINK}&consent=1`);
+  await page.locator("#src-offer-dismiss").click();
+
+  await expect(page.locator("#src-offer")).toBeHidden();
+  await expect(page.locator("#empty-state")).toBeVisible();
+  // Only `src` is answered here; an unrelated parameter is none of this
+  // feature's business and survives.
+  expect(await page.evaluate(() => location.search)).toBe("?consent=1");
+});
+
+test("an unsafe query src is never offered", async ({ page }) => {
+  // The offer is a button someone will click, so an unsafe value must not
+  // reach it. Declining to offer is the protection (DEMO-18's guard).
+  await page.goto(`/?src=${encodeURIComponent("javascript:alert(1)")}`);
+  await expect(page.locator("#src-offer")).toBeHidden();
+  await expect(page.locator("#empty-state")).toBeVisible();
+});
+
+test("a hash link still loads directly, and wins over a query src", async ({ page }) => {
+  await serveFixture(page);
+  await serveFixture(page, "https://remote.test/other.dxf", "box.dxf");
+
+  // The regression guard: the hash form must not have grown a prompt.
+  await page.goto(
+    `/?src=${encodeURIComponent("https://remote.test/other.dxf")}#src=${encodeURIComponent(REMOTE)}`,
+  );
+  await expect(page.locator("#file-chip")).toHaveText("box.dxf");
+  await expect(page.locator("#src-offer")).toBeHidden();
+  expect(await page.evaluate(() => location.hash)).toContain(encodeURIComponent(REMOTE));
+});

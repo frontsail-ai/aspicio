@@ -16,6 +16,7 @@ import { dxfParser } from "@aspicio/core/dxf";
 import { applyTheme, canvasColors, loadTheme, saveTheme } from "./theme.ts";
 import { pdfParser } from "@aspicio/core/pdf";
 import type { EntityInfo, LayerInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
+import { resolveEntry, withoutSrc } from "./entry.ts";
 import { decodeView, encodeView, packLayers } from "./viewurl.ts";
 import type { ViewLink } from "./viewurl.ts";
 import { FetchError, fetchWithProgress, isHttpUrl } from "./fetch-progress.ts";
@@ -158,6 +159,19 @@ app.innerHTML = `
           <div class="empty-actions">
             <button id="empty-open" class="btn-primary" type="button">Open</button>
             <button id="empty-sample" class="btn-ghost" type="button">Load sample</button>
+          </div>
+          <div id="src-offer" class="src-offer" hidden>
+            <div class="src-offer-kicker">THIS LINK POINTS AT A DRAWING</div>
+            <div id="src-offer-name" class="src-offer-name"></div>
+            <div id="src-offer-host" class="src-offer-host"></div>
+            <div class="src-offer-actions">
+              <button id="src-offer-load" class="btn-primary" type="button">Load it</button>
+              <button id="src-offer-dismiss" class="btn-ghost" type="button">Dismiss</button>
+            </div>
+            <div class="src-offer-note">
+              Aspicio fetches it in your browser. Share links use <code>#src=</code>, which
+              never reaches a server.
+            </div>
           </div>
           <div class="empty-supports">OPENS · DXF · PDF<br>DXF ENTITIES · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · SPLINE · TEXT · MTEXT · INSERT · DIMENSION · HATCH · SOLID · POINT</div>
           <nav class="empty-links" aria-label="Project links">
@@ -1830,7 +1844,54 @@ function openFromLink(link: ViewLink | null, cold: boolean): void {
   loadSample();
 }
 
-openFromLink(decodeView(location.hash), true);
+/**
+ * Drop `src` from the address bar once the offer is answered, either way, so a
+ * reload does not ask again and the bar stops advertising a URL that may have
+ * been declined. Other parameters are left alone.
+ */
+function clearSrcQuery(): void {
+  history.replaceState(null, "", location.pathname + withoutSrc(location.search) + location.hash);
+}
+
+/**
+ * A `src` in the query string is offered, not followed (DEMO-23).
+ *
+ * It cannot be loaded silently: a query string is sent to the server, so the
+ * drawing's URL is in this site's access log before any of this code runs, and
+ * a link that fetches on sight would make that exposure a surprise rather than
+ * a choice. The hash form has neither property, so the offer names it.
+ */
+function offerSrc(src: string): void {
+  const offer = $("#src-offer");
+  $("#src-offer-name").textContent = nameFromUrl(src);
+  $("#src-offer-host").textContent = hostOf(src);
+  offer.hidden = false;
+  setMode("empty");
+
+  $("#src-offer-load").addEventListener("click", () => {
+    offer.hidden = true;
+    // Canonicalise to the hash *before* loading, so the share link the visitor
+    // ends up with is the private form even though they arrived by the other.
+    history.replaceState(
+      null,
+      "",
+      location.pathname + withoutSrc(location.search) + `#src=${encodeURIComponent(src)}`,
+    );
+    // unitsPerPixel 0 is viewurl's "no camera pose" sentinel: load fitted.
+    openFromLink(
+      { view: { center: { x: 0, y: 0 }, unitsPerPixel: 0, rotation: 0 }, src, spaceIndex: 0 },
+      true,
+    );
+  });
+  $("#src-offer-dismiss").addEventListener("click", () => {
+    offer.hidden = true;
+    clearSrcQuery();
+  });
+}
+
+const entry = resolveEntry(location.hash, location.search);
+if (entry.kind === "offer") offerSrc(entry.src);
+else openFromLink(entry.kind === "link" ? entry.link : null, true);
 // React to a hash the user introduces after load — pasting a share link into the
 // address bar, or back/forward between shared links. Our own writes go through
 // history.replaceState, which never fires hashchange, so this can't loop.
