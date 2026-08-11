@@ -158,3 +158,27 @@ test("the Ghent Output Suite renders its images in the browser", async ({ page }
   const total = colors.red + colors.green + colors.cyan + colors.magenta + colors.yellow;
   expect(total).toBeGreaterThan(1000);
 });
+
+test("a clipped image draws only the pixels its region keeps (PDF-3)", async ({ page }) => {
+  await page.locator("#file").setInputFiles(fixture("clip-image-rect.pdf"));
+  await expect(page.locator("#file-chip")).toHaveText("clip-image-rect.pdf");
+
+  // The image is four solid columns — red, green, blue, yellow — and the file
+  // clips it to its left half. Red and green must survive; blue and yellow,
+  // the two columns the region excludes, must appear nowhere. Before clipping
+  // was applied the whole image drew, so this fails loudly on a regression.
+  //
+  // The colour buckets are no use here: the boundary between the red and
+  // green columns is a wide filtered gradient, and its middle (223/141/0)
+  // sits in the "yellow" bucket without a yellow pixel being drawn. Matching
+  // the column colours themselves is what distinguishes drawn from blended.
+  expect(await canvasCountNear(page, [255, 0, 0])).toBeGreaterThan(100);
+  expect(await canvasCountNear(page, [0, 255, 0])).toBeGreaterThan(100);
+  expect(await canvasCountNear(page, [0, 0, 255])).toBe(0);
+  expect(await canvasCountNear(page, [255, 255, 0])).toBe(0);
+
+  // And the crop is honest about what it left out: nothing is counted,
+  // because nothing was declined (PDF-8).
+  const probe = await probeViewer(page);
+  expect(probe.unsupported["Clip"]).toBeUndefined();
+});

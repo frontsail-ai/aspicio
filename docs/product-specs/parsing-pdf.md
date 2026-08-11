@@ -67,6 +67,26 @@ use. A shape with holes therefore keeps them. PDF's own two fill rules are
 both approximated by that convention, which is a documented limitation rather
 than a per-file decision (PDF-8).
 
+Clipping paths crop what follows them. A path that reads as a convex region —
+a rectangle, the parallelogram a transformed rectangle becomes, any convex
+outline — narrows the region in force, and nested clips intersect it further,
+so a shape draws only where every enclosing region allows and clips that fail
+to overlap leave nothing drawable at all. Strokes are cut at the boundary, and
+a stroke a region interrupts becomes several runs rather than one bridging the
+gap; fills keep their holes; a placed image keeps the pixels inside the region
+and no others (PDF-9). A form XObject's `/BBox` narrows the region the same
+way, because the specification crops a form to it, and the region a form is
+invoked under carries into its content. A path that is _not_ a convex region —
+a concave outline, one built from curves, several subpaths at once — leaves
+the region it found in place and is counted instead (PDF-8): the drawing is
+then no worse than before clipping was applied at all.
+
+Text is deliberately exempt from cutting. Glyph widths are estimated rather
+than read (PDF-4), so a run is dropped only where it provably cannot reach the
+region — at twice its estimated length — and one overlapping the boundary
+draws whole rather than half. Losing a word a reader can see would be a worse
+failure than drawing one past the crop.
+
 ### PDF-4: Text becomes text, not outlines
 
 Text-showing operators produce text entities positioned, sized, and rotated by
@@ -149,9 +169,9 @@ that drew nothing has none.
 ### PDF-8: What this viewer does not draw is counted, never fatal
 
 Shadings, soft masks (the graphics-state kind — an image's own soft mask
-draws, PDF-9), non-normal blend modes, patterned fills, clipping paths, and
-glyph drawing procedures are skipped and reported per kind (INV-3), so a
-describe answers honestly about what was left out. An image outside PDF-9's
+draws, PDF-9), non-normal blend modes, patterned fills, and glyph drawing
+procedures are skipped and reported per kind (INV-3), so a describe answers
+honestly about what was left out. An image outside PDF-9's
 decodable set — JPEG 2000, JBIG2, CCITT fax, a progressive JPEG, an exotic
 colour space — is counted as `Image`, the same key as before images drew, so
 a count consumer needs no migration. Three optional-content cases are
@@ -166,6 +186,13 @@ regardless (PDF-4). Embedded typefaces are not counted because DXF does not
 count them either: both substitute the stroke font, and one policy covers both
 formats.
 
+A clipping path is counted only where it could not be applied (PDF-3): a
+concave outline, one built from curves, several subpaths at once, or a
+placement whose region needs a per-pixel mask larger than this viewer will
+build. The count therefore names a region that was ignored, not every region
+in the file — across the acceptance corpus it falls from 3,134 to 82. A file
+whose count is zero was cropped exactly as its producer asked.
+
 Two color simplifications are counted the same way, because they change a
 color rather than omit a shape: a tint transform this viewer cannot evaluate
 falls back to ink coverage, and a color space it cannot convert — Indexed,
@@ -176,11 +203,13 @@ from passing as a faithful one.
 A file made mostly of these constructs loads to a nearly empty drawing. That is
 a correct report about the file, not a failure.
 
-Two omissions can look wrong rather than incomplete, and are documented instead
-of counted because they affect shapes that do draw: ignored clipping lets fills
-escape a region the producer meant to crop, and the single fill convention of
-PDF-3 approximates both of PDF's fill rules, so a self-intersecting or
-multiply-nested path may fill differently than intended.
+Two approximations can look wrong rather than incomplete, and are documented
+instead of counted because they affect shapes that do draw. The single fill
+convention of PDF-3 approximates both of PDF's fill rules, so a
+self-intersecting or multiply-nested path may fill differently than intended.
+And a clipped image crops on whole pixels of its own raster, so a placement
+may keep up to one source pixel past its region — the alternative, rounding
+inward, would shave a column the region genuinely covers.
 
 ### PDF-9: Raster images draw
 

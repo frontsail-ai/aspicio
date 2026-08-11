@@ -8,12 +8,23 @@
 
 import { sampleCubic } from "../../geom/bezier.ts";
 import { DEFAULT_CURVE_SEGMENTS } from "../../geom/arc.ts";
+import {
+  boundsOf,
+  classifyBox,
+  clipContains,
+  clipPolyline,
+  clipRing,
+  convexClipFromRing,
+  intersectClips,
+} from "../../geom/clip.ts";
+import type { ConvexClip } from "../../geom/clip.ts";
 import type {
   Entity,
   HatchEntity,
   LineTypeDef,
   Point2,
   PolylineEntity,
+  RasterImage,
   TextEntity,
 } from "../../model/types.ts";
 import { isStream } from "./document.ts";
@@ -36,6 +47,24 @@ const POINTS_TO_LINEWEIGHT = 2540 / 72;
 
 /** Bound on form recursion; a cyclic form graph must not hang the parse. */
 const MAX_FORM_DEPTH = 12;
+
+/**
+ * Pixels above which an image mask is refused rather than paid for.
+ *
+ * Only a placement whose region is not a rectangle in the image's own space
+ * ever reaches the mask, and the crop that precedes it has already shrunk the
+ * work to the overlapping pixels; a placement still above this bound is
+ * counted like any other clip this viewer declines to apply (PDF-8).
+ */
+const MAX_MASK_PIXELS = 16_000_000;
+
+/** An image XObject occupies the unit square in its own space (PDF-9). */
+const UNIT_SQUARE: readonly Point2[] = [
+  { x: 0, y: 0 },
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+  { x: 0, y: 1 },
+];
 
 /** A 2×3 affine matrix, PDF's `[a b c d e f]`. */
 export type Matrix = readonly [number, number, number, number, number, number];
@@ -77,8 +106,20 @@ export { cmykToRgb, grayToRgb } from "./color-space.ts";
 
 /* ---------- graphics state ---------- */
 
+/**
+ * The clipping region in force: none, one, or none-at-all.
+ *
+ * "empty" is not the same as `undefined`. Nested clips that fail to overlap
+ * leave a region nothing can draw in — 28 of them across the acceptance
+ * corpus — and collapsing that into "unclipped" would paint everything
+ * exactly where the file asked for nothing.
+ */
+type ClipState = ConvexClip | "empty" | undefined;
+
 interface GraphicsState {
   ctm: Matrix;
+  /** The clipping region (PDF-3); inherited by forms this state invokes. */
+  clip: ClipState;
   strokeColor: number;
   fillColor: number;
   lineWidth: number;
@@ -97,8 +138,9 @@ interface GraphicsState {
   rise: number;
 }
 
-const initialState = (ctm: Matrix): GraphicsState => ({
+const initialState = (ctm: Matrix, clip: ClipState): GraphicsState => ({
   ctm,
+  clip,
   strokeColor: 0x000000,
   fillColor: 0x000000,
   lineWidth: 1,
@@ -237,16 +279,79 @@ class Interpreter {
     this.unsupported[kind] = (this.unsupported[kind] ?? 0) + 1;
   }
 
+  /**
+   * Narrow the state's region by a `W`/`W*` path.
+   *
+   * A path this viewer cannot turn into a convex region — several subpaths,
+   * a concave outline, a curve, a degenerate ring — leaves the region it
+   * found in place and is counted (PDF-8): drawing too much is the failure
+   * this already had, while guessing a region would hide content instead.
+   */
+  private applyClip(state: GraphicsState, subpaths: readonly Point2[][]): void {
+    const rings = subpaths.filter((points) => points.length >= 3);
+    const region = rings.length === 1 ? convexClipFromRing(rings[0] as Point2[]) : undefined;
+    if (region === undefined) {
+      this.count("Clip");
+      return;
+    }
+    if (state.clip === "empty") return;
+    state.clip =
+      state.clip === undefined ? region : (intersectClips(state.clip, region) ?? "empty");
+  }
+
+  /**
+   * Narrow a region by a `[x0 y0 x1 y1]` box placed through a matrix.
+   *
+   * A box that is missing, malformed, or zero-area narrows nothing: a form
+   * whose own bounds this viewer cannot read still draws what it holds.
+   */
+  private async boxClip(
+    value: PdfValue | undefined,
+    m: Matrix,
+    clip: ClipState,
+  ): Promise<ClipState> {
+    if (clip === "empty") return "empty";
+    const box = await this.doc.array(value);
+    if (box.length !== 4) return clip;
+    const x0 = toNumber(box[0]);
+    const y0 = toNumber(box[1]);
+    const x1 = toNumber(box[2]);
+    const y1 = toNumber(box[3]);
+    const region = convexClipFromRing([
+      apply(m, x0, y0),
+      apply(m, x1, y0),
+      apply(m, x1, y1),
+      apply(m, x0, y1),
+    ]);
+    if (region === undefined) return clip;
+    return clip === undefined ? region : (intersectClips(clip, region) ?? "empty");
+  }
+
+  /**
+   * Cut a ring to the region, or `undefined` when nothing of it survives.
+   *
+   * The box test carries the load: 7,425 of the corpus's 7,616 clipped paths
+   * lie wholly inside their region, and those must cost four comparisons.
+   */
+  private clipToRegion(points: Point2[], clip: ConvexClip): Point2[] | undefined {
+    const verdict = classifyBox(boundsOf(points), clip);
+    if (verdict === "inside") return points;
+    if (verdict === "outside") return undefined;
+    const cut = clipRing(points, clip);
+    return cut.length >= 3 ? cut : undefined;
+  }
+
   async execute(
     content: Uint8Array,
     resources: PdfDict | undefined,
     ctm: Matrix,
     depth: number,
+    clip?: ClipState,
   ): Promise<void> {
     if (depth > MAX_FORM_DEPTH) return;
 
     const stack: GraphicsState[] = [];
-    let state = initialState(ctm);
+    let state = initialState(ctm, clip);
     let operands: PdfValue[] = [];
 
     // Current path, in device space: each subpath is a run of points.
@@ -269,9 +374,9 @@ class Interpreter {
     const resetPath = (): void => {
       flushSubpath();
       if (pendingClip) {
-        // Clipping is honored by counting, not by cropping: a fill may escape
-        // the region its producer intended (PDF-8).
-        this.count("Clip");
+        // The path clips only after the painting operator that ends it has
+        // drawn, so the paint above used the region this one narrows.
+        this.applyClip(state, subpaths);
         pendingClip = false;
       }
       subpaths = [];
@@ -591,11 +696,7 @@ class Interpreter {
 
   /** Map a device-space point back through the CTM, for `v`'s implicit control point. */
   private inverse(m: Matrix, p: Point2): Point2 {
-    const det = m[0] * m[3] - m[1] * m[2];
-    if (Math.abs(det) < 1e-12) return { x: 0, y: 0 };
-    const dx = p.x - m[4];
-    const dy = p.y - m[5];
-    return { x: (dx * m[3] - dy * m[2]) / det, y: (dy * m[0] - dx * m[1]) / det };
+    return inversePoint(m, p);
   }
 
   /**
@@ -634,8 +735,20 @@ class Interpreter {
       state.rise,
     ];
     const render = multiply(multiply(scaled, textMatrix), state.ctm);
+    // Text space without the font-size scaling: the frame the run's own
+    // advance width is measured in, which the clip test needs.
+    const place = multiply(textMatrix, state.ctm);
 
-    if (text !== "") {
+    // Advance by the run's width. Without glyph metrics the estimate is the
+    // standard half-em average, which keeps successive runs from stacking on
+    // one another — exact advance needs /Widths, which is 1.5 work.
+    const glyphs = decoder?.twoByte === true ? bytes.length / 2 : bytes.length;
+    const spaces = decoder?.twoByte === true ? 0 : countSpaces(bytes);
+    const width =
+      (glyphs * 0.5 * state.fontSize + glyphs * state.charSpacing + spaces * state.wordSpacing) *
+      state.horizontalScale;
+
+    if (text !== "" && this.textReachesRegion(render, place, width, state)) {
       const position = { x: render[4], y: render[5] };
       // Cap height, not em size: the stroke font draws caps at `height`, and
       // 0.7 em is the usual cap-height ratio for text faces.
@@ -662,15 +775,45 @@ class Interpreter {
       }
     }
 
-    // Advance by the run's width. Without glyph metrics the estimate is the
-    // standard half-em average, which keeps successive runs from stacking on
-    // one another — exact advance needs /Widths, which is 1.5 work.
-    const glyphs = decoder?.twoByte === true ? bytes.length / 2 : bytes.length;
-    const spaces = decoder?.twoByte === true ? 0 : countSpaces(bytes);
-    const width =
-      (glyphs * 0.5 * state.fontSize + glyphs * state.charSpacing + spaces * state.wordSpacing) *
-      state.horizontalScale;
     return multiply([1, 0, 0, 1, width, 0], textMatrix);
+  }
+
+  /**
+   * Whether a text run can reach the clipping region.
+   *
+   * Text is dropped only when it provably cannot, and is never cut: glyph
+   * widths are estimated rather than read (PDF-4), so the run's box is
+   * inflated by an em and by its own estimated length again — room for a run
+   * twice as long as the estimate — before the test. 8,996 of the corpus's
+   * text runs sit under a clip and 432 are dropped; none of the 432 would
+   * survive even at three times the estimate, so the margin is headroom
+   * rather than a threshold anything sits near. Losing a word a reader can
+   * see would be a worse failure than painting one past the crop.
+   */
+  private textReachesRegion(
+    render: Matrix,
+    place: Matrix,
+    width: number,
+    state: GraphicsState,
+  ): boolean {
+    if (state.clip === "empty") return false;
+    const clip = state.clip;
+    if (clip === undefined) return true;
+    const origin = { x: render[4], y: render[5] };
+    const advance = { x: place[0] * width, y: place[1] * width };
+    const box = boundsOf([origin, { x: origin.x + advance.x, y: origin.y + advance.y }]);
+    const margin = Math.hypot(render[2], render[3]) + Math.hypot(advance.x, advance.y);
+    return (
+      classifyBox(
+        {
+          minX: box.minX - margin,
+          minY: box.minY - margin,
+          maxX: box.maxX + margin,
+          maxY: box.maxY + margin,
+        },
+        clip,
+      ) !== "outside"
+    );
   }
 
   /** Resolve and cache a font resource's decoder. */
@@ -692,7 +835,19 @@ class Interpreter {
     return decoder;
   }
 
-  private emitStrokes(subpaths: Point2[][], state: GraphicsState): void {
+  private emitStrokes(paths: Point2[][], state: GraphicsState): void {
+    if (state.clip === "empty") return;
+    // A stroke the region splits comes back as several runs, never one run
+    // bridging the gap: that would draw a segment the file does not contain.
+    const clip = state.clip;
+    const subpaths =
+      clip === undefined
+        ? paths
+        : paths.flatMap((points) =>
+            classifyBox(boundsOf(points), clip) === "inside"
+              ? [points]
+              : clipPolyline(points, clip),
+          );
     const scale = matrixScale(state.ctm);
     // A zero width means "thinnest line the device can draw" — hairline, which
     // is what an undefined lineWeight already means downstream.
@@ -726,7 +881,15 @@ class Interpreter {
    * its own filled region, carrying the rings nested inside it as holes.
    */
   private emitFill(subpaths: Point2[][], state: GraphicsState): void {
-    const rings = subpaths.filter((points) => points.length >= 3);
+    if (state.clip === "empty") return;
+    const clip = state.clip;
+    // Every ring is cut on its own, which is exact for a convex region: the
+    // part of a hole outside the region is already excluded by the clipped
+    // boundary that encloses it, so holes need no special handling.
+    const rings = subpaths
+      .filter((points) => points.length >= 3)
+      .map((points) => (clip === undefined ? points : this.clipToRegion(points, clip)))
+      .filter((points): points is Point2[] => points !== undefined);
     if (rings.length === 0) return;
     if (rings.length === 1) {
       this.pushHatch(rings, state);
@@ -882,12 +1045,21 @@ class Interpreter {
         this.count("Image");
         return;
       }
+      if (state.clip === "empty") return;
+      // Clipped after decoding, never before: a placement the region drops
+      // must still report the codecs and colour spaces it needed (PDF-8), or
+      // the counts would depend on where a shape happens to sit.
+      const placed =
+        state.clip === undefined
+          ? { image, transform: [...state.ctm] as Matrix }
+          : clipPlacedImage(image, state.ctm, state.clip, () => this.count("Clip"));
+      if (placed === undefined) return;
       this.entities.push({
         type: "IMAGE",
         layer: ocLayer ?? this.currentLayer(),
         color: null,
-        transform: [...state.ctm],
-        image,
+        transform: [...placed.transform],
+        image: placed.image,
       });
       return;
     }
@@ -908,16 +1080,118 @@ class Interpreter {
         : IDENTITY;
     const formResources = (await this.doc.dict(object.dict.get("Resources"))) ?? resources;
 
+    // A form's /BBox is a clip, not a hint: the specification crops the form
+    // to it, and 1,025 placements across the corpus draw content it actually
+    // narrows. A missing or degenerate box simply does not narrow anything.
+    const inner = multiply(matrix, state.ctm);
+    const formClip = await this.boxClip(object.dict.get("BBox"), inner, state.clip);
+
     // A form or image XObject may carry `/OC` itself — the corpus uses this as
     // often as marked content, and three files use only this form.
     const formLayer = await this.ocLayerFor(object.dict.get("OC"));
     const depthBefore = this.marks.length;
     if (formLayer !== undefined) this.marks.push(formLayer);
-    await this.execute(decoded, formResources, multiply(matrix, state.ctm), depth + 1);
+    await this.execute(decoded, formResources, inner, depth + 1, formClip);
     // Truncate rather than pop: a form whose content leaves marks unbalanced
     // must not leak them into its parent (INV-3).
     this.marks.length = depthBefore;
   }
+}
+
+/** Map a drawing-space point back through an affine placement. */
+function inversePoint(m: Matrix, p: Point2): Point2 {
+  const det = m[0] * m[3] - m[1] * m[2];
+  if (Math.abs(det) < 1e-12) return { x: 0, y: 0 };
+  const dx = p.x - m[4];
+  const dy = p.y - m[5];
+  return { x: (dx * m[3] - dy * m[2]) / det, y: (dy * m[0] - dx * m[1]) / det };
+}
+
+/**
+ * Crop a placed image to a clipping region, or `undefined` when none of it
+ * lands inside.
+ *
+ * Cropping, not masking, is the main path: every partially clipped placement
+ * in the acceptance corpus — 122 of them — is a rectangle in the image's own
+ * space, where a pixel sub-rectangle says exactly what the region says and
+ * costs less memory than the original rather than more. A region that is not
+ * such a rectangle (a rotated placement, a clip at an angle to it) crops to
+ * its bounds first and then masks what the crop over-covers into the alpha
+ * channel, which every surface already honours from soft masks (PDF-9).
+ *
+ * The crop lands on whole pixels, so a placement may keep up to one source
+ * pixel past its region — invisible for artwork, and the alternative is
+ * shaving a column the region genuinely covers.
+ *
+ * Never mutates: one decoded image is shared by every placement of it, and
+ * two placements may be clipped differently.
+ */
+function clipPlacedImage(
+  image: RasterImage,
+  ctm: Matrix,
+  clip: ConvexClip,
+  giveUp: () => void,
+): { image: RasterImage; transform: Matrix } | undefined {
+  const placement: Matrix = [...ctm];
+  const corners = UNIT_SQUARE.map((p) => apply(ctm, p.x, p.y));
+  const verdict = classifyBox(boundsOf(corners), clip);
+  if (verdict === "outside") return undefined;
+  if (verdict === "inside") return { image, transform: placement };
+
+  // Work in the image's own space: an affine inverse turns the region into
+  // another convex polygon, so the per-pixel test needs no matrix at all.
+  const local = convexClipFromRing(clip.ring.map((p) => inversePoint(ctm, p)));
+  if (local === undefined) return { image, transform: placement };
+  const region = clipRing(UNIT_SQUARE, local);
+  if (region.length < 3) return undefined;
+
+  const { width, height, rgba } = image;
+  const bounds = boundsOf(region);
+  const col0 = Math.max(0, Math.floor(bounds.minX * width));
+  const col1 = Math.min(width, Math.ceil(bounds.maxX * width));
+  // Row 0 is the image's top edge, which is v = 1.
+  const row0 = Math.max(0, Math.floor((1 - bounds.maxY) * height));
+  const row1 = Math.min(height, Math.ceil((1 - bounds.minY) * height));
+  if (col1 <= col0 || row1 <= row0) return undefined;
+
+  const cropWidth = col1 - col0;
+  const cropHeight = row1 - row0;
+  const cropped = new Uint8ClampedArray(cropWidth * cropHeight * 4);
+  for (let row = 0; row < cropHeight; row++) {
+    const from = ((row0 + row) * width + col0) * 4;
+    cropped.set(rgba.subarray(from, from + cropWidth * 4), row * cropWidth * 4);
+  }
+
+  // The sub-square of the original placement those pixels occupy.
+  const u0 = col0 / width;
+  const u1 = col1 / width;
+  const v0 = 1 - row1 / height;
+  const v1 = 1 - row0 / height;
+
+  // A region that reaches every corner of its own bounding box is that
+  // rectangle, and the crop has already expressed it.
+  const rectangular = [
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+    { x: bounds.minX, y: bounds.maxY },
+  ].every((corner) => clipContains(local, corner));
+  if (!rectangular) {
+    if (cropWidth * cropHeight > MAX_MASK_PIXELS) giveUp();
+    else
+      for (let row = 0; row < cropHeight; row++) {
+        const y = v1 - ((row + 0.5) / cropHeight) * (v1 - v0);
+        for (let col = 0; col < cropWidth; col++) {
+          const x = u0 + ((col + 0.5) / cropWidth) * (u1 - u0);
+          if (!clipContains(local, { x, y })) cropped[(row * cropWidth + col) * 4 + 3] = 0;
+        }
+      }
+  }
+
+  return {
+    image: { width: cropWidth, height: cropHeight, rgba: cropped },
+    transform: multiply([u1 - u0, 0, 0, v1 - v0, u0, v0], ctm),
+  };
 }
 
 interface Box {

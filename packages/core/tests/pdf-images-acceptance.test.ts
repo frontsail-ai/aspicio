@@ -42,12 +42,19 @@ const CORPUS: Record<string, Expectation> = {
   // patches that reuse them.
   "Ghent_PDF-Output-Test-V50_ALL_X4.pdf": {
     imagesPerSpace: [12, 6, 10, 7, 10, 10],
-    totalEntities: 6020,
+    // 6020 before clipping was applied (PDF-3). The 21 fewer are 30 text
+    // runs the file draws outside their region, less 9 more polylines from
+    // strokes a region cuts into several runs. No image or fill is lost:
+    // every clipped placement here crops rather than disappears.
+    totalEntities: 5999,
     skippedImages: 18,
   },
   "PDFX-ready_Output-Test_302e_X4.pdf": {
     imagesPerSpace: [12, 6, 10, 6],
-    totalEntities: 6831,
+    // 6831 before clipping. This file's test pages label panels with text
+    // that sits outside the panel's own clip — 377 such runs — and gains 9
+    // polylines the same way as above.
+    totalEntities: 6463,
     skippedImages: 16,
   },
 };

@@ -164,3 +164,44 @@ test("one shared XObject decodes once and places twice (PDF-9)", async () => {
   expect(images[0].image).toBe(images[1].image);
   expect(images[0].transform).not.toEqual(images[1].transform);
 });
+
+/* ---------- clipping (PDF-3) ---------- */
+
+test("a rectangular region crops the placed pixels, and moves the placement with them", async () => {
+  const e = await onlyImage("clip-image-rect.pdf");
+  // The image spans 10..50; the region keeps 10..30, its left half — the red
+  // and green columns, and nothing of blue or yellow.
+  expect(e.image.width).toBe(2);
+  expect(e.image.height).toBe(4);
+  expect(px(e, 0, 0)).toEqual([255, 0, 0, 255]);
+  expect(px(e, 1, 0)).toEqual([0, 255, 0, 255]);
+  // The surviving half must still sit where it always sat: the unit square
+  // now maps onto 10..30, not back onto the original 10..50.
+  expect(e.transform[0]).toBeCloseTo(20);
+  expect(e.transform[4]).toBeCloseTo(10);
+  expect(e.transform[5]).toBeCloseTo(10);
+});
+
+test("a region no pixel rectangle can express becomes alpha", async () => {
+  const e = await onlyImage("clip-image-diamond.pdf");
+  // The crop takes the diamond's bounds; the corners it does not cover are
+  // masked out, which every surface already honours from soft masks (PDF-9).
+  const alpha = (x: number, y: number): number => px(e, x, y)[3] as number;
+  expect(alpha(0, 0)).toBe(0); // outside the diamond
+  expect(alpha(e.image.width - 1, 0)).toBe(0);
+  const midX = Math.floor(e.image.width / 2);
+  const midY = Math.floor(e.image.height / 2);
+  expect(alpha(midX, midY)).toBe(255); // the middle is inside it
+  // Masking must never reach the shared decode: colour survives untouched.
+  expect(
+    px(e, midX, midY)
+      .slice(0, 3)
+      .some((c) => c > 0),
+  ).toBe(true);
+});
+
+test("clipping one placement never disturbs another sharing the pixels", async () => {
+  const doc = await parse("image-shared-twice.pdf");
+  const images = doc.entities.filter((e): e is ImageEntity => e.type === "IMAGE");
+  expect(images[0]?.image).toBe(images[1]?.image);
+});

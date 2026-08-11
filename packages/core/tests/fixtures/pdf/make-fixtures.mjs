@@ -1367,3 +1367,87 @@ console.log("wrote gate-path fixtures");
 
   console.log("wrote page-box fixtures");
 }
+
+/* Clipping fixtures (PDF-3): what a region does to a placed image and to a
+   form's own bounds. Vector clipping needs no fixture — the interpreter
+   tests feed it content streams directly. */
+{
+  const streamBody = (text) =>
+    Buffer.concat([enc(`<< /Length ${text.length} >>\nstream\n`), enc(text), enc("\nendstream")]);
+  // 4×4 DeviceRGB in four solid columns: red, green, blue, yellow. Column
+  // identity is what makes a crop provable — the surviving pixels name
+  // exactly which part of the image the region kept.
+  const columns = [];
+  for (let y = 0; y < 4; y++) columns.push(255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0);
+  const imageObj = (num) => [
+    num,
+    Buffer.concat([
+      enc(
+        `<< /Type /XObject /Subtype /Image /Width 4 /Height 4 /ColorSpace /DeviceRGB ` +
+          `/BitsPerComponent 8 /Filter /FlateDecode /Length ${deflateSync(Buffer.from(columns)).length} >>\nstream\n`,
+      ),
+      deflateSync(Buffer.from(columns)),
+      enc("\nendstream"),
+    ]),
+  ];
+  const imagePage = (content) =>
+    classic([
+      catalog,
+      [2, "<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 100 100] >>"],
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /Contents 4 0 R " +
+          "/Resources << /XObject << /Im0 5 0 R >> >> >>",
+      ],
+      [4, streamBody(content)],
+      imageObj(5),
+    ]);
+
+  // 26. An axis-aligned region over an axis-aligned placement: the everyday
+  //     `re W n` around placed artwork. The image occupies 10..50; the region
+  //     keeps 10..30, which is its left half — columns red and green.
+  writeFileSync(
+    "clip-image-rect.pdf",
+    imagePage("q 10 10 20 40 re W n 40 0 0 40 10 10 cm /Im0 Do Q\n"),
+  );
+
+  // 27. The same placement under a region at 45° to it, which no pixel
+  //     rectangle can express: the crop takes the region's bounds and the
+  //     rest becomes alpha.
+  writeFileSync(
+    "clip-image-diamond.pdf",
+    imagePage("q 30 5 m 55 30 l 30 55 l 5 30 l h W n 40 0 0 40 10 10 cm /Im0 Do Q\n"),
+  );
+
+  // 28. A form whose /BBox is smaller than what it draws. The specification
+  //     crops the form to that box, so the stroke stops at the corner.
+  {
+    const page = "/X1 Do\n";
+    const form = "0 0 m 30 30 l S\n";
+    writeFileSync(
+      "clip-form-bbox.pdf",
+      classic([
+        catalog,
+        pagesNode("3 0 R"),
+        [
+          3,
+          "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Contents 4 0 R " +
+            "/Resources << /XObject << /X1 5 0 R >> >> >>",
+        ],
+        [4, streamBody(page)],
+        [
+          5,
+          Buffer.concat([
+            enc(
+              `<< /Type /XObject /Subtype /Form /BBox [0 0 10 10] /Length ${form.length} >>\nstream\n`,
+            ),
+            enc(form),
+            enc("\nendstream"),
+          ]),
+        ],
+      ]),
+    );
+  }
+
+  console.log("wrote clipping fixtures");
+}
