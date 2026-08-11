@@ -12,7 +12,13 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
-import { canvasCountNear, canvasCountWhere, canvasPixel, probeViewer } from "./helpers.ts";
+import {
+  canvasCountNear,
+  canvasCountWhere,
+  canvasDarkest,
+  canvasPixel,
+  probeViewer,
+} from "./helpers.ts";
 
 const fixture = (name: string): string =>
   fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
@@ -130,4 +136,42 @@ test("light mode darkens DXF pen colours but keeps the panel honest (VIEW-18, IN
     .first();
   const color = await swatch.evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(color).not.toBe("rgb(0, 255, 0)");
+});
+
+test("the default DXF pen becomes ink in light mode, not mid-grey (VIEW-18)", async ({ page }) => {
+  await open(page, "default-color.dxf");
+  // ACI 7 is the default pen and the most common colour in real drawings.
+  // It arrives as white, because the palette assumes a black screen.
+  expect(await canvasCountNear(page, [255, 255, 255], 12)).toBeGreaterThan(50);
+
+  await page.locator("#toggle-theme").click();
+  await page.waitForTimeout(500);
+  expect(await canvasCountNear(page, [255, 255, 255], 12)).toBeLessThan(20);
+
+  // The discriminator is how *dark* the darkest pixel gets, not how many are
+  // dark: antialiasing spreads a hairline towards the canvas either way, and
+  // a pixel count only measures the viewport. Ink is #1c1a17 (mean 25.7); a
+  // rule stopping at the contrast target gives #706f6f (mean 111.3) and can
+  // never reach below it, whatever the zoom.
+  expect(await canvasDarkest(page), "darkest linework pixel").toBeLessThan(70);
+});
+
+test("selection stays visible on a light-theme DXF (VIEW-8)", async ({ page }) => {
+  await open(page, "default-color.dxf");
+  await page.locator("#toggle-theme").click();
+  await page.waitForTimeout(500);
+
+  const canvas = page.locator("#viewer canvas");
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("canvas has no bounding box");
+  // The fixture is a 10x10 box; click the middle of its bottom edge.
+  const at = await page.evaluate(() => window.__aspicio!.worldToScreen({ x: 5, y: 0 }));
+  await page.mouse.click(box.x + at.x, box.y + at.y);
+  await page.waitForTimeout(300);
+  await expect(page.locator("#info-panel")).toBeVisible();
+
+  // #8fc8ff is 1.25:1 against the light canvas — a selection nobody can see.
+  // The theme supplies #2b78c8, which clears 3:1 on canvas and on paper.
+  const selected = await canvasCountWhere(page, (r, g, b) => b > 110 && b - r > 50 && b - g > 25);
+  expect(selected, "selection overlay pixels").toBeGreaterThan(100);
 });

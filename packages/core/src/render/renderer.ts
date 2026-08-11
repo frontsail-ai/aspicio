@@ -32,6 +32,10 @@ export interface SceneRendererOptions {
   sheet?: number | null;
   /** Hairline around the sheet, 24-bit RGB, or null for none (VIEW-17). */
   sheetEdge?: number | null;
+  /** Selection overlay over an unbounded canvas (VIEW-8). Default: #8fc8ff. */
+  select?: number;
+  /** Selection overlay over paper, where the canvas colour fails. Default: #2b78c8. */
+  selectOnSheet?: number;
   /** Pixel width of the layer-highlight overlay lines. */
   highlightWidth?: number;
   /**
@@ -52,6 +56,14 @@ const DEFAULT_LINEWEIGHT_SCALE = 5;
  */
 const SELECT_COLOR = 0x8fc8ff;
 const SELECT_COLOR_ON_SHEET = 0x2b78c8;
+
+/*
+ * Both are defaults, not constants, because the canvas is not always dark.
+ * #8fc8ff is 10:1 on the dark canvas, 1.8:1 on paper — and 1.25:1 on a light
+ * canvas, where a selection made on a DXF would be invisible. The surface a
+ * selection is drawn over depends on the theme *and* on whether the space
+ * has paper, so the host supplies a pair and the renderer picks by backdrop.
+ */
 
 /**
  * Production guides on the sheet (VIEW-19). Both live on white paper in
@@ -117,6 +129,8 @@ export class SceneRenderer {
   private readonly guideMaterials = new Map<number, LineMaterial>();
   private sheetColor: Color | null;
   private sheetEdgeColor: Color | null;
+  private selectColor: number;
+  private selectOnSheetColor: number;
   private highlightObject: LineSegments2 | null = null;
   private selectLineObject: LineSegments2 | null = null;
   private selectFillObject: Mesh | null = null;
@@ -134,6 +148,8 @@ export class SceneRenderer {
     this.renderer.setClearColor(this.clearColor, this.clearAlpha);
     this.camera.position.z = 10;
     this.sheetColor = options.sheet === null ? null : new Color(options.sheet ?? 0xffffff);
+    this.selectColor = options.select ?? SELECT_COLOR;
+    this.selectOnSheetColor = options.selectOnSheet ?? SELECT_COLOR_ON_SHEET;
     this.sheetEdgeColor = options.sheetEdge == null ? null : new Color(options.sheetEdge);
     this.lineWeightScale = options.lineWeightScale ?? DEFAULT_LINEWEIGHT_SCALE;
     // Overlays are transparent on purpose — see the render-band contract
@@ -182,7 +198,7 @@ export class SceneRenderer {
     if (tessellation.backdrop) this.buildBackdrop(tessellation.backdrop);
     // Selection has to know what it will be drawn over: the same blue cannot
     // read against both the dark canvas and white paper.
-    const select = tessellation.backdrop ? SELECT_COLOR_ON_SHEET : SELECT_COLOR;
+    const select = tessellation.backdrop ? this.selectOnSheetColor : this.selectColor;
     this.selectLineMaterial.color.setHex(select);
     this.selectFillMaterial.color.setHex(select);
     for (const [name, layer] of tessellation.layers) {
@@ -208,6 +224,15 @@ export class SceneRenderer {
         this.layerObjects.set(name, this.buildLineObjects(layer));
       }
     }
+  }
+
+  /** Re-colour the selection overlay, e.g. on a theme switch (VIEW-8). */
+  setSelectColors(select?: number, onSheet?: number): void {
+    if (select !== undefined) this.selectColor = select;
+    if (onSheet !== undefined) this.selectOnSheetColor = onSheet;
+    const active = this.tessellation?.backdrop ? this.selectOnSheetColor : this.selectColor;
+    this.selectLineMaterial.color.setHex(active);
+    this.selectFillMaterial.color.setHex(active);
   }
 
   /**

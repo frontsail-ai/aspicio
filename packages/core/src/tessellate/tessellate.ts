@@ -18,7 +18,7 @@ import type {
   Point2,
   RasterImage,
 } from "../model/types.ts";
-import { darkenForContrast } from "../geom/color.ts";
+import { darkenForLegibility } from "../geom/color.ts";
 import { layoutText } from "../text/layout.ts";
 
 type Affine = Affine2D;
@@ -312,6 +312,12 @@ export interface TessellateOptions {
    * in the first place; PDF ink is not, and passing this never changes it.
    */
   legibleOn?: number;
+  /**
+   * The colour a pen darkens *towards* when it has no hue to preserve —
+   * the theme's ink. Only consulted alongside `legibleOn`; defaults to
+   * black, which is legible but colder than a warm palette's near-black.
+   */
+  ink?: number;
 }
 
 interface Tessellator {
@@ -568,7 +574,7 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
       : (color: number): number => {
           let out = legibleCache.get(color);
           if (out === undefined) {
-            out = darkenForContrast(color, canvas, CONTRAST_TARGET);
+            out = darkenForLegibility(color, canvas, CONTRAST_TARGET, options.ink ?? 0x000000);
             legibleCache.set(color, out);
           }
           return out;

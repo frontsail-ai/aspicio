@@ -20,13 +20,33 @@ const KEY = "aspicio:theme";
  */
 export const canvasColors: Record<
   ThemeMode,
-  { sheet: number; sheetEdge: number | null; legibleOn?: number }
+  {
+    sheet: number;
+    sheetEdge: number | null;
+    select: number;
+    selectOnSheet: number;
+    legibleOn?: number;
+    ink?: number;
+  }
 > = {
-  // Sheet-to-surround is 19:1 in the dark theme, so the boundary carries
-  // itself; a hairline there is lost in either the white or the void.
-  dark: { sheet: 0xffffff, sheetEdge: null },
-  // 1.75:1 in the light theme, where contrast alone cannot carry it.
-  light: { sheet: 0xffffff, sheetEdge: 0xa8a8a8, legibleOn: 0xdcd8d1 },
+  dark: {
+    sheet: 0xffffff,
+    // Sheet-to-surround is 19:1 here, so the boundary carries itself; a
+    // hairline is lost in either the white or the void.
+    sheetEdge: null,
+    select: 0x8fc8ff,
+    selectOnSheet: 0x2b78c8,
+  },
+  light: {
+    sheet: 0xffffff,
+    // 1.75:1 here, where contrast alone cannot carry it.
+    sheetEdge: 0xa8a8a8,
+    // #8fc8ff is 1.25:1 on the light canvas — a selection nobody can see.
+    select: 0x2b78c8,
+    selectOnSheet: 0x2b78c8,
+    legibleOn: 0xdcd8d1,
+    ink: 0x1c1a17,
+  },
 };
 
 /** The browser store, or null when it's unavailable (private mode, SSR, tests). */

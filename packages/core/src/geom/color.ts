@@ -125,6 +125,81 @@ function atLightness(hue: number, chroma: number, L: number): number {
  * reads better — which leaves dark canvases alone and still darkens fully
  * on a light canvas that no hue can quite clear.
  */
+
+/**
+ * Chroma below which a colour carries no hue worth preserving, and its
+ * identity is entirely in its lightness.
+ *
+ * ACI 7 — the default DXF pen, and the most common colour in real drawings —
+ * arrives as white, because the palette assumes a black screen. On a light
+ * canvas it has to become ink, the same flip AutoCAD performs. Everything
+ * else in the achromatic ramp gets the same treatment for the same reason.
+ */
+const ACHROMATIC = 0.05;
+
+/** The grey at OKLab lightness `L`. */
+function greyAt(L: number): number {
+  const v = Math.round(Math.min(1, Math.max(0, linearToSrgb(L ** 3))) * 255);
+  return ((v << 16) | (v << 8) | v) >>> 0;
+}
+
+/** The lightness whose grey exactly meets `target` against `background`. */
+function greyLightnessAt(background: number, target: number): number {
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < SEARCH_STEPS; i++) {
+    const mid = (lo + hi) / 2;
+    if (contrastRatio(greyAt(mid), background) >= target) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/** Blend two 24-bit colours in sRGB. */
+function mix(a: number, b: number, t: number): number {
+  let out = 0;
+  for (const shift of [16, 8, 0]) {
+    const va = (a >> shift) & 0xff;
+    const vb = (b >> shift) & 0xff;
+    out = (out << 8) | Math.round(va + (vb - va) * t);
+  }
+  return out >>> 0;
+}
+
+/**
+ * Make a pen colour legible against `canvas`, darkening towards `ink`.
+ *
+ * Chromatic colours stop at `target`: their identity is their hue, and
+ * darkening past legibility only muddies it. Achromatic ones have no hue to
+ * carry them, so their whole ramp is reflected into `[ink, just-legible]`.
+ *
+ * The reflection matters more than the endpoint. Clamping the achromatic
+ * ramp at the target maps every grey from #a0a0a0 to #ffffff onto a single
+ * mid-grey — ninety-six values to one — so a drawing that separates linework
+ * by grey level loses the separation entirely. Reflecting keeps them
+ * distinct and keeps their order: the lightest input, the most prominent on
+ * a dark screen, becomes the darkest output, the most prominent on a light
+ * one.
+ */
+export function darkenForLegibility(
+  color: number,
+  canvas: number,
+  target: number,
+  ink: number,
+): number {
+  if (contrastRatio(color, canvas) >= target) return color;
+
+  const { L, a, b } = toOklab(color);
+  if (Math.hypot(a, b) >= ACHROMATIC) return darkenForContrast(color, canvas, target);
+
+  const floor = greyLightnessAt(canvas, target);
+  const inkL = toOklab(ink).L;
+  if (floor <= inkL) return ink;
+  // Reflect: L = 1 (white) lands on ink, L = floor stays where it is.
+  const t = Math.min(1, Math.max(0, (L - floor) / (1 - floor)));
+  return mix(greyAt(floor), ink, t);
+}
+
 export function darkenForContrast(color: number, background: number, target: number): number {
   if (contrastRatio(color, background) >= target) return color;
 

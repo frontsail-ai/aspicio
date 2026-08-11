@@ -95,3 +95,29 @@ describe("SVG export parity", () => {
     expect(svg).not.toContain('fill="#ffffff"');
   });
 });
+
+describe("headless surfaces draw paper", () => {
+  it("puts a sheet under a page and leaves an unbounded space alone", async () => {
+    const { tessellationToSvg } = await import("../src/export.ts");
+    const { parseDxf } = await import("../src/parse/parse.ts");
+    const { readFileSync: read } = await import("node:fs");
+
+    // What the agent surfaces now pass: a background for the surround and a
+    // sheet for the page. This is the same call shape as the MCP tools and
+    // the HTTP API, so the assertion covers all three.
+    const opts = { background: "#16181d", sheet: "#ffffff" };
+
+    const pdf = await load("page-boxes.pdf");
+    expect(tessellationToSvg(tessellate(pdf), () => true, opts)).toContain('fill="#ffffff"');
+
+    // A DXF has no page box, so the same options must produce byte-identical
+    // output to before — the sheet option is inert without a backdrop.
+    const dxfBytes = read(
+      fileURLToPath(new URL("../../../apps/demo/e2e/fixtures/box.dxf", import.meta.url)),
+    ).toString("utf8");
+    const dxf = parseDxf(dxfBytes);
+    expect(tessellationToSvg(tessellate(dxf), () => true, opts)).toBe(
+      tessellationToSvg(tessellate(dxf), () => true, { background: "#16181d" }),
+    );
+  });
+});

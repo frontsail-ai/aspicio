@@ -121,11 +121,15 @@ async function handleRender(
   const background = bgParam === "none" ? undefined : (bgParam ?? DEFAULT_BG);
 
   const doc = await parseFor(parsers, bytes, "render");
-  const svg = tessellationToSvg(
-    tessellateSpace(doc, spaceParam(url)),
-    undefined,
-    background ? { background } : {},
-  );
+  const svg = tessellationToSvg(tessellateSpace(doc, spaceParam(url)), undefined, {
+    ...(background ? { background } : {}),
+    // Paper under a bounded page, matching the canvas (VIEW-12, VIEW-17).
+    // `bg` still controls the surround; a space with no page box is
+    // unaffected, so DXF output is unchanged. `bg=none` keeps the surround
+    // transparent while the page itself stays opaque, which is what makes a
+    // page render usable on an arbitrary backdrop.
+    sheet: "#ffffff",
+  });
 
   if (format === "svg")
     return new Response(svg, {
