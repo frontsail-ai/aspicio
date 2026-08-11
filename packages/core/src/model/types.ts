@@ -252,6 +252,28 @@ export interface Viewport {
   twist: number;
 }
 
+/**
+ * The printable geometry of a *bounded* space — today, a PDF page.
+ *
+ * DXF model space is unbounded and has none of this, which is the whole
+ * distinction: a space either declares where the paper is or it does not,
+ * and everything downstream (backdrop, fit, guides) keys off that rather
+ * than off the document's format.
+ */
+export interface PageGeometry {
+  /**
+   * The sheet. From PDF's CropBox intersected with its MediaBox — the box
+   * Acrobat and Preview display, not the larger media the file was imposed
+   * on — already carried through the page's `/Rotate` transform, so it is
+   * axis-aligned in the same coordinates as the entities beside it.
+   */
+  sheet: Bounds;
+  /** Finished size after cutting, when the file declares a TrimBox. */
+  trim?: Bounds;
+  /** How far artwork must run past the trim, when a BleedBox is declared. */
+  bleed?: Bounds;
+}
+
 /** A paper-space layout: a printable sheet with its own geometry and viewports. */
 export interface Layout {
   name: string;
@@ -259,6 +281,11 @@ export interface Layout {
   entities: Entity[];
   /** Windows into model space. */
   viewports: Viewport[];
+  /**
+   * Page geometry, for layouts that are bounded pages (PDF). DXF layouts
+   * omit it — their sheet is drawn as ordinary entities by the producer.
+   */
+  page?: PageGeometry;
 }
 
 export interface DrawingDocument {
@@ -287,4 +314,10 @@ export interface DrawingDocument {
    * hand-built documents may omit it.
    */
   format?: string;
+  /**
+   * Page geometry for model space, when model space is a bounded page. A PDF
+   * loads page 1 into `entities` (PDF-5), so the first page's box lives here
+   * rather than on a layout. Absent for DXF, whose model space is unbounded.
+   */
+  page?: PageGeometry;
 }

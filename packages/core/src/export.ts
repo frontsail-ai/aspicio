@@ -20,6 +20,12 @@ function hex(r: number, g: number, b: number): string {
 export interface SvgExportOptions {
   /** Solid background rect (e.g. "#16181d"). Omit for a transparent SVG. */
   background?: string;
+  /**
+   * Paper drawn under a bounded space (e.g. "#ffffff"), matching the canvas
+   * (VIEW-12, VIEW-17). Ignored when the space declares no page box, so a
+   * DXF export is unaffected. Omit to export page content with no sheet.
+   */
+  sheet?: string;
 }
 
 /**
@@ -95,7 +101,19 @@ export function tessellationToSvg(
     }
   }
 
-  const parts: string[] = [...images];
+  // The sheet goes first: it is the bottom render band on the canvas and must
+  // be the bottom of the SVG too, or a headless render disagrees with what the
+  // viewer shows. It belongs inside the flipped group, unlike the `bg` rect
+  // below, because its coordinates are drawing-space, not viewBox-space.
+  const page = tessellation.backdrop;
+  const sheet =
+    page && options.sheet
+      ? `<rect x="${n(page.sheet.minX)}" y="${n(page.sheet.minY)}" ` +
+        `width="${n(page.sheet.maxX - page.sheet.minX)}" ` +
+        `height="${n(page.sheet.maxY - page.sheet.minY)}" fill="${options.sheet}"/>`
+      : "";
+
+  const parts: string[] = [sheet, ...images].filter(Boolean);
   // Images sit under everything; fills next (under the lines), then strokes.
   for (const [color, ds] of fillPaths) {
     parts.push(`<path fill="${color}" stroke="none" d="${ds.join("")}"/>`);

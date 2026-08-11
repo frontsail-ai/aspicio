@@ -23,6 +23,20 @@ export interface DrawingViewerOptions {
   /** Segments per full circle when flattening curves. Default: 72. */
   curveSegments?: number;
   /**
+   * The paper drawn under a space that declares a page box — a PDF page
+   * (VIEW-17). 24-bit RGB, or null to draw no sheet. Default: white.
+   *
+   * White, and not an off-white "paper" tint, because in a PDF the sheet is
+   * the *unpainted* region: artwork that paints 0/0/0/0 white — knockout
+   * type, a barcode's quiet zone — would otherwise appear as a visible
+   * rectangle against the paper it is supposed to match. Substrate
+   * simulation is a soft-proof feature with a stated white point, not a
+   * default backdrop. Spaces with no page box are unaffected.
+   */
+  sheet?: number | null;
+  /** Hairline drawn around the sheet. 24-bit RGB, or null (default) for none. */
+  sheetEdge?: number | null;
+  /**
    * The formats this viewer accepts, tried in order (PARSE-13, VIEW-15).
    * Core imports no parser of its own — pass `dxfParser` from
    * "@aspicio/core/dxf" — which is what keeps a PDF-only app free of DXF
@@ -125,7 +139,11 @@ export class DrawingViewer {
     this.canvas.style.height = "100%";
     container.appendChild(this.canvas);
 
-    this.renderer = new SceneRenderer(this.canvas, { background: options.background });
+    this.renderer = new SceneRenderer(this.canvas, {
+      background: options.background,
+      sheet: options.sheet,
+      sheetEdge: options.sheetEdge,
+    });
 
     this.detachGestures = attachGestures(this.canvas, this.camera, {
       onChange: () => {
