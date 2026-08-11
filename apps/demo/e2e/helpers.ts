@@ -53,3 +53,66 @@ export async function canvasColors(page: Page): Promise<ColorCounts> {
   const shot = await page.locator("#viewer canvas").screenshot();
   return countColors(shot);
 }
+
+/**
+ * Pixels matching one colour, within `tolerance` per channel.
+ *
+ * {@link countColors} buckets only saturated hues, so it is blind to paper,
+ * the surround, and every neutral the page backdrop introduced — a sheet
+ * could vanish entirely without moving one of its counters.
+ */
+export function countNear(buffer: Buffer, rgb: [number, number, number], tolerance = 10): number {
+  const png = PNG.sync.read(buffer);
+  let n = 0;
+  for (let i = 0; i < png.data.length; i += 4) {
+    if (
+      Math.abs(png.data[i] - rgb[0]) <= tolerance &&
+      Math.abs(png.data[i + 1] - rgb[1]) <= tolerance &&
+      Math.abs(png.data[i + 2] - rgb[2]) <= tolerance
+    )
+      n += 1;
+  }
+  return n;
+}
+
+/** Pixels satisfying an arbitrary predicate — for hues no bucket names. */
+export function countWhere(
+  buffer: Buffer,
+  match: (r: number, g: number, b: number) => boolean,
+): number {
+  const png = PNG.sync.read(buffer);
+  let n = 0;
+  for (let i = 0; i < png.data.length; i += 4)
+    if (match(png.data[i], png.data[i + 1], png.data[i + 2])) n += 1;
+  return n;
+}
+
+/** {@link countWhere} against the live canvas. */
+export async function canvasCountWhere(
+  page: Page,
+  match: (r: number, g: number, b: number) => boolean,
+): Promise<number> {
+  return countWhere(await page.locator("#viewer canvas").screenshot(), match);
+}
+
+/** The colour at one point of the canvas, given as viewport fractions. */
+export async function canvasPixel(
+  page: Page,
+  fx: number,
+  fy: number,
+): Promise<[number, number, number]> {
+  const png = PNG.sync.read(await page.locator("#viewer canvas").screenshot());
+  const x = Math.min(png.width - 1, Math.max(0, Math.round(png.width * fx)));
+  const y = Math.min(png.height - 1, Math.max(0, Math.round(png.height * fy)));
+  const i = (png.width * y + x) * 4;
+  return [png.data[i], png.data[i + 1], png.data[i + 2]];
+}
+
+/** {@link countNear} against the live canvas. */
+export async function canvasCountNear(
+  page: Page,
+  rgb: [number, number, number],
+  tolerance = 10,
+): Promise<number> {
+  return countNear(await page.locator("#viewer canvas").screenshot(), rgb, tolerance);
+}

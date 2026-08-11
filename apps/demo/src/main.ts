@@ -13,6 +13,7 @@ import {
   spaceEntities,
 } from "@aspicio/core";
 import { dxfParser } from "@aspicio/core/dxf";
+import { applyTheme, canvasColors, loadTheme, saveTheme } from "./theme.ts";
 import { pdfParser } from "@aspicio/core/pdf";
 import type { EntityInfo, LayerInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
 import { decodeView, encodeView, packLayers } from "./viewurl.ts";
@@ -36,6 +37,8 @@ const reticle = (size: number, stroke: string, ticks: string): string => `
   </svg>`;
 
 const icons = {
+  sun: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>`,
+  moon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path></svg>`,
   layers: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Z"></path><path d="m3 12 9 5 9-5"></path><path d="m3 17 9 5 9-5"></path></svg>`,
   file: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg>`,
   filePlus: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"></path><path d="M14 2v6h6"></path><path d="M12 12v5"></path><path d="M9.5 14.5h5"></path></svg>`,
@@ -106,6 +109,7 @@ app.innerHTML = `
       </span>
     </div>
     <div class="topbar-actions">
+      <button id="toggle-theme" class="btn-ghost" type="button" aria-pressed="false" title="Switch between the dark and light theme"></button>
       <button id="toggle-layers" class="btn-ghost layers-toggle" type="button">${icons.layers} Layers</button>
       <div class="export-wrap">
         <button id="export-btn" class="btn-ghost export-btn" type="button" hidden>${icons.download} Export</button>
@@ -374,7 +378,14 @@ const measureOverlay = app.querySelector<SVGSVGElement>("#measure-overlay")!;
 type Mode = "empty" | "loading" | "loaded" | "error";
 
 const viewerEl = $<HTMLElement>("#viewer");
-const viewer = new DrawingViewer(viewerEl, { background: null, parsers: [dxfParser, pdfParser] });
+let theme = loadTheme();
+applyTheme(theme);
+
+const viewer = new DrawingViewer(viewerEl, {
+  background: null,
+  ...canvasColors[theme],
+  parsers: [dxfParser, pdfParser],
+});
 
 let mode: Mode = "empty";
 let currentName = "";
@@ -904,6 +915,17 @@ function buildSpaceTabs(): void {
   }
 }
 
+/**
+ * Tell the canvas whether it is framing a bounded page.
+ *
+ * The grid stands down when it is: a page carries its own scale reference in
+ * its edge, and a repeating pattern running up to that edge competes with the
+ * one line the reader has to trust.
+ */
+function paintCanvasMode(): void {
+  $(".viewer-wrap").classList.toggle("page-mode", viewer.activePage != null);
+}
+
 function setSpace(name: string): void {
   if (name === viewer.activeSpaceName) return;
   soloLayer = null;
@@ -914,6 +936,9 @@ function setSpace(name: string): void {
   for (const tab of $("#space-tabs").querySelectorAll<HTMLElement>(".space-tab")) {
     tab.classList.toggle("active", tab.textContent === name);
   }
+  // A drawing can mix bounded and unbounded spaces, so this is re-asked per
+  // space rather than per file.
+  paintCanvasMode();
   // Both readouts describe the space on screen (VIEW-16), so both are redrawn
   // here: the counts change, and so does which layers have anything on them.
   // Leaving them alone showed page 1's figures over page 3's drawing.
@@ -992,6 +1017,7 @@ viewer.on("loaded", () => {
   soloLayer = null;
   setHover(null, null);
   baselineZoom = viewer.view.unitsPerPixel;
+  paintCanvasMode();
   buildLayerPanel();
   buildSpaceTabs();
 
@@ -1695,6 +1721,34 @@ const setPanelOpen = (open: boolean): void => {
   panel.classList.toggle("open", open);
   backdrop.hidden = !open;
 };
+/**
+ * The theme button shows the theme it switches *to*, which is the convention
+ * every OS toggle uses — a sun means "go light", not "you are light".
+ */
+const themeBtn = $("#toggle-theme");
+function paintThemeButton(): void {
+  const next = theme === "dark" ? "light" : "dark";
+  themeBtn.innerHTML =
+    `${theme === "dark" ? icons.sun : icons.moon}` +
+    `<span class="btn-label">${next === "light" ? "Light" : "Dark"}</span>`;
+  themeBtn.setAttribute("aria-pressed", String(theme === "light"));
+}
+paintThemeButton();
+
+themeBtn.addEventListener("click", () => {
+  theme = theme === "dark" ? "light" : "dark";
+  applyTheme(theme);
+  saveTheme(theme);
+  paintThemeButton();
+  // Repainted rather than reloaded: a reload would re-parse the file and
+  // throw away the camera, and only the colours changed.
+  viewer.setCanvasColors(canvasColors[theme]);
+  // The swatches show what was drawn, not what the layer table claims
+  // (INV-2), and a theme switch changes what was drawn — so the panel is
+  // rebuilt here for the same reason it is rebuilt on a space switch.
+  buildLayerPanel();
+});
+
 $("#toggle-layers").addEventListener("click", () =>
   setPanelOpen(!panel.classList.contains("open")),
 );

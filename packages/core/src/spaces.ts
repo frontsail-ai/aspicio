@@ -1,4 +1,4 @@
-import type { DrawingDocument, Entity, Layout } from "./model/types.ts";
+import type { DrawingDocument, Entity, Layout, PageGeometry } from "./model/types.ts";
 
 /** Thrown when a caller names a space the drawing does not have. */
 export class UnknownSpaceError extends Error {
@@ -36,6 +36,21 @@ export function spaceEntities(doc: DrawingDocument, name?: string): Entity[] | n
   if (name === undefined || name === MODEL_SPACE) return doc.entities;
   const layout = doc.layouts?.find((l) => l.name === name);
   return layout ? layoutEntities(doc, layout) : null;
+}
+
+/**
+ * The page geometry of one space, or null when the space is unbounded.
+ *
+ * This is the question the backdrop, the fit, and the host's canvas styling
+ * all ask, and they must agree: a space either declares paper or it does not.
+ * Deliberately keyed off the space rather than `doc.format`, because "is this
+ * a PDF" and "does this space have a sheet" are not the same question — a PDF
+ * page whose box would not read has no sheet, and answering from the format
+ * would promise one.
+ */
+export function spacePage(doc: DrawingDocument, name?: string): PageGeometry | null {
+  if (name === undefined || name === MODEL_SPACE) return doc.page ?? null;
+  return doc.layouts?.find((l) => l.name === name)?.page ?? null;
 }
 
 /**

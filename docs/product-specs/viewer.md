@@ -21,6 +21,12 @@ visibility); zoom-by
 factors > 1 zoom in at the viewport center; rotation reset returns to 0°
 keeping center and zoom. Each is optionally animated.
 
+For a **bounded** space the page itself is part of those extents
+(VIEW-17), so a fit frames the paper rather than the ink on it — matching
+Acrobat and Preview, and keeping a drawing whose artwork sits in one
+corner of the page from opening zoomed into that corner. Unbounded spaces
+are unaffected.
+
 ### VIEW-3: View state round-trips
 
 The camera pose (center, units-per-pixel, rotation) can be read as a
@@ -117,3 +123,56 @@ decides which formats it accepts (PARSE-13). A viewer created without
 parsers loads nothing and says so, naming the import that fixes it
 ("no format parsers configured — pass `parsers: [dxfParser]` from
 `@aspicio/core/dxf`").
+
+### VIEW-17: Bounded spaces are drawn on paper
+
+A space that declares a page box — today, a PDF page — renders that page
+as an opaque sheet beneath everything else, with the area outside it left
+to the host to style. The sheet's colour is a viewer option defaulting to
+white, and it is white rather than a warmed "paper" tint because in a PDF
+the sheet is the _unpainted_ region: artwork that paints 0/0/0/0 white
+would otherwise show as a visible rectangle against the paper it is meant
+to match. Substrate simulation belongs to a soft-proof mode with a stated
+white point, not to the default backdrop.
+
+The sheet is not a layer. It is never pickable, never snappable, never
+hidden by layer visibility, and never appears in the layer panel.
+
+An unbounded space — every DXF space, and any PDF page whose boxes will
+not read — renders exactly as it did before this existed.
+
+Because paper changes what a selection is drawn over, the selection
+overlay uses a second colour on a bounded space: the canvas variant is
+1.8:1 against white and would be illegible there (VIEW-8).
+
+### VIEW-18: Pen colours stay legible on a light canvas
+
+When the host supplies the canvas colour it is judging against, DXF
+entity colours are darkened — hue preserved, chroma refit to gamut —
+until they reach 3.5:1 contrast against it. The default is off, and
+nothing changes for a host that does not ask.
+
+This applies to DXF only. A DXF colour is a _display attribute_: an ACI
+index names a pen, and the RGB it resolves to is a convention for showing
+that pen on a black screen. PDF colour is ink, and a dieline authored in
+100% cyan renders as 100% cyan on the sheet in every theme.
+
+The rule targets contrast, not lightness. Perceptual lightness and WCAG
+relative luminance do not track across hues, so no fixed lightness
+threshold can guarantee a ratio.
+
+Darkening is one-directional and only helps against a light background,
+so when the target cannot be reached the colour is left as it reads best
+rather than walked towards the background.
+
+Layer summaries and swatches report the colours actually drawn, so this
+transform is visible in them too (INV-2).
+
+### VIEW-19: Pages carry their production guides
+
+A page that declares a TrimBox or a BleedBox distinct from its sheet
+draws them as dashed rectangles above the artwork they measure and below
+any overlay. They are one screen pixel at every zoom — a guide that
+thickened under magnification would compete with the line work it exists
+to qualify — and their colours do not vary with theme, because they are
+always drawn on white paper.

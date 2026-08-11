@@ -1,7 +1,7 @@
 import type { DrawingViewer, LayerInfo } from "@aspicio/core";
 import { LitElement, css, html, nothing } from "lit";
 import type { PropertyValues, TemplateResult } from "lit";
-import type { AspicioTheme } from "./theme.ts";
+import type { AspicioTheme, AspicioThemeMode } from "./theme.ts";
 import { tokenStyles } from "./theme.ts";
 
 const DESKTOP_HINTS: [string, string][] = [
@@ -51,6 +51,7 @@ export class AspicioLayerPanel extends LitElement {
   static properties = {
     viewer: { attribute: false },
     theme: { type: String },
+    themeMode: { type: String, attribute: "theme-mode", reflect: true },
     reverseHighlightLayer: { type: String, attribute: "reverse-highlight-layer" },
     noHints: { type: Boolean, attribute: "no-hints" },
     _layers: { state: true },
@@ -60,6 +61,7 @@ export class AspicioLayerPanel extends LitElement {
 
   declare viewer: DrawingViewer | null;
   declare theme: AspicioTheme;
+  declare themeMode: AspicioThemeMode;
   declare reverseHighlightLayer: string | null;
   declare noHints: boolean;
   declare _layers: LayerInfo[];
@@ -76,6 +78,7 @@ export class AspicioLayerPanel extends LitElement {
     super();
     this.viewer = null;
     this.theme = "aspicio";
+    this.themeMode = "dark";
     this.reverseHighlightLayer = null;
     this.noHints = false;
     this._layers = [];

@@ -243,3 +243,24 @@ because the failure it prevents is a surface being forgotten: a menu wired
 only for click-outside ignores the keyboard and outlives the overlays that
 supersede it, which reads as broken rather than deliberate. Modals keep their
 own documented behavior; this requirement governs what closes around them.
+
+### DEMO-22: Theme switch
+
+The toolbar carries a theme control that switches the whole app between
+the dark and light palettes and remembers the choice across visits. It
+shows the theme it switches _to_, and keeps its icon without its label on
+narrow viewports, where the toolbar row is already at its width budget.
+
+The choice is not seeded from `prefers-color-scheme`: this is a drawing
+tool whose canvas has always been dark, and inheriting the OS setting
+would change how a returning visitor's drawings look without them asking.
+
+Switching repaints rather than reloads — the drawing is not re-parsed and
+the camera does not move — and the layer panel is redrawn with it, because
+a light canvas changes the colours actually drawn (VIEW-18) and the
+swatches must keep agreeing with them (INV-2).
+
+On a bounded space the blueprint grid stands down in favour of a plain
+surround (VIEW-17): a page carries its own scale reference in its edge,
+and a repeating pattern running up to that edge competes with the one line
+the reader has to trust.

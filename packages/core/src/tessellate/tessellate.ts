@@ -14,14 +14,28 @@ import type {
   Entity,
   EntityType,
   Layout,
+  PageGeometry,
   Point2,
   RasterImage,
 } from "../model/types.ts";
+import { darkenForContrast } from "../geom/color.ts";
 import { layoutText } from "../text/layout.ts";
 
 type Affine = Affine2D;
 
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
+
+/**
+ * Contrast a darkened pen colour must reach against the canvas.
+ *
+ * 3.5:1 rather than the 3:1 AA floor for non-text: line work at 3:1 sits
+ * exactly on the boundary with nothing left for a thin hairline or a
+ * miscalibrated display, and the extra step costs very little saturation.
+ */
+const CONTRAST_TARGET = 3.5;
+
+/** Documents this never touches: PDF colours are ink, not pen assignments. */
+const PDF_FORMAT = "pdf";
 /** Block recursion bound, shared by rendering and text collection. */
 export const MAX_INSERT_DEPTH = 16;
 
@@ -87,6 +101,18 @@ export interface Tessellation {
    * stay two views of one number. Summing the values gives the space's total.
    */
   entityCounts: Map<string, number>;
+  /**
+   * The space's paper, in tessellation coordinates (the shared `offset`
+   * already subtracted, like every position array) — or null for an
+   * unbounded space, which is every DXF space.
+   *
+   * It rides beside `layers` rather than in them on purpose: the sheet is
+   * not a layer and must never behave like one. Everything that walks
+   * `layers` — picking, snapping, the layer panel, per-layer visibility —
+   * is therefore blind to it by construction rather than by a filter
+   * somebody has to remember to write (VIEW-4, VIEW-7, VIEW-9).
+   */
+  backdrop: PageGeometry | null;
 }
 
 export interface TessellationContext {
@@ -276,6 +302,16 @@ interface Accumulator {
 
 export interface TessellateOptions {
   curveSegments?: number;
+  /**
+   * Keep line work legible against this canvas colour: pen colours are
+   * darkened, hue intact, until they reach {@link CONTRAST_TARGET} against
+   * it (VIEW-18). Omit — the default — to draw the colours the file names.
+   *
+   * Applies to DXF only. An ACI index is a display attribute, so remapping
+   * it for a light canvas is the same kind of decision as picking its RGB
+   * in the first place; PDF ink is not, and passing this never changes it.
+   */
+  legibleOn?: number;
 }
 
 interface Tessellator {
@@ -294,6 +330,8 @@ interface Tessellator {
     entityIdOverride: number | null,
     clip: Rect | null,
   ): void;
+  /** Give the space its paper, before finalizing. Null leaves it unbounded. */
+  setPage(page: PageGeometry | null): void;
   /**
    * Everything but `entityCounts`, which the space entry points add: only they
    * know which entity lists make up the space (a sheet's own geometry plus
@@ -351,7 +389,7 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
       const entityId = entityIdOverride ?? idx;
       // CAD rule: block entities on layer "0" belong to the insert's layer.
       const layer = layerOverride !== null && entity.layer === "0" ? layerOverride : entity.layer;
-      const color = entity.color ?? colorOverride ?? layerColor(layer);
+      const color = legible(entity.color ?? colorOverride ?? layerColor(layer));
       const dashPattern = resolveDash(entity, layer);
       const weight = resolveWidth(entity, layer, widthOverride);
       // OCS: entities carrying an extrusion normal (mirrored ARCs, POLYLINEs,
@@ -512,6 +550,45 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
     }
   }
 
+  /**
+   * Pen colours darkened for a light canvas, or identity.
+   *
+   * Keyed off the document's format rather than a caller flag, so no surface
+   * can accidentally apply it to ink. `!== "pdf"` and not `=== "dxf"`: the
+   * DXF parser does not stamp a format, and hand-built documents may carry
+   * none, so equality would silently skip exactly the documents this exists
+   * for. Memoised because a drawing has few distinct colours and many
+   * entities.
+   */
+  const canvas = doc.format === PDF_FORMAT ? undefined : options.legibleOn;
+  const legibleCache = new Map<number, number>();
+  const legible =
+    canvas === undefined
+      ? (color: number): number => color
+      : (color: number): number => {
+          let out = legibleCache.get(color);
+          if (out === undefined) {
+            out = darkenForContrast(color, canvas, CONTRAST_TARGET);
+            legibleCache.set(color, out);
+          }
+          return out;
+        };
+
+  let page: PageGeometry | null = null;
+
+  const setPage = (p: PageGeometry | null): void => {
+    page = p;
+    if (!p) return;
+    // The sheet joins the bounds, so a fit frames the paper rather than the
+    // ink on it (VIEW-2). A logo in one corner of an A4 page opens showing
+    // the page, which is what Acrobat and Preview do and what a reader
+    // expects; framing the artwork instead hides that a page exists at all.
+    minX = Math.min(minX, p.sheet.minX);
+    minY = Math.min(minY, p.sheet.minY);
+    maxX = Math.max(maxX, p.sheet.maxX);
+    maxY = Math.max(maxY, p.sheet.maxY);
+  };
+
   const finalize = (): Omit<Tessellation, "entityCounts"> => {
     const bounds: Bounds | null = minX <= maxX ? { minX, minY, maxX, maxY } : null;
     const offset: Point2 = bounds
@@ -560,15 +637,30 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
       });
     }
 
-    return { layers, bounds, offset, segmentCount, imageCount, layerColors };
+    const shift = (b: Bounds): Bounds => ({
+      minX: b.minX - offset.x,
+      minY: b.minY - offset.y,
+      maxX: b.maxX - offset.x,
+      maxY: b.maxY - offset.y,
+    });
+    const backdrop: PageGeometry | null = page
+      ? {
+          sheet: shift(page.sheet),
+          ...(page.trim ? { trim: shift(page.trim) } : {}),
+          ...(page.bleed ? { bleed: shift(page.bleed) } : {}),
+        }
+      : null;
+
+    return { layers, bounds, offset, segmentCount, imageCount, layerColors, backdrop };
   };
 
-  return { walk, finalize };
+  return { walk, setPage, finalize };
 }
 
 /** Tessellate a document's model space into per-layer batched geometry. */
 export function tessellate(doc: DrawingDocument, options: TessellateOptions = {}): Tessellation {
   const t = createTessellator(doc, options);
+  t.setPage(doc.page ?? null);
   t.walk(doc.entities, IDENTITY, null, null, 0, null, null, null);
   return { ...t.finalize(), entityCounts: countEntitiesByLayer(doc.entities) };
 }
@@ -609,6 +701,7 @@ export function tessellateLayout(
   options: TessellateOptions = {},
 ): Tessellation {
   const t = createTessellator(doc, options);
+  t.setPage(layout.page ?? null);
   t.walk(layout.entities, IDENTITY, null, null, 0, null, null, null);
   for (const vp of layout.viewports) {
     t.walk(doc.entities, viewportTransform(vp), null, null, 0, null, null, viewportRect(vp));

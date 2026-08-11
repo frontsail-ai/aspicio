@@ -78,3 +78,22 @@ still reaches the viewer through its `parsers` option (VIEW-15) and can
 drive the layer panel bound to that viewer (ELEM-2), but it cannot teach
 the preview or embed a new format. Opening the registry is additive and
 waits for a real use case.
+
+### ELEM-10: Palette is selectable
+
+Styled elements accept a palette via `theme-mode` (`"dark"` — the default
+— or `"light"`), reflected so a host can style against it. It is a second
+axis from `theme`, which decides _whether_ an element styles itself at
+all: `theme="none"` opts out of styling entirely and `theme-mode` then
+does nothing.
+
+The palettes share token names and differ in value, so a host overriding
+`--aspicio-*` overrides both. The light palette preserves each token's
+intent rather than inverting its lightness, and every text pair in it
+clears WCAG AA on all three surfaces it can land on: panel, canvas, and
+paper (VIEW-17).
+
+The canvas is the exception that cannot be a custom property: the sheet is
+WebGL geometry, so the element passes its colour to the viewer as a value
+instead. Both come from the same palette, so the paper on the canvas and
+the paper in the CSS cannot drift.

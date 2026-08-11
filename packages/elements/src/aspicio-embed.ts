@@ -1,8 +1,8 @@
 import type { DrawingSource, DrawingViewer, DrawingViewerOptions } from "@aspicio/core";
 import { LitElement, css, html, nothing } from "lit";
 import type { PropertyValues, TemplateResult } from "lit";
-import type { AspicioTheme } from "./theme.ts";
-import { canvasBackgroundStyles, tokenStyles } from "./theme.ts";
+import type { AspicioTheme, AspicioThemeMode } from "./theme.ts";
+import { aspicioCanvasColors, canvasBackgroundStyles, tokenStyles } from "./theme.ts";
 
 export type PanelSide = "left" | "right" | "none";
 
@@ -30,6 +30,8 @@ export class AspicioEmbed extends LitElement {
     // Reflected: the host styles key off :host([theme="none"]), which must
     // hold whether callers set the attribute or the property.
     theme: { type: String, reflect: true },
+    // Reflected for the same reason: the palette lives in :host([theme-mode]).
+    themeMode: { type: String, attribute: "theme-mode", reflect: true },
     panelStyle: { attribute: false },
     noDownload: { type: Boolean, attribute: "no-download" },
     shortcuts: { type: Boolean },
@@ -42,6 +44,7 @@ export class AspicioEmbed extends LitElement {
   declare options: DrawingViewerOptions | undefined;
   declare panel: PanelSide;
   declare theme: AspicioTheme;
+  declare themeMode: AspicioThemeMode;
   declare panelStyle: Partial<CSSStyleDeclaration> | undefined;
   declare noDownload: boolean;
   declare shortcuts: boolean;
@@ -55,6 +58,7 @@ export class AspicioEmbed extends LitElement {
     this.options = undefined;
     this.panel = "left";
     this.theme = "aspicio";
+    this.themeMode = "dark";
     this.panelStyle = undefined;
     this.noDownload = false;
     this.shortcuts = false;
@@ -137,9 +141,28 @@ export class AspicioEmbed extends LitElement {
     // The demo look draws its blueprint grid behind a transparent canvas;
     // respect an explicit background if the caller set one.
     const themed = this.theme !== "none";
-    return themed && this.options?.background === undefined
-      ? { ...this.options, background: null }
-      : this.options;
+    if (!themed) return this.options;
+    // The sheet is WebGL geometry, so unlike every other surface it cannot
+    // come from a custom property — it has to be handed to the viewer as a
+    // number. Explicit caller options still win.
+    const canvas = aspicioCanvasColors[this.themeMode] ?? aspicioCanvasColors.dark;
+    return {
+      ...(this.options?.background === undefined ? { background: null } : {}),
+      ...canvas,
+      ...this.options,
+    };
+  }
+
+  /**
+   * True when the space on screen is a bounded page.
+   *
+   * Drives the grid: an infinite blueprint grid is scale feedback for
+   * unbounded model space, and a page provides that itself through its own
+   * edge. Read from the viewer rather than from the file format, because a
+   * PDF page whose box would not read has no sheet to key off.
+   */
+  get #hasPage(): boolean {
+    return this._viewer?.activePage != null;
   }
 
   #renderPanel(): TemplateResult | typeof nothing {
@@ -150,6 +173,7 @@ export class AspicioEmbed extends LitElement {
         part="panel"
         exportparts="header, row, checkbox, swatch, name, count, hints, solo-banner, rows"
         theme=${this.theme}
+        theme-mode=${this.themeMode}
         .viewer=${this._viewer}
         reverse-highlight-layer=${this._reverseHighlight ?? nothing}
       ></aspicio-layer-panel>
@@ -160,7 +184,11 @@ export class AspicioEmbed extends LitElement {
     const themed = this.theme !== "none";
     return html`
       ${this.panel === "left" ? this.#renderPanel() : nothing}
-      <div class="canvas-wrap ${themed ? "canvas-grid" : ""}">
+      <div
+        class="canvas-wrap ${themed ? "canvas-grid" : ""} ${themed && this.#hasPage
+          ? "page-mode"
+          : ""}"
+      >
         <aspicio-preview
           part="preview"
           exportparts="canvas-host, download"

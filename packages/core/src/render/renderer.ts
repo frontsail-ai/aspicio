@@ -18,11 +18,20 @@ import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import type { Camera2D } from "../camera/camera2d.ts";
+import type { Bounds, PageGeometry } from "../model/types.ts";
 import type { Tessellation } from "../tessellate/tessellate.ts";
 
 export interface SceneRendererOptions {
   /** Canvas clear color, 24-bit RGB — or null for a transparent canvas. */
   background?: number | null;
+  /**
+   * The paper a bounded space is drawn on, 24-bit RGB — or null to draw no
+   * sheet at all. Only spaces that declare a page box get one; DXF model
+   * space is unbounded and never does.
+   */
+  sheet?: number | null;
+  /** Hairline around the sheet, 24-bit RGB, or null for none (VIEW-17). */
+  sheetEdge?: number | null;
   /** Pixel width of the layer-highlight overlay lines. */
   highlightWidth?: number;
   /**
@@ -33,8 +42,30 @@ export interface SceneRendererOptions {
 }
 
 const DEFAULT_LINEWEIGHT_SCALE = 5;
-/** Selection overlay colours. */
+/**
+ * Selection overlay colours.
+ *
+ * Two, because the sheet broke the single one: #8fc8ff is 10:1 against the
+ * dark canvas and 1.8:1 against white paper, so a selection made on a PDF
+ * page was legible only until the page had paper under it. The on-sheet
+ * variant is 4.5:1 on white and still 3.9:1 on the dark canvas (VIEW-8).
+ */
 const SELECT_COLOR = 0x8fc8ff;
+const SELECT_COLOR_ON_SHEET = 0x2b78c8;
+
+/**
+ * Production guides on the sheet (VIEW-19). Both live on white paper in
+ * either theme, so neither is theme-dependent.
+ *
+ * Bleed reuses the brand red every Illustrator user already reads as
+ * "bleed", so no new hue enters the palette. Trim is neutral on purpose:
+ * a hue there could be mistaken for a separation.
+ */
+const TRIM_COLOR = 0x7a7a7a;
+const BLEED_COLOR = 0xe0301e;
+/** Dash metrics in *screen* pixels — see `updateGuideDashes`. */
+const GUIDE_DASH_PX = 6;
+const GUIDE_GAP_PX = 4;
 
 /*
  * Render-order bands. Three.js draws the opaque pass first, then the
@@ -46,11 +77,20 @@ const SELECT_COLOR = 0x8fc8ff;
  * test also disables depth *writes*, so an opaque-pass overlay leaves no
  * depth for a later image fragment to fail against (issue #169).
  *
+ *   -2  page backdrop       (opaque pass — the sheet a PDF page is drawn on)
  *   -1  raster images        (transparent pass — alpha from SMasks)
  *    0  fills                (opaque pass)
  *    1  lines                (opaque pass)
+ *    2  page guides          (opaque pass — trim/bleed, above the artwork
+ *                             they measure, below any overlay)
  *  10+  overlays             (transparent pass — highlight, selection;
  *                             VIEW-6/VIEW-8: bold *on top of all content*)
+ *
+ * The backdrop needs no depth trick, unlike the images above it: an opaque
+ * mesh is drawn in the opaque pass, which three.js runs *before* the
+ * transparent one, so images land on top of the sheet whatever their
+ * renderOrder. Sitting at z = -0.2 — behind the images' -0.1 — keeps the
+ * depth buffer agreeing with the pass order rather than fighting it.
  */
 
 /** Three.js-backed renderer drawing batched per-layer line segments. */
@@ -70,6 +110,13 @@ export class SceneRenderer {
   private fillObjects = new Map<string, Mesh>();
   /** Textured quads for raster images, per layer. Own material + texture each. */
   private imageObjects = new Map<string, Mesh[]>();
+  /** Sheet mesh and its hairline, for spaces that have paper. */
+  private backdropObjects: (Mesh | LineSegments)[] = [];
+  /** Trim/bleed outlines; dashes are re-scaled per frame to stay screen-space. */
+  private guideObjects: LineSegments2[] = [];
+  private readonly guideMaterials = new Map<number, LineMaterial>();
+  private sheetColor: Color | null;
+  private sheetEdgeColor: Color | null;
   private highlightObject: LineSegments2 | null = null;
   private selectLineObject: LineSegments2 | null = null;
   private selectFillObject: Mesh | null = null;
@@ -86,6 +133,8 @@ export class SceneRenderer {
     this.clearAlpha = transparent ? 0 : 1;
     this.renderer.setClearColor(this.clearColor, this.clearAlpha);
     this.camera.position.z = 10;
+    this.sheetColor = options.sheet === null ? null : new Color(options.sheet ?? 0xffffff);
+    this.sheetEdgeColor = options.sheetEdge == null ? null : new Color(options.sheetEdge);
     this.lineWeightScale = options.lineWeightScale ?? DEFAULT_LINEWEIGHT_SCALE;
     // Overlays are transparent on purpose — see the render-band contract
     // above: it is what puts them in the pass that draws after images.
@@ -130,6 +179,12 @@ export class SceneRenderer {
   setGeometry(tessellation: Tessellation): void {
     this.clearGeometry();
     this.tessellation = tessellation;
+    if (tessellation.backdrop) this.buildBackdrop(tessellation.backdrop);
+    // Selection has to know what it will be drawn over: the same blue cannot
+    // read against both the dark canvas and white paper.
+    const select = tessellation.backdrop ? SELECT_COLOR_ON_SHEET : SELECT_COLOR;
+    this.selectLineMaterial.color.setHex(select);
+    this.selectFillMaterial.color.setHex(select);
     for (const [name, layer] of tessellation.layers) {
       // Images draw under everything (renderOrder -1), fills next (0),
       // lines on top (1) — the fills-under-lines approximation extended one
@@ -152,6 +207,172 @@ export class SceneRenderer {
       if (layer.positions.length > 0) {
         this.layerObjects.set(name, this.buildLineObjects(layer));
       }
+    }
+  }
+
+  /**
+   * Repaint the paper in new colours, e.g. on a theme switch.
+   *
+   * Rebuilds the backdrop from the tessellation already on screen rather
+   * than asking the caller to reload: the geometry has not changed, only
+   * what colour it is, and a reload would cost a parse and reset the camera.
+   */
+  setSheetColors(sheet: number | null, edge: number | null): void {
+    this.sheetColor = sheet === null ? null : new Color(sheet);
+    this.sheetEdgeColor = edge === null ? null : new Color(edge);
+    for (const object of this.backdropObjects) {
+      this.scene.remove(object);
+      object.geometry.dispose();
+      (object.material as MeshBasicMaterial | LineBasicMaterial).dispose();
+    }
+    this.backdropObjects = [];
+    this.clearGuides();
+    if (this.tessellation?.backdrop) this.buildBackdrop(this.tessellation.backdrop);
+  }
+
+  /**
+   * The sheet a bounded space is drawn on, plus its optional hairline.
+   *
+   * Opaque and drawn first, so everything above it — images included — lands
+   * on top without a depth trick; see the render-band contract above. The
+   * hairline is world-space geometry rather than a screen-space stroke, which
+   * keeps it exactly on the paper's edge at every zoom.
+   */
+  private buildBackdrop(page: PageGeometry): void {
+    if (!this.sheetColor) return;
+    const { minX, minY, maxX, maxY } = page.sheet;
+
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new BufferAttribute(
+        new Float32Array([minX, minY, 0, maxX, minY, 0, maxX, maxY, 0, minX, maxY, 0]),
+        3,
+      ),
+    );
+    geometry.setIndex([0, 1, 2, 0, 2, 3]);
+    const sheet = new Mesh(geometry, new MeshBasicMaterial({ color: this.sheetColor }));
+    sheet.frustumCulled = false;
+    sheet.position.z = -0.2;
+    sheet.renderOrder = -2;
+    this.scene.add(sheet);
+    this.backdropObjects.push(sheet);
+
+    for (const [box, color] of [
+      [page.bleed, BLEED_COLOR],
+      [page.trim, TRIM_COLOR],
+    ] as const) {
+      if (box) this.buildGuide(box, color);
+    }
+
+    if (!this.sheetEdgeColor) return;
+    const edge = new BufferGeometry();
+    edge.setAttribute(
+      "position",
+      new BufferAttribute(
+        new Float32Array([
+          minX,
+          minY,
+          0,
+          maxX,
+          minY,
+          0,
+          maxX,
+          minY,
+          0,
+          maxX,
+          maxY,
+          0,
+          maxX,
+          maxY,
+          0,
+          minX,
+          maxY,
+          0,
+          minX,
+          maxY,
+          0,
+          minX,
+          minY,
+          0,
+        ]),
+        3,
+      ),
+    );
+    const outline = new LineSegments(edge, new LineBasicMaterial({ color: this.sheetEdgeColor }));
+    outline.frustumCulled = false;
+    outline.position.z = -0.19;
+    outline.renderOrder = -2;
+    this.scene.add(outline);
+    this.backdropObjects.push(outline);
+  }
+
+  /**
+   * One dashed guide rectangle, drawn above the artwork it measures and
+   * below any overlay (band 2).
+   *
+   * A guide is a measuring instrument, so it is 1px on screen at every
+   * zoom: one that thickened under magnification would compete with the
+   * line work it exists to qualify.
+   */
+  private buildGuide(box: Bounds, color: number): void {
+    const { minX, minY, maxX, maxY } = box;
+    const geometry = new LineSegmentsGeometry();
+    geometry.setPositions([
+      minX,
+      minY,
+      0,
+      maxX,
+      minY,
+      0,
+      maxX,
+      minY,
+      0,
+      maxX,
+      maxY,
+      0,
+      maxX,
+      maxY,
+      0,
+      minX,
+      maxY,
+      0,
+      minX,
+      maxY,
+      0,
+      minX,
+      minY,
+      0,
+    ]);
+
+    let material = this.guideMaterials.get(color);
+    if (!material) {
+      material = new LineMaterial({ color, linewidth: 1, dashed: true, transparent: true });
+      material.resolution.set(this.width, this.height);
+      this.guideMaterials.set(color, material);
+    }
+
+    const object = new LineSegments2(geometry, material);
+    object.computeLineDistances();
+    object.frustumCulled = false;
+    object.renderOrder = 2;
+    this.scene.add(object);
+    this.guideObjects.push(object);
+  }
+
+  /**
+   * Keep guide dashes a constant size on screen.
+   *
+   * `LineMaterial` measures dashes along world-space line distance, so a
+   * fixed `dashSize` would turn into a solid line when zoomed out and a few
+   * enormous strokes when zoomed in. Converting through units-per-pixel each
+   * frame is what makes "1px, screen-space" true of the pattern and not just
+   * the stroke width.
+   */
+  private updateGuideDashes(unitsPerPixel: number): void {
+    for (const material of this.guideMaterials.values()) {
+      material.dashSize = GUIDE_DASH_PX * unitsPerPixel;
+      material.gapSize = GUIDE_GAP_PX * unitsPerPixel;
     }
   }
 
@@ -329,9 +550,11 @@ export class SceneRenderer {
     this.highlightMaterial.resolution.set(width, height);
     this.selectLineMaterial.resolution.set(width, height);
     for (const mat of this.widthMaterials.values()) mat.resolution.set(width, height);
+    for (const mat of this.guideMaterials.values()) mat.resolution.set(width, height);
   }
 
   render(camera2d: Camera2D): void {
+    this.updateGuideDashes(camera2d.unitsPerPixel);
     const halfW = (camera2d.viewportWidth / 2) * camera2d.unitsPerPixel;
     const halfH = (camera2d.viewportHeight / 2) * camera2d.unitsPerPixel;
     this.camera.left = -halfW;
@@ -366,6 +589,13 @@ export class SceneRenderer {
   private clearGeometry(): void {
     this.setHighlight(null);
     this.setSelection(null, null);
+    for (const object of this.backdropObjects) {
+      this.scene.remove(object);
+      object.geometry.dispose();
+      (object.material as MeshBasicMaterial | LineBasicMaterial).dispose();
+    }
+    this.backdropObjects = [];
+    this.clearGuides();
     for (const objects of this.layerObjects.values()) {
       for (const object of objects) {
         this.scene.remove(object);
@@ -391,8 +621,18 @@ export class SceneRenderer {
     this.tessellation = null;
   }
 
+  private clearGuides(): void {
+    for (const object of this.guideObjects) {
+      this.scene.remove(object);
+      object.geometry.dispose();
+    }
+    this.guideObjects = [];
+  }
+
   dispose(): void {
     this.clearGeometry();
+    for (const mat of this.guideMaterials.values()) mat.dispose();
+    this.guideMaterials.clear();
     this.material.dispose();
     this.fillMaterial.dispose();
     this.highlightMaterial.dispose();

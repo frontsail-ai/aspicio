@@ -3,6 +3,7 @@ import "@aspicio/elements";
 import type {
   AspicioEmbed as AspicioEmbedElement,
   AspicioTheme,
+  AspicioThemeMode,
   PanelSide,
 } from "@aspicio/elements";
 import { defineComponent, h, ref, toRaw } from "vue";
@@ -36,6 +37,8 @@ export const AspicioEmbed = defineComponent({
     panel: { type: String as PropType<PanelSide>, default: "left" },
     /** Visual theme. Defaults to the Aspicio demo look. */
     theme: { type: String as PropType<AspicioTheme>, default: "aspicio" },
+    /** Which palette the theme uses. Defaults to dark (VUE-10). */
+    themeMode: { type: String as PropType<AspicioThemeMode>, default: "dark" },
     /** Inline styles applied to the inner layer panel (CSSOM values, e.g. "300px"). */
     panelStyle: {
       type: Object as PropType<Partial<CSSStyleDeclaration> | undefined>,
@@ -70,6 +73,7 @@ export const AspicioEmbed = defineComponent({
         options: props.options ? toRaw(props.options) : undefined,
         panel: props.panel,
         theme: props.theme,
+        "theme-mode": props.themeMode,
         panelStyle: props.panelStyle ? toRaw(props.panelStyle) : undefined,
         noDownload: !props.showDownload,
         shortcuts: props.shortcuts,

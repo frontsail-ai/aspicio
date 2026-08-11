@@ -3,14 +3,14 @@ import { describeEntity } from "./entity-info.ts";
 import type { EntityInfo } from "./entity-info.ts";
 import { tessellationToSvg } from "./export.ts";
 import { attachGestures } from "./input/gestures.ts";
-import type { DrawingDocument, Entity, LayerInfo, Point2 } from "./model/types.ts";
+import type { DrawingDocument, Entity, LayerInfo, PageGeometry, Point2 } from "./model/types.ts";
 import { parseWith } from "./parse/registry.ts";
 import type { DrawingParser, DrawingSource } from "./parse/registry.ts";
 import { pickEntity as pickEntityHit, pickLayer } from "./pick/pick.ts";
 import { SceneRenderer } from "./render/renderer.ts";
 import { buildSnapIndex } from "./snap/snap.ts";
 import type { SnapIndex, SnapResult } from "./snap/snap.ts";
-import { MODEL_SPACE, documentEntityCount, spaceNames } from "./spaces.ts";
+import { MODEL_SPACE, documentEntityCount, spaceNames, spacePage } from "./spaces.ts";
 import { tessellate, tessellateLayout } from "./tessellate/tessellate.ts";
 import type { Tessellation } from "./tessellate/tessellate.ts";
 
@@ -22,6 +22,26 @@ export interface DrawingViewerOptions {
   background?: number | null;
   /** Segments per full circle when flattening curves. Default: 72. */
   curveSegments?: number;
+  /**
+   * Keep DXF line work legible against this canvas colour (VIEW-18). Omit —
+   * the default — to draw the colours the file names. PDF ink is never
+   * affected. See `TessellateOptions.legibleOn`.
+   */
+  legibleOn?: number;
+  /**
+   * The paper drawn under a space that declares a page box — a PDF page
+   * (VIEW-17). 24-bit RGB, or null to draw no sheet. Default: white.
+   *
+   * White, and not an off-white "paper" tint, because in a PDF the sheet is
+   * the *unpainted* region: artwork that paints 0/0/0/0 white — knockout
+   * type, a barcode's quiet zone — would otherwise appear as a visible
+   * rectangle against the paper it is supposed to match. Substrate
+   * simulation is a soft-proof feature with a stated white point, not a
+   * default backdrop. Spaces with no page box are unaffected.
+   */
+  sheet?: number | null;
+  /** Hairline drawn around the sheet. 24-bit RGB, or null (default) for none. */
+  sheetEdge?: number | null;
   /**
    * The formats this viewer accepts, tried in order (PARSE-13, VIEW-15).
    * Core imports no parser of its own — pass `dxfParser` from
@@ -104,6 +124,7 @@ export class DrawingViewer {
   private tessellation: Tessellation | null = null;
   private snapIndex: SnapIndex | null = null;
   private activeSpace = MODEL_SPACE;
+  private legibleOn: number | undefined;
   private renderQueued = false;
   private highlightedLayer: string | null = null;
   private selectedIndex: number | null = null;
@@ -125,7 +146,12 @@ export class DrawingViewer {
     this.canvas.style.height = "100%";
     container.appendChild(this.canvas);
 
-    this.renderer = new SceneRenderer(this.canvas, { background: options.background });
+    this.legibleOn = options.legibleOn;
+    this.renderer = new SceneRenderer(this.canvas, {
+      background: options.background,
+      sheet: options.sheet,
+      sheetEdge: options.sheetEdge,
+    });
 
     this.detachGestures = attachGestures(this.canvas, this.camera, {
       onChange: () => {
@@ -147,7 +173,7 @@ export class DrawingViewer {
     // parsers — one policy, shared with the API and MCP surfaces (PARSE-13).
     this.document = await parseWith(this.options.parsers ?? [], source);
     this.activeSpace = MODEL_SPACE;
-    this.activate(tessellate(this.document, { curveSegments: this.options.curveSegments }));
+    this.activate(tessellate(this.document, this.tessellateOptions()));
     this.emit("loaded");
   }
 
@@ -189,13 +215,85 @@ export class DrawingViewer {
     return this.activeSpace;
   }
 
+  private tessellateOptions(): { curveSegments?: number; legibleOn?: number } {
+    return { curveSegments: this.options.curveSegments, legibleOn: this.legibleOn };
+  }
+
+  /**
+   * Re-tessellate the space on screen without reloading the drawing.
+   *
+   * Needed because pen colours are baked into vertex buffers: unlike the
+   * paper, which is one uniform, changing the canvas a drawing is judged
+   * against changes every vertex. The camera is deliberately left alone —
+   * the geometry has not moved, and refitting under the user would read as
+   * the viewer losing their place.
+   */
+  private retessellate(): void {
+    if (!this.document) return;
+    const opts = this.tessellateOptions();
+    const layout =
+      this.activeSpace === MODEL_SPACE
+        ? null
+        : this.document.layouts?.find((l) => l.name === this.activeSpace);
+    const view = this.view;
+    this.activate(
+      layout ? tessellateLayout(this.document, layout, opts) : tessellate(this.document, opts),
+    );
+    this.setView(view);
+  }
+
+  /**
+   * Re-colour the canvas for a theme switch (VIEW-17, VIEW-18).
+   *
+   * One call rather than two setters because the two halves have to agree:
+   * the paper and the pen colours judged against it are the same decision,
+   * and applying one without the other puts dark ink on a dark canvas.
+   */
+  setCanvasColors(colors: {
+    sheet?: number | null;
+    sheetEdge?: number | null;
+    legibleOn?: number;
+  }): void {
+    const relegible = colors.legibleOn !== this.legibleOn;
+    this.legibleOn = colors.legibleOn;
+    this.renderer.setSheetColors(colors.sheet ?? null, colors.sheetEdge ?? null);
+    // Only re-walk the drawing when the pen colours actually changed; the
+    // paper alone is a uniform swap.
+    if (relegible) this.retessellate();
+    else this.requestRender();
+  }
+
+  /**
+   * Repaint the paper, e.g. when the host switches theme (VIEW-17).
+   *
+   * Kept separate from the constructor options so a theme switch does not
+   * have to recreate the viewer: rebuilding it would drop the WebGL context,
+   * re-parse the drawing and reset the camera, all to change one colour.
+   */
+  setSheetColors(sheet: number | null, edge: number | null = null): void {
+    this.renderer.setSheetColors(sheet, edge);
+    this.requestRender();
+  }
+
+  /**
+   * The active space's paper, or null when the space is unbounded (VIEW-17).
+   *
+   * Hosts need this to style the canvas *around* the sheet: a bounded page
+   * gets a plain surround, an unbounded space keeps whatever infinite-space
+   * treatment the host draws. Core states the fact and styles nothing
+   * itself (INV-1).
+   */
+  get activePage(): PageGeometry | null {
+    return this.document ? spacePage(this.document, this.activeSpace) : null;
+  }
+
   /**
    * Switch the displayed space to model space or a paper-space layout by name.
    * Re-tessellates, re-fits, and re-renders. Unknown names are ignored.
    */
   setActiveSpace(name: string): void {
     if (!this.document || name === this.activeSpace) return;
-    const opts = { curveSegments: this.options.curveSegments };
+    const opts = this.tessellateOptions();
     if (name === MODEL_SPACE) {
       this.activeSpace = name;
       this.activate(tessellate(this.document, opts));
