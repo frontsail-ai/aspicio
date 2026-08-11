@@ -98,8 +98,8 @@ export class SceneRenderer {
   private imageObjects = new Map<string, Mesh[]>();
   /** Sheet mesh and its hairline, for spaces that have paper. */
   private backdropObjects: (Mesh | LineSegments)[] = [];
-  private readonly sheetColor: Color | null;
-  private readonly sheetEdgeColor: Color | null;
+  private sheetColor: Color | null;
+  private sheetEdgeColor: Color | null;
   private highlightObject: LineSegments2 | null = null;
   private selectLineObject: LineSegments2 | null = null;
   private selectFillObject: Mesh | null = null;
@@ -191,6 +191,25 @@ export class SceneRenderer {
         this.layerObjects.set(name, this.buildLineObjects(layer));
       }
     }
+  }
+
+  /**
+   * Repaint the paper in new colours, e.g. on a theme switch.
+   *
+   * Rebuilds the backdrop from the tessellation already on screen rather
+   * than asking the caller to reload: the geometry has not changed, only
+   * what colour it is, and a reload would cost a parse and reset the camera.
+   */
+  setSheetColors(sheet: number | null, edge: number | null): void {
+    this.sheetColor = sheet === null ? null : new Color(sheet);
+    this.sheetEdgeColor = edge === null ? null : new Color(edge);
+    for (const object of this.backdropObjects) {
+      this.scene.remove(object);
+      object.geometry.dispose();
+      (object.material as MeshBasicMaterial | LineBasicMaterial).dispose();
+    }
+    this.backdropObjects = [];
+    if (this.tessellation?.backdrop) this.buildBackdrop(this.tessellation.backdrop);
   }
 
   /**

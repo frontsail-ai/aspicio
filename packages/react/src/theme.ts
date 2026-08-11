@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 
 /** Visual theme for the ready-made components. */
-export type { AspicioTheme } from "@aspicio/elements";
+export type { AspicioTheme, AspicioThemeMode, AspicioTokens } from "@aspicio/elements";
 
 /**
  * Design tokens lifted from the Aspicio demo app. The elements underneath
@@ -9,7 +9,7 @@ export type { AspicioTheme } from "@aspicio/elements";
  * those to retheme; this object remains for hosts that build their own
  * chrome around the components.
  */
-export { aspicioTokens } from "@aspicio/elements";
+export { aspicioCanvasColors, aspicioLightTokens, aspicioTokens } from "@aspicio/elements";
 
 /**
  * The demo app's blueprint grid, drawn behind a transparent canvas.

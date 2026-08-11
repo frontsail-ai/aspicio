@@ -20,7 +20,55 @@
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
+  /* Canvas regions. The surround is the darkest region after the app frame,
+     which is what keeps it reading as "outside the drawing" rather than as a
+     second panel. The sheet itself is WebGL geometry and is handed to the
+     viewer as a number; it appears here only for chrome that sits on it. */
+  --surround: #0d0f13;
+  --sheet: #ffffff;
+  --gridminor: rgb(255 255 255 / 2.8%);
+  --gridmajor: rgb(255 255 255 / 5%);
+  /* Floating canvas chrome. Translucent over whatever is behind it, which is
+     the dark canvas in one theme and white paper in the other — so it is a
+     token, not the hardcoded slate it used to be. */
+  --chip-fill: rgb(25 28 34 / 75%);
+  --ctrl-fill: rgb(25 28 34 / 90%);
+  --scale-fill: rgb(154 160 171 / 12%);
+
   color-scheme: dark;
+}
+
+/* Same names, same intent — not the dark palette inverted. See
+   packages/elements/src/theme.ts, which is the source these mirror. */
+:root[data-theme="light"] {
+  --canvas: #dcd8d1;
+  --bg: #e6e3dd;
+  --panel: #efece6;
+  --panel2: #f7f5f1;
+  --hover: rgb(0 0 0 / 5%);
+  --hairline: #dbd6cd;
+  --hairline2: #b6b0a5;
+  --frame: #8d8679;
+  --text: #1c1a17;
+  --text2: #3f3c36;
+  --text3: #605c54;
+  --cut: #c02417;
+  --cut2: #e0301e;
+  --crease: #1a63d8;
+  --creasedim: rgb(26 99 216 / 12%);
+  --amber: #8a6209;
+  --amberdim: rgb(138 98 9 / 14%);
+  --err: #b3392e;
+
+  --surround: #c4c4c4;
+  --sheet: #ffffff;
+  --gridminor: rgb(0 0 0 / 3.5%);
+  --gridmajor: rgb(0 0 0 / 6.5%);
+  --chip-fill: rgb(239 236 230 / 82%);
+  --ctrl-fill: rgb(239 236 230 / 92%);
+  --scale-fill: rgb(63 60 54 / 10%);
+
+  color-scheme: light;
 }
 
 * {
@@ -720,9 +768,6 @@ button {
 .grid-bg {
   position: absolute;
   inset: 0;
-  --gridminor: rgb(255 255 255 / 2.8%);
-  --gridmajor: rgb(255 255 255 / 5%);
-
   background-image:
     linear-gradient(var(--gridminor) 1px, transparent 1px),
     linear-gradient(90deg, var(--gridminor) 1px, transparent 1px),
@@ -734,6 +779,18 @@ button {
     130px 130px,
     130px 130px;
   pointer-events: none;
+}
+
+/* A bounded page provides its own scale reference through its edge, so the
+   grid stands down: a repeating pattern running up to the sheet edge fights
+   the one line the reader has to trust, and sits beside artwork being
+   colour-judged. */
+.viewer-wrap.page-mode {
+  background: var(--surround);
+}
+
+.viewer-wrap.page-mode .grid-bg {
+  background-image: none;
 }
 
 .viewer {
@@ -764,7 +821,7 @@ button {
 }
 
 .readout-chip {
-  background: rgb(25 28 34 / 75%);
+  background: var(--chip-fill);
   border: 1px solid var(--hairline);
   border-radius: 3px;
   padding: 3px 7px;
@@ -787,7 +844,7 @@ button {
   justify-content: center;
   width: 36px;
   height: 36px;
-  background: rgb(25 28 34 / 90%);
+  background: var(--ctrl-fill);
   backdrop-filter: blur(6px);
   border: 1px solid var(--hairline2);
   border-radius: 4px;
@@ -809,7 +866,7 @@ button {
   border: 1px solid var(--hairline2);
   border-radius: 4px;
   overflow: hidden;
-  background: rgb(25 28 34 / 90%);
+  background: var(--ctrl-fill);
   backdrop-filter: blur(6px);
 }
 
@@ -994,7 +1051,7 @@ button {
   display: flex;
   gap: 3px;
   padding: 3px;
-  background: rgb(25 28 34 / 90%);
+  background: var(--ctrl-fill);
   backdrop-filter: blur(6px);
   border: 1px solid var(--hairline2);
   border-radius: 5px;
@@ -1157,7 +1214,7 @@ button {
   min-width: 1px;
   border: 1px solid var(--text3);
   border-top: none;
-  background: rgb(154 160 171 / 12%);
+  background: var(--scale-fill);
 }
 
 /* ===================== ENTITY INFO PANEL ===================== */

@@ -17,8 +17,8 @@ export type { PanelSide } from "./aspicio-embed.ts";
 export { AspicioLayerPanel } from "./aspicio-layer-panel.ts";
 export { AspicioPreview } from "./aspicio-preview.ts";
 export type { LoadedDetail } from "./aspicio-preview.ts";
-export { aspicioTokens } from "./theme.ts";
-export type { AspicioTheme } from "./theme.ts";
+export { aspicioCanvasColors, aspicioLightTokens, aspicioTokens } from "./theme.ts";
+export type { AspicioTheme, AspicioThemeMode, AspicioTokens } from "./theme.ts";
 
 // Guarded registration: safe under repeated imports (two bundles on one
 // page) and under Node's SSR shim, which provides a customElements stub.

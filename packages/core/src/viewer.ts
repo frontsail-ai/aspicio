@@ -3,14 +3,14 @@ import { describeEntity } from "./entity-info.ts";
 import type { EntityInfo } from "./entity-info.ts";
 import { tessellationToSvg } from "./export.ts";
 import { attachGestures } from "./input/gestures.ts";
-import type { DrawingDocument, Entity, LayerInfo, Point2 } from "./model/types.ts";
+import type { DrawingDocument, Entity, LayerInfo, PageGeometry, Point2 } from "./model/types.ts";
 import { parseWith } from "./parse/registry.ts";
 import type { DrawingParser, DrawingSource } from "./parse/registry.ts";
 import { pickEntity as pickEntityHit, pickLayer } from "./pick/pick.ts";
 import { SceneRenderer } from "./render/renderer.ts";
 import { buildSnapIndex } from "./snap/snap.ts";
 import type { SnapIndex, SnapResult } from "./snap/snap.ts";
-import { MODEL_SPACE, documentEntityCount, spaceNames } from "./spaces.ts";
+import { MODEL_SPACE, documentEntityCount, spaceNames, spacePage } from "./spaces.ts";
 import { tessellate, tessellateLayout } from "./tessellate/tessellate.ts";
 import type { Tessellation } from "./tessellate/tessellate.ts";
 
@@ -205,6 +205,30 @@ export class DrawingViewer {
   /** The currently displayed space (`"Model"` or a layout name). */
   get activeSpaceName(): string {
     return this.activeSpace;
+  }
+
+  /**
+   * Repaint the paper, e.g. when the host switches theme (VIEW-17).
+   *
+   * Kept separate from the constructor options so a theme switch does not
+   * have to recreate the viewer: rebuilding it would drop the WebGL context,
+   * re-parse the drawing and reset the camera, all to change one colour.
+   */
+  setSheetColors(sheet: number | null, edge: number | null = null): void {
+    this.renderer.setSheetColors(sheet, edge);
+    this.requestRender();
+  }
+
+  /**
+   * The active space's paper, or null when the space is unbounded (VIEW-17).
+   *
+   * Hosts need this to style the canvas *around* the sheet: a bounded page
+   * gets a plain surround, an unbounded space keeps whatever infinite-space
+   * treatment the host draws. Core states the fact and styles nothing
+   * itself (INV-1).
+   */
+  get activePage(): PageGeometry | null {
+    return this.document ? spacePage(this.document, this.activeSpace) : null;
   }
 
   /**

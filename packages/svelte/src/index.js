@@ -15,4 +15,4 @@
 export { default as AspicioEmbed } from "./AspicioEmbed.svelte";
 export { default as AspicioLayerPanel } from "./AspicioLayerPanel.svelte";
 export { default as AspicioPreview } from "./AspicioPreview.svelte";
-export { aspicioTokens } from "@aspicio/elements";
+export { aspicioCanvasColors, aspicioLightTokens, aspicioTokens } from "@aspicio/elements";

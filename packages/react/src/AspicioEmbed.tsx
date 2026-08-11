@@ -5,7 +5,7 @@ import * as React from "react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { AspicioPreviewProps } from "./AspicioPreview.tsx";
-import type { AspicioTheme } from "./theme.ts";
+import type { AspicioTheme, AspicioThemeMode } from "./theme.ts";
 
 export interface AspicioEmbedProps extends AspicioPreviewProps {
   /** Where the layer list sits. Default: "left". */
@@ -20,6 +20,8 @@ export interface AspicioEmbedProps extends AspicioPreviewProps {
   panelStyle?: CSSProperties;
   /** Visual theme. Defaults to the Aspicio demo look; "none" inherits the host. */
   theme?: AspicioTheme;
+  /** Which palette the theme uses. Defaults to dark (REACT-9). */
+  themeMode?: AspicioThemeMode;
 }
 
 const EmbedElement = createComponent({
@@ -81,6 +83,7 @@ export const AspicioEmbed = forwardRef<DrawingViewer | null, AspicioEmbedProps>(
       panelClassName: _panelClassName,
       panelStyle,
       theme = "aspicio",
+      themeMode = "dark",
       src,
       srcUrl,
       options,
@@ -136,6 +139,7 @@ export const AspicioEmbed = forwardRef<DrawingViewer | null, AspicioEmbedProps>(
         options={options}
         panel={panel}
         theme={theme}
+        theme-mode={themeMode}
         panelStyle={panelStyleCssom}
         noDownload={!showDownload}
         shortcuts={shortcuts}

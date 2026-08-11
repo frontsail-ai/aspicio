@@ -9,10 +9,10 @@ import type {
   LayerInfo,
   ViewerStats,
 } from "@aspicio/core";
-import type { AspicioTheme, PanelSide } from "@aspicio/elements";
+import type { AspicioTheme, AspicioThemeMode, PanelSide } from "@aspicio/elements";
 import type { Component } from "svelte";
 
-export { aspicioTokens } from "@aspicio/elements";
+export { aspicioCanvasColors, aspicioLightTokens, aspicioTokens } from "@aspicio/elements";
 
 /** Payload of the `onloaded` callback. */
 export interface LoadedInfo {
@@ -53,6 +53,7 @@ export interface AspicioEmbedProps extends SourceProps {
   panel?: PanelSide;
   /** Visual theme. Defaults to the Aspicio demo look. */
   theme?: AspicioTheme;
+  themeMode?: AspicioThemeMode;
   /** Inline styles applied to the inner layer panel (CSSOM values, e.g. "300px"). */
   panelStyle?: Partial<CSSStyleDeclaration>;
 }
@@ -62,6 +63,7 @@ export interface AspicioLayerPanelProps {
   viewer?: DrawingViewer | null;
   /** Visual theme. Defaults to the Aspicio demo look; "none" renders a minimal list. */
   theme?: AspicioTheme;
+  themeMode?: AspicioThemeMode;
   /** Layer hovered on the canvas; its row is reverse-highlighted. */
   reverseHighlightLayer?: string | null;
   /** Show the gesture-hints footer (themed mode only). Default: true. */
