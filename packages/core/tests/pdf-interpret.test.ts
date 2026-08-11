@@ -13,6 +13,7 @@ import {
   multiply,
 } from "../src/parse/pdf/interpret.ts";
 import type { Matrix } from "../src/parse/pdf/interpret.ts";
+import { parsePdfBytes } from "../src/parse/pdf/parse.ts";
 import type { HatchEntity, PolylineEntity } from "../src/model/types.ts";
 
 const encode = (s: string) => new TextEncoder().encode(s);
@@ -31,6 +32,17 @@ const polylines = (entities: readonly { type: string }[]): PolylineEntity[] =>
   entities.filter((e): e is PolylineEntity => e.type === "POLYLINE");
 const hatches = (entities: readonly { type: string }[]): HatchEntity[] =>
   entities.filter((e): e is HatchEntity => e.type === "HATCH");
+
+/** Shoelace area of a ring, for asserting on what a clip left behind. */
+const area = (ring: readonly { x: number; y: number }[]): number => {
+  let sum = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i] as { x: number; y: number };
+    const b = ring[(i + 1) % ring.length] as { x: number; y: number };
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(sum) / 2;
+};
 
 /* ---------- matrices ---------- */
 
@@ -211,12 +223,87 @@ test("an empty dash array means solid", async () => {
   expect(lineTypes.size).toBe(0);
 });
 
+/* ---------- clipping (PDF-3) ---------- */
+
+test("a rectangular clip crops the stroke that follows it", async () => {
+  const { entities, unsupported } = await run("0 0 10 10 re W n 0 0 m 20 20 l S");
+  expect(unsupported["Clip"]).toBeUndefined();
+  expect(polylines(entities)[0]?.points).toEqual([
+    { x: 0, y: 0 },
+    { x: 10, y: 10 },
+  ]);
+});
+
+test("content wholly outside the region does not draw at all", async () => {
+  const { entities } = await run("0 0 10 10 re W n 50 50 m 60 60 l S 50 50 m 60 50 l 60 60 l f");
+  expect(entities).toHaveLength(0);
+});
+
+test("a clipped fill keeps its holes", async () => {
+  // A 20×20 square with a 10×10 hole, clipped to its left half.
+  const { entities } = await run("0 0 10 20 re W n 0 0 20 20 re 5 5 10 10 re f");
+  const [fill] = hatches(entities);
+  expect(fill?.loops).toHaveLength(2);
+  expect(area(fill?.loops[0] ?? [])).toBeCloseTo(200);
+  expect(area(fill?.loops[1] ?? [])).toBeCloseTo(50);
+});
+
+test("the painting operator that ends a clip path is not itself clipped", async () => {
+  // `W f` fills the whole path, then narrows the region for what follows.
+  const { entities } = await run("0 0 10 10 re W f 0 0 20 20 re f");
+  const [first, second] = hatches(entities);
+  expect(area(first?.loops[0] ?? [])).toBeCloseTo(100);
+  expect(area(second?.loops[0] ?? [])).toBeCloseTo(100);
+});
+
+test("Q restores the region the clip narrowed", async () => {
+  const { entities } = await run("q 0 0 10 10 re W n Q 0 0 m 20 20 l S");
+  expect(polylines(entities)[0]?.points[1]).toEqual({ x: 20, y: 20 });
+});
+
+test("clips that do not overlap leave nothing drawable", async () => {
+  const { entities } = await run("0 0 10 10 re W n 50 50 10 10 re W n 0 0 m 60 60 l S");
+  expect(entities).toHaveLength(0);
+});
+
+test("a stroke that leaves and re-enters the region yields two runs", async () => {
+  const { entities } = await run("0 0 10 10 re W n -5 5 m 15 5 l 15 2 l -5 2 l S");
+  const runs = polylines(entities);
+  expect(runs).toHaveLength(2);
+  expect(runs[0]?.points).toEqual([
+    { x: 0, y: 5 },
+    { x: 10, y: 5 },
+  ]);
+  expect(runs[1]?.points).toEqual([
+    { x: 10, y: 2 },
+    { x: 0, y: 2 },
+  ]);
+});
+
+test("a form is cropped to its own /BBox", async () => {
+  const doc = await parsePdfBytes(
+    new Uint8Array(
+      readFileSync(fileURLToPath(new URL("./fixtures/pdf/clip-form-bbox.pdf", import.meta.url))),
+    ),
+  );
+  // The form strokes to (30, 30) but declares /BBox [0 0 10 10]; the
+  // specification crops it there, so the stroke stops at the corner.
+  const [line] = polylines(doc.entities);
+  expect(line?.points).toEqual([
+    { x: 0, y: 0 },
+    { x: 10, y: 10 },
+  ]);
+});
+
 /* ---------- unsupported counting (PDF-8) ---------- */
 
-test("counts clipping without cropping anything", async () => {
-  const { entities, unsupported } = await run("0 0 10 10 re W n 0 0 m 20 20 l S");
+test("counts a clip it cannot apply, and leaves the drawing whole", async () => {
+  // A concave clipping path: outside the convex regions this viewer keeps,
+  // so it is counted and the stroke draws at full length (PDF-8).
+  const { entities, unsupported } = await run(
+    "0 0 m 10 0 l 10 10 l 5 2 l 0 10 l h W n 0 0 m 20 20 l S",
+  );
   expect(unsupported["Clip"]).toBe(1);
-  // The line still draws at full length — clipping is counted, not applied.
   expect(polylines(entities)[0]?.points[1]).toEqual({ x: 20, y: 20 });
 });
 

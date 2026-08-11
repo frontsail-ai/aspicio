@@ -67,7 +67,9 @@ const CORPUS: Record<string, Expectation> = {
   // Page 1 sees one Stamp placement; all 27 pages together see 27.
   "issue14824.pdf": {
     layers: { Content: 264, Stamp: 1 },
-    documentLayers: { Content: 11783, Stamp: 27 },
+    // 11783 before clipping (PDF-3): 16 of this file's text runs fall
+    // outside the region in force where they are drawn.
+    documentLayers: { Content: 11767, Stamp: 27 },
     totalLayers: 2,
   },
   // 35 groups, 3 ordered, 33 hidden by /OFF — all 35 still present.

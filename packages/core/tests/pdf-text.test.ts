@@ -186,3 +186,28 @@ test("malformed text operators degrade instead of throwing", async () => {
   await expect(run("BT /F1 Tf Tj ET")).resolves.toBeDefined();
   await expect(run("ET ET BT BT (x) Tj")).resolves.toBeDefined();
 });
+
+/* ---------- clipping (PDF-3) ---------- */
+
+test("a run that cannot reach the clipping region is dropped", async () => {
+  const { entities } = await run("0 0 10 10 re W n BT /F1 12 Tf 500 500 Td (far away) Tj ET");
+  expect(texts(entities)).toHaveLength(0);
+});
+
+test("a run inside the region is kept, and one straddling it is kept whole", async () => {
+  const inside = await run("0 0 100 100 re W n BT /F1 12 Tf 10 10 Td (in) Tj ET");
+  expect(texts(inside.entities)).toHaveLength(1);
+
+  // Glyph widths are estimated, never read, so a run overlapping the boundary
+  // is never cut: it draws in full or not at all (PDF-4, PDF-8).
+  const straddling = await run("0 0 100 100 re W n BT /F1 12 Tf 90 50 Td (over the edge) Tj ET");
+  const [run1] = texts(straddling.entities);
+  expect(run1?.text).toBe("over the edge");
+});
+
+test("a region nothing can draw in drops text too", async () => {
+  const { entities } = await run(
+    "0 0 10 10 re W n 50 50 10 10 re W n BT /F1 12 Tf 5 5 Td (gone) Tj ET",
+  );
+  expect(texts(entities)).toHaveLength(0);
+});
