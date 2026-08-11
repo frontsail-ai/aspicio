@@ -16,6 +16,7 @@ import { dxfParser } from "@aspicio/core/dxf";
 import { applyTheme, canvasColors, loadTheme, saveTheme } from "./theme.ts";
 import { pdfParser } from "@aspicio/core/pdf";
 import type { EntityInfo, LayerInfo, PickedEntity, Point2, SnapResult } from "@aspicio/core";
+import { resolveEntry, withoutSrc } from "./entry.ts";
 import { decodeView, encodeView, packLayers } from "./viewurl.ts";
 import type { ViewLink } from "./viewurl.ts";
 import { FetchError, fetchWithProgress, isHttpUrl } from "./fetch-progress.ts";
@@ -255,6 +256,29 @@ app.innerHTML = `
       <div class="shortcuts-grid">${SHORTCUTS.map(
         ([k, v]) => `<kbd class="sc-key">${k}</kbd><span class="sc-desc">${v}</span>`,
       ).join("")}</div>
+    </div>
+  </div>
+  <div id="src-prompt" class="od-scrim src-prompt" hidden role="dialog" aria-modal="true"
+       aria-labelledby="src-prompt-title">
+    <div class="od-card src-prompt-card">
+      <div class="od-head">
+        <div class="od-head-title" id="src-prompt-title">${icons.filePlus}<span>OPEN THIS DRAWING?</span></div>
+      </div>
+      <div class="od-body">
+        <div class="src-prompt-lede">This link asks Aspicio to fetch a drawing from another site.</div>
+        <div class="src-prompt-target">
+          <div id="src-prompt-name" class="src-prompt-name"></div>
+          <div id="src-prompt-host" class="src-prompt-host"></div>
+        </div>
+        <div class="src-prompt-note">
+          Nothing is fetched until you choose. Share links use <code>#src=</code>, which
+          stays in your browser and never reaches a server.
+        </div>
+        <div class="src-prompt-actions">
+          <button id="src-prompt-reject" class="btn-ghost" type="button">Don't open</button>
+          <button id="src-prompt-accept" class="btn-primary" type="button">Open drawing</button>
+        </div>
+      </div>
     </div>
   </div>
   <div id="open-dialog" class="od-scrim" hidden>
@@ -1830,7 +1854,75 @@ function openFromLink(link: ViewLink | null, cold: boolean): void {
   loadSample();
 }
 
-openFromLink(decodeView(location.hash), true);
+/**
+ * Drop `src` from the address bar once the offer is answered, either way, so a
+ * reload does not ask again and the bar stops advertising a URL that may have
+ * been declined. Other parameters are left alone.
+ */
+function clearSrcQuery(): void {
+  history.replaceState(null, "", location.pathname + withoutSrc(location.search) + location.hash);
+}
+
+/**
+ * A `src` in the query string is offered, not followed (DEMO-23).
+ *
+ * It cannot be loaded silently: a query string is sent to the server, so the
+ * drawing's URL is in this site's access log before any of this code runs, and
+ * a link that fetches on sight would make that exposure a surprise rather than
+ * a choice. The hash form has neither property, so the offer names it.
+ */
+function offerSrc(src: string): void {
+  const prompt = $("#src-prompt");
+  $("#src-prompt-name").textContent = nameFromUrl(src);
+  $("#src-prompt-host").textContent = hostOf(src);
+  setMode("empty");
+  prompt.hidden = false;
+  // Focus the refusing button, not the accepting one: a stray Enter on a
+  // prompt the visitor has not read yet must not start a fetch.
+  $("#src-prompt-reject").focus();
+
+  const close = (): void => {
+    prompt.hidden = true;
+    window.removeEventListener("keydown", onKey);
+  };
+  const reject = (): void => {
+    close();
+    clearSrcQuery();
+  };
+  const accept = (): void => {
+    close();
+    // Canonicalise to the hash *before* loading, so the share link the visitor
+    // ends up with is the private form even though they arrived by the other.
+    history.replaceState(
+      null,
+      "",
+      location.pathname + withoutSrc(location.search) + `#src=${encodeURIComponent(src)}`,
+    );
+    // unitsPerPixel 0 is viewurl's "no camera pose" sentinel: load fitted.
+    openFromLink(
+      { view: { center: { x: 0, y: 0 }, unitsPerPixel: 0, rotation: 0 }, src, spaceIndex: 0 },
+      true,
+    );
+  };
+  // Escape and a backdrop click both mean "no" rather than "ask me later"
+  // (DEMO-21 dismisses uniformly). Mapping an accidental dismissal to the
+  // safe outcome is the point: only a deliberate click fetches anything.
+  function onKey(e: KeyboardEvent): void {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    reject();
+  }
+  window.addEventListener("keydown", onKey);
+  prompt.addEventListener("click", (e) => {
+    if (e.target === prompt) reject();
+  });
+  $("#src-prompt-accept").addEventListener("click", accept);
+  $("#src-prompt-reject").addEventListener("click", reject);
+}
+
+const entry = resolveEntry(location.hash, location.search);
+if (entry.kind === "offer") offerSrc(entry.src);
+else openFromLink(entry.kind === "link" ? entry.link : null, true);
 // React to a hash the user introduces after load — pasting a share link into the
 // address bar, or back/forward between shared links. Our own writes go through
 // history.replaceState, which never fires hashchange, so this can't loop.
