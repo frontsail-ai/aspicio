@@ -18,7 +18,7 @@ import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import type { Camera2D } from "../camera/camera2d.ts";
-import type { PageGeometry } from "../model/types.ts";
+import type { Bounds, PageGeometry } from "../model/types.ts";
 import type { Tessellation } from "../tessellate/tessellate.ts";
 
 export interface SceneRendererOptions {
@@ -52,6 +52,20 @@ const DEFAULT_LINEWEIGHT_SCALE = 5;
  */
 const SELECT_COLOR = 0x8fc8ff;
 const SELECT_COLOR_ON_SHEET = 0x2b78c8;
+
+/**
+ * Production guides on the sheet (VIEW-19). Both live on white paper in
+ * either theme, so neither is theme-dependent.
+ *
+ * Bleed reuses the brand red every Illustrator user already reads as
+ * "bleed", so no new hue enters the palette. Trim is neutral on purpose:
+ * a hue there could be mistaken for a separation.
+ */
+const TRIM_COLOR = 0x7a7a7a;
+const BLEED_COLOR = 0xe0301e;
+/** Dash metrics in *screen* pixels — see `updateGuideDashes`. */
+const GUIDE_DASH_PX = 6;
+const GUIDE_GAP_PX = 4;
 
 /*
  * Render-order bands. Three.js draws the opaque pass first, then the
@@ -98,6 +112,9 @@ export class SceneRenderer {
   private imageObjects = new Map<string, Mesh[]>();
   /** Sheet mesh and its hairline, for spaces that have paper. */
   private backdropObjects: (Mesh | LineSegments)[] = [];
+  /** Trim/bleed outlines; dashes are re-scaled per frame to stay screen-space. */
+  private guideObjects: LineSegments2[] = [];
+  private readonly guideMaterials = new Map<number, LineMaterial>();
   private sheetColor: Color | null;
   private sheetEdgeColor: Color | null;
   private highlightObject: LineSegments2 | null = null;
@@ -209,6 +226,7 @@ export class SceneRenderer {
       (object.material as MeshBasicMaterial | LineBasicMaterial).dispose();
     }
     this.backdropObjects = [];
+    this.clearGuides();
     if (this.tessellation?.backdrop) this.buildBackdrop(this.tessellation.backdrop);
   }
 
@@ -239,6 +257,13 @@ export class SceneRenderer {
     sheet.renderOrder = -2;
     this.scene.add(sheet);
     this.backdropObjects.push(sheet);
+
+    for (const [box, color] of [
+      [page.bleed, BLEED_COLOR],
+      [page.trim, TRIM_COLOR],
+    ] as const) {
+      if (box) this.buildGuide(box, color);
+    }
 
     if (!this.sheetEdgeColor) return;
     const edge = new BufferGeometry();
@@ -280,6 +305,75 @@ export class SceneRenderer {
     outline.renderOrder = -2;
     this.scene.add(outline);
     this.backdropObjects.push(outline);
+  }
+
+  /**
+   * One dashed guide rectangle, drawn above the artwork it measures and
+   * below any overlay (band 2).
+   *
+   * A guide is a measuring instrument, so it is 1px on screen at every
+   * zoom: one that thickened under magnification would compete with the
+   * line work it exists to qualify.
+   */
+  private buildGuide(box: Bounds, color: number): void {
+    const { minX, minY, maxX, maxY } = box;
+    const geometry = new LineSegmentsGeometry();
+    geometry.setPositions([
+      minX,
+      minY,
+      0,
+      maxX,
+      minY,
+      0,
+      maxX,
+      minY,
+      0,
+      maxX,
+      maxY,
+      0,
+      maxX,
+      maxY,
+      0,
+      minX,
+      maxY,
+      0,
+      minX,
+      maxY,
+      0,
+      minX,
+      minY,
+      0,
+    ]);
+
+    let material = this.guideMaterials.get(color);
+    if (!material) {
+      material = new LineMaterial({ color, linewidth: 1, dashed: true, transparent: true });
+      material.resolution.set(this.width, this.height);
+      this.guideMaterials.set(color, material);
+    }
+
+    const object = new LineSegments2(geometry, material);
+    object.computeLineDistances();
+    object.frustumCulled = false;
+    object.renderOrder = 2;
+    this.scene.add(object);
+    this.guideObjects.push(object);
+  }
+
+  /**
+   * Keep guide dashes a constant size on screen.
+   *
+   * `LineMaterial` measures dashes along world-space line distance, so a
+   * fixed `dashSize` would turn into a solid line when zoomed out and a few
+   * enormous strokes when zoomed in. Converting through units-per-pixel each
+   * frame is what makes "1px, screen-space" true of the pattern and not just
+   * the stroke width.
+   */
+  private updateGuideDashes(unitsPerPixel: number): void {
+    for (const material of this.guideMaterials.values()) {
+      material.dashSize = GUIDE_DASH_PX * unitsPerPixel;
+      material.gapSize = GUIDE_GAP_PX * unitsPerPixel;
+    }
   }
 
   /** One textured two-triangle quad on the placed corners. */
@@ -456,9 +550,11 @@ export class SceneRenderer {
     this.highlightMaterial.resolution.set(width, height);
     this.selectLineMaterial.resolution.set(width, height);
     for (const mat of this.widthMaterials.values()) mat.resolution.set(width, height);
+    for (const mat of this.guideMaterials.values()) mat.resolution.set(width, height);
   }
 
   render(camera2d: Camera2D): void {
+    this.updateGuideDashes(camera2d.unitsPerPixel);
     const halfW = (camera2d.viewportWidth / 2) * camera2d.unitsPerPixel;
     const halfH = (camera2d.viewportHeight / 2) * camera2d.unitsPerPixel;
     this.camera.left = -halfW;
@@ -499,6 +595,7 @@ export class SceneRenderer {
       (object.material as MeshBasicMaterial | LineBasicMaterial).dispose();
     }
     this.backdropObjects = [];
+    this.clearGuides();
     for (const objects of this.layerObjects.values()) {
       for (const object of objects) {
         this.scene.remove(object);
@@ -524,8 +621,18 @@ export class SceneRenderer {
     this.tessellation = null;
   }
 
+  private clearGuides(): void {
+    for (const object of this.guideObjects) {
+      this.scene.remove(object);
+      object.geometry.dispose();
+    }
+    this.guideObjects = [];
+  }
+
   dispose(): void {
     this.clearGeometry();
+    for (const mat of this.guideMaterials.values()) mat.dispose();
+    this.guideMaterials.clear();
     this.material.dispose();
     this.fillMaterial.dispose();
     this.highlightMaterial.dispose();

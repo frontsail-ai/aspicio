@@ -3,6 +3,10 @@ import type { Tessellation } from "./tessellate/tessellate.ts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+/** Production guides, matching the canvas (VIEW-19). */
+const GUIDE_TRIM = "#7a7a7a";
+const GUIDE_BLEED = "#e0301e";
+
 /** Round to 3 decimals and drop trailing zeros, to keep the SVG small. */
 function n(v: number): string {
   return String(Math.round(v * 1000) / 1000);
@@ -26,6 +30,8 @@ export interface SvgExportOptions {
    * DXF export is unaffected. Omit to export page content with no sheet.
    */
   sheet?: string;
+  /** Draw the page's trim and bleed guides, when it declares them (VIEW-19). */
+  guides?: boolean;
 }
 
 /**
@@ -122,6 +128,24 @@ export function tessellationToSvg(
     parts.push(
       `<path fill="none" stroke="${stroke}" stroke-width="${n(width)}" stroke-linecap="round" d="${d.join("")}"/>`,
     );
+  }
+
+  // Guides last: above the artwork they measure. The dash is in drawing units
+  // rather than screen pixels, because an SVG has no zoom to stay constant
+  // against — 1% of the extent reads as a guide at any output size.
+  if (page && options.guides) {
+    const dash = n(extent * 0.01);
+    for (const [box, color] of [
+      [page.bleed, GUIDE_BLEED],
+      [page.trim, GUIDE_TRIM],
+    ] as const) {
+      if (!box) continue;
+      parts.push(
+        `<rect x="${n(box.minX)}" y="${n(box.minY)}" width="${n(box.maxX - box.minX)}" ` +
+          `height="${n(box.maxY - box.minY)}" fill="none" stroke="${color}" ` +
+          `stroke-width="${n(hair)}" stroke-dasharray="${dash} ${dash}"/>`,
+      );
+    }
   }
 
   const bg = options.background

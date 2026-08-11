@@ -1313,3 +1313,57 @@ console.log("wrote gate-path fixtures");
 
   console.log("wrote raster-image fixtures");
 }
+
+/* 15. Page boxes: a CropBox smaller than the media (an imposed press file),
+ *     with TrimBox and BleedBox inside it. The sheet must be the crop, not
+ *     the media — that is what Acrobat and Preview display — and the two
+ *     guides must survive as distinct boxes.
+ */
+{
+  const content = "0 0 1 RG\n30 30 m 170 130 l S\n";
+  writeFileSync(
+    "page-boxes.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 300] /CropBox [20 10 220 170] " +
+          "/BleedBox [30 20 210 160] /TrimBox [40 30 200 150] /Contents 4 0 R >>",
+      ],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${content.length} >>\nstream\n`),
+          enc(content),
+          enc("\nendstream"),
+        ]),
+      ],
+    ]),
+  );
+
+  /* 16. A CropBox that escapes the media, which real files do. The sheet is
+   *     the overlap, so no paper is drawn where no media exists. */
+  writeFileSync(
+    "page-crop-overflow.pdf",
+    classic([
+      catalog,
+      pagesNode("3 0 R"),
+      [
+        3,
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /CropBox [-50 -50 150 80] " +
+          "/Contents 4 0 R >>",
+      ],
+      [
+        4,
+        Buffer.concat([
+          enc(`<< /Length ${content.length} >>\nstream\n`),
+          enc(content),
+          enc("\nendstream"),
+        ]),
+      ],
+    ]),
+  );
+
+  console.log("wrote page-box fixtures");
+}
