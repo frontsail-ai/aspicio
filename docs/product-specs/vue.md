@@ -67,3 +67,8 @@ that imports none gets a clear load error rather than a silent blank
 canvas (VIEW-15). Format modules are read when a load starts, not when a
 component mounts, so import order never matters and importing a format
 never recreates a live viewer.
+
+### VUE-10: Palette is selectable
+
+`themeMode` (`"dark"` | `"light"`, default `"dark"`) selects the palette,
+forwarding to the element's `theme-mode` (ELEM-10).

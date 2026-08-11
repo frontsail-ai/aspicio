@@ -4,7 +4,7 @@ import type { CSSResult } from "lit";
 /** Whether the ready-made elements style themselves at all. */
 export type AspicioTheme = "aspicio" | "none";
 
-/** Which palette a styled element uses (ELEM-13). */
+/** Which palette a styled element uses (ELEM-10). */
 export type AspicioThemeMode = "dark" | "light";
 
 /**
@@ -31,7 +31,9 @@ export const aspicioTokens = {
   hairline2: "#3a3f4a",
   text: "#e7e3da",
   text2: "#9aa0ab",
-  text3: "#6a707b",
+  // 4.8:1 on the canvas and 4.6:1 on the panel. The shipped #6a707b was
+  // 3.6:1 / 3.4:1 — under AA for body text, and it is used at 9.5-11px.
+  text3: "#7f858f",
   crease: "#4c8dff",
   creasedim: "rgba(76,141,255,.16)",
   amber: "#e0a82e",

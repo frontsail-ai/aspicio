@@ -37,7 +37,7 @@ export const AspicioEmbed = defineComponent({
     panel: { type: String as PropType<PanelSide>, default: "left" },
     /** Visual theme. Defaults to the Aspicio demo look. */
     theme: { type: String as PropType<AspicioTheme>, default: "aspicio" },
-    /** Which palette the theme uses. Defaults to dark (VUE-9). */
+    /** Which palette the theme uses. Defaults to dark (VUE-10). */
     themeMode: { type: String as PropType<AspicioThemeMode>, default: "dark" },
     /** Inline styles applied to the inner layer panel (CSSOM values, e.g. "300px"). */
     panelStyle: {

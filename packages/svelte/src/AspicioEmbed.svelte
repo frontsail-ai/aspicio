@@ -25,7 +25,7 @@
     panel = "left",
     /** Visual theme. Defaults to the Aspicio demo look. */
     theme = "aspicio",
-    /** Which palette the theme uses: "dark" | "light". Defaults to dark (SVELTE-9). */
+    /** Which palette the theme uses: "dark" | "light". Defaults to dark (SVELTE-10). */
     themeMode = "dark",
     /** Inline styles applied to the inner layer panel (CSSOM values, e.g. "300px"). */
     panelStyle = undefined,

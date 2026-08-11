@@ -215,3 +215,27 @@ extended one level. For the files this exists for, that ordering is the
 correct one: artwork below, dieline above, always. A file relying on paint
 order between an image and a fill may differ from a reference viewer, the
 same documented trade the fill convention makes (PDF-3).
+
+### PDF-10: Pages carry their geometry
+
+Every page reports the box it is drawn on, so the viewer can put paper
+under it (VIEW-17) and frame it (VIEW-2).
+
+The sheet is the **CropBox intersected with the MediaBox** — the box
+Acrobat and Preview display. A file imposed on oversized media declares
+its finished page in the CropBox, and using the media would draw paper no
+reader ever sees. The intersection rather than a straight preference is
+deliberate: the spec requires the CropBox to lie within the media, and
+real files violate it.
+
+TrimBox and BleedBox are read for the same page and default to the
+CropBox. They are **not** inherited: PDF makes only `/Resources`,
+`/MediaBox`, `/CropBox` and `/Rotate` inheritable, so a TrimBox found on
+an ancestor node is not this page's box. A guide equal to the sheet is
+dropped, since a line on the paper's edge states nothing.
+
+All boxes pass through the page's own `/Rotate` transform, so a rotated
+page's paper lands where its ink does.
+
+A page whose boxes will not read loses its backdrop, not its content —
+it renders as an unbounded space.

@@ -1,5 +1,5 @@
 /**
- * Light/dark theme for the demo (DEMO-20).
+ * Light/dark theme for the demo (DEMO-22).
  *
  * The palettes themselves live in CSS (`style.css`, keyed off
  * `:root[data-theme]`); this module only decides which one is active and

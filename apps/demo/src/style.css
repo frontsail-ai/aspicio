@@ -9,7 +9,7 @@
   --frame: #4b515e;
   --text: #e7e3da;
   --text2: #9aa0ab;
-  --text3: #6a707b;
+  --text3: #7f858f;
   --cut: #e0301e;
   --cut2: #f2503f;
   --crease: #4c8dff;
@@ -1574,6 +1574,12 @@ button {
 
   .statusbar,
   .sample-btn {
+    display: none;
+  }
+
+  /* The theme control stays reachable on a phone, but its label does not:
+     the row is already at its width budget and the icon carries the state. */
+  #toggle-theme .btn-label {
     display: none;
   }
 

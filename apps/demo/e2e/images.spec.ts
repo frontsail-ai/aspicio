@@ -14,7 +14,7 @@ import type { Page } from "@playwright/test";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
-import { canvasColors, probeViewer } from "./helpers.ts";
+import { canvasColors, canvasCountNear, probeViewer } from "./helpers.ts";
 
 const fixture = (name: string): string =>
   fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
@@ -43,8 +43,12 @@ test("artwork renders under the dieline: raster below, strokes on top", async ({
   expect(probe.layers.map((l) => l.name)).toContain("Artwork");
 
   const colors = await canvasColors(page);
-  // The cyan-ish artwork raster dominates the canvas…
-  expect(colors.cyan).toBeGreaterThan(2000);
+  // The artwork raster dominates the canvas. Counted by its actual ink,
+  // (118,237,237), rather than through `countColors`' cyan bucket: that
+  // bucket requires r < 90, which this artwork never satisfied. What it
+  // used to count was the SMask fade darkening towards the canvas — an
+  // artifact of there being no paper, and the very thing #177 removed.
+  expect(await canvasCountNear(page, [118, 237, 237], 12)).toBeGreaterThan(2000);
   // …the red cut rectangle survives along the artwork's edges…
   expect(colors.red).toBeGreaterThan(50);
   // …and the green crease runs entirely *inside* the artwork: it is only
@@ -75,6 +79,10 @@ test("selection overlay stays above the artwork (VIEW-8, #169)", async ({ page }
   // selection-blue pixels with the artwork shown vs hidden. Equal counts
   // mean the overlay is not being swallowed; before the fix the visible
   // half was only the sliver protected by the base line's depth.
+  //
+  // The band is the *on-sheet* selection colour (#2b78c8). A PDF page now
+  // has paper under it, and the original #8fc8ff is 1.8:1 against white —
+  // the selection did not move, the surface under it did (VIEW-8).
   const selectionBlue = async (): Promise<number> => {
     const shot = PNG.sync.read(await canvas.screenshot());
     let n = 0;
@@ -82,7 +90,7 @@ test("selection overlay stays above the artwork (VIEW-8, #169)", async ({ page }
       const r = shot.data[i];
       const g = shot.data[i + 1];
       const b = shot.data[i + 2];
-      if (r > 110 && r < 180 && g > 170 && g < 230 && b > 230) n += 1;
+      if (r < 90 && g > 90 && g < 160 && b > 160 && b < 235) n += 1;
     }
     return n;
   };

@@ -1728,7 +1728,9 @@ const setPanelOpen = (open: boolean): void => {
 const themeBtn = $("#toggle-theme");
 function paintThemeButton(): void {
   const next = theme === "dark" ? "light" : "dark";
-  themeBtn.innerHTML = `${theme === "dark" ? icons.sun : icons.moon} ${next === "light" ? "Light" : "Dark"}`;
+  themeBtn.innerHTML =
+    `${theme === "dark" ? icons.sun : icons.moon}` +
+    `<span class="btn-label">${next === "light" ? "Light" : "Dark"}</span>`;
   themeBtn.setAttribute("aria-pressed", String(theme === "light"));
 }
 paintThemeButton();

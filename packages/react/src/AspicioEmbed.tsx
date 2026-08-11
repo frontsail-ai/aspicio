@@ -20,7 +20,7 @@ export interface AspicioEmbedProps extends AspicioPreviewProps {
   panelStyle?: CSSProperties;
   /** Visual theme. Defaults to the Aspicio demo look; "none" inherits the host. */
   theme?: AspicioTheme;
-  /** Which palette the theme uses. Defaults to dark (REACT-9). */
+  /** Which palette the theme uses. Defaults to dark (REACT-11). */
   themeMode?: AspicioThemeMode;
 }
 
