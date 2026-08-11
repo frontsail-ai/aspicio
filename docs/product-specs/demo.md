@@ -129,6 +129,23 @@ surfaces), the formats it opens, and the supported-entity list. Once the app boo
 the static shell with the live empty screen; the two never disagree in
 substance.
 
+The shell also carries the live screen's actions, dimmed and marked
+not-yet-ready, beside a "Starting…" note. Substance is what a screen
+offers, not only what it says: a shell that reproduced the prose but
+omitted the controls read as a finished page with nothing to press, and
+on a slow connection it stayed that way for seconds while an eager
+visitor's click landed on nothing at all.
+
+An action taken during that window is honoured rather than discarded —
+the shell records which control was pressed, and the app carries it out
+the moment it is wired. Anything the URL itself asked for takes
+precedence, being what the visitor asked for first: a share link is
+already loading, and a query-string offer (DEMO-23) is a question still
+on screen, so carrying out a queued press would answer it on their
+behalf. The press is recorded on pointer-down rather than on click,
+because the app replaces the shell wholesale and a press that straddles
+that swap never becomes a click at all.
+
 ### DEMO-16: Empty-screen project links
 
 The empty screen links to the project's home surfaces — documentation,
