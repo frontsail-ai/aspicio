@@ -148,8 +148,7 @@ export class AspicioEmbed extends LitElement {
     const canvas = aspicioCanvasColors[this.themeMode] ?? aspicioCanvasColors.dark;
     return {
       ...(this.options?.background === undefined ? { background: null } : {}),
-      sheet: canvas.sheet,
-      sheetEdge: canvas.sheetEdge,
+      ...canvas,
       ...this.options,
     };
   }

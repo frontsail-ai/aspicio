@@ -109,10 +109,12 @@ export const aspicioLightTokens: AspicioTokens = {
  */
 export const aspicioCanvasColors: Record<
   AspicioThemeMode,
-  { sheet: number; sheetEdge: number | null }
+  { sheet: number; sheetEdge: number | null; legibleOn?: number }
 > = {
   dark: { sheet: 0xffffff, sheetEdge: null },
-  light: { sheet: 0xffffff, sheetEdge: 0xa8a8a8 },
+  // `legibleOn` darkens DXF pen colours until they read on the light canvas
+  // (VIEW-18); PDF ink is never affected.
+  light: { sheet: 0xffffff, sheetEdge: 0xa8a8a8, legibleOn: 0xdcd8d1 },
 };
 
 /** `fontSans` → `--aspicio-font-sans`. */

@@ -383,8 +383,7 @@ applyTheme(theme);
 
 const viewer = new DrawingViewer(viewerEl, {
   background: null,
-  sheet: canvasColors[theme].sheet,
-  sheetEdge: canvasColors[theme].sheetEdge,
+  ...canvasColors[theme],
   parsers: [dxfParser, pdfParser],
 });
 
@@ -1739,9 +1738,13 @@ themeBtn.addEventListener("click", () => {
   applyTheme(theme);
   saveTheme(theme);
   paintThemeButton();
-  // Only the paper changes colour, so the drawing is repainted rather than
-  // reloaded: a reload would re-parse the file and throw away the camera.
-  viewer.setSheetColors(canvasColors[theme].sheet, canvasColors[theme].sheetEdge);
+  // Repainted rather than reloaded: a reload would re-parse the file and
+  // throw away the camera, and only the colours changed.
+  viewer.setCanvasColors(canvasColors[theme]);
+  // The swatches show what was drawn, not what the layer table claims
+  // (INV-2), and a theme switch changes what was drawn — so the panel is
+  // rebuilt here for the same reason it is rebuilt on a space switch.
+  buildLayerPanel();
 });
 
 $("#toggle-layers").addEventListener("click", () =>

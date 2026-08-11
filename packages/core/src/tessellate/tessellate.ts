@@ -18,11 +18,24 @@ import type {
   Point2,
   RasterImage,
 } from "../model/types.ts";
+import { darkenForContrast } from "../geom/color.ts";
 import { layoutText } from "../text/layout.ts";
 
 type Affine = Affine2D;
 
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
+
+/**
+ * Contrast a darkened pen colour must reach against the canvas.
+ *
+ * 3.5:1 rather than the 3:1 AA floor for non-text: line work at 3:1 sits
+ * exactly on the boundary with nothing left for a thin hairline or a
+ * miscalibrated display, and the extra step costs very little saturation.
+ */
+const CONTRAST_TARGET = 3.5;
+
+/** Documents this never touches: PDF colours are ink, not pen assignments. */
+const PDF_FORMAT = "pdf";
 /** Block recursion bound, shared by rendering and text collection. */
 export const MAX_INSERT_DEPTH = 16;
 
@@ -289,6 +302,16 @@ interface Accumulator {
 
 export interface TessellateOptions {
   curveSegments?: number;
+  /**
+   * Keep line work legible against this canvas colour: pen colours are
+   * darkened, hue intact, until they reach {@link CONTRAST_TARGET} against
+   * it (VIEW-18). Omit — the default — to draw the colours the file names.
+   *
+   * Applies to DXF only. An ACI index is a display attribute, so remapping
+   * it for a light canvas is the same kind of decision as picking its RGB
+   * in the first place; PDF ink is not, and passing this never changes it.
+   */
+  legibleOn?: number;
 }
 
 interface Tessellator {
@@ -366,7 +389,7 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
       const entityId = entityIdOverride ?? idx;
       // CAD rule: block entities on layer "0" belong to the insert's layer.
       const layer = layerOverride !== null && entity.layer === "0" ? layerOverride : entity.layer;
-      const color = entity.color ?? colorOverride ?? layerColor(layer);
+      const color = legible(entity.color ?? colorOverride ?? layerColor(layer));
       const dashPattern = resolveDash(entity, layer);
       const weight = resolveWidth(entity, layer, widthOverride);
       // OCS: entities carrying an extrusion normal (mirrored ARCs, POLYLINEs,
@@ -526,6 +549,30 @@ function createTessellator(doc: DrawingDocument, options: TessellateOptions): Te
       handlers.get(entity.type)?.(entity, ctx);
     }
   }
+
+  /**
+   * Pen colours darkened for a light canvas, or identity.
+   *
+   * Keyed off the document's format rather than a caller flag, so no surface
+   * can accidentally apply it to ink. `!== "pdf"` and not `=== "dxf"`: the
+   * DXF parser does not stamp a format, and hand-built documents may carry
+   * none, so equality would silently skip exactly the documents this exists
+   * for. Memoised because a drawing has few distinct colours and many
+   * entities.
+   */
+  const canvas = doc.format === PDF_FORMAT ? undefined : options.legibleOn;
+  const legibleCache = new Map<number, number>();
+  const legible =
+    canvas === undefined
+      ? (color: number): number => color
+      : (color: number): number => {
+          let out = legibleCache.get(color);
+          if (out === undefined) {
+            out = darkenForContrast(color, canvas, CONTRAST_TARGET);
+            legibleCache.set(color, out);
+          }
+          return out;
+        };
 
   let page: PageGeometry | null = null;
 

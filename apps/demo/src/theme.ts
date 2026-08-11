@@ -12,13 +12,21 @@ export type ThemeMode = "dark" | "light";
 
 const KEY = "aspicio:theme";
 
-/** Canvas colours the renderer needs as numbers rather than CSS. */
-export const canvasColors: Record<ThemeMode, { sheet: number; sheetEdge: number | null }> = {
+/**
+ * Canvas colours the renderer needs as numbers rather than CSS.
+ *
+ * `legibleOn` is the canvas a DXF pen colour is judged against; omitted in
+ * the dark theme, where the ACI palette was designed to be read on black.
+ */
+export const canvasColors: Record<
+  ThemeMode,
+  { sheet: number; sheetEdge: number | null; legibleOn?: number }
+> = {
   // Sheet-to-surround is 19:1 in the dark theme, so the boundary carries
   // itself; a hairline there is lost in either the white or the void.
   dark: { sheet: 0xffffff, sheetEdge: null },
   // 1.75:1 in the light theme, where contrast alone cannot carry it.
-  light: { sheet: 0xffffff, sheetEdge: 0xa8a8a8 },
+  light: { sheet: 0xffffff, sheetEdge: 0xa8a8a8, legibleOn: 0xdcd8d1 },
 };
 
 /** The browser store, or null when it's unavailable (private mode, SSR, tests). */

@@ -23,6 +23,12 @@ export interface DrawingViewerOptions {
   /** Segments per full circle when flattening curves. Default: 72. */
   curveSegments?: number;
   /**
+   * Keep DXF line work legible against this canvas colour (VIEW-18). Omit —
+   * the default — to draw the colours the file names. PDF ink is never
+   * affected. See `TessellateOptions.legibleOn`.
+   */
+  legibleOn?: number;
+  /**
    * The paper drawn under a space that declares a page box — a PDF page
    * (VIEW-17). 24-bit RGB, or null to draw no sheet. Default: white.
    *
@@ -118,6 +124,7 @@ export class DrawingViewer {
   private tessellation: Tessellation | null = null;
   private snapIndex: SnapIndex | null = null;
   private activeSpace = MODEL_SPACE;
+  private legibleOn: number | undefined;
   private renderQueued = false;
   private highlightedLayer: string | null = null;
   private selectedIndex: number | null = null;
@@ -139,6 +146,7 @@ export class DrawingViewer {
     this.canvas.style.height = "100%";
     container.appendChild(this.canvas);
 
+    this.legibleOn = options.legibleOn;
     this.renderer = new SceneRenderer(this.canvas, {
       background: options.background,
       sheet: options.sheet,
@@ -165,7 +173,7 @@ export class DrawingViewer {
     // parsers — one policy, shared with the API and MCP surfaces (PARSE-13).
     this.document = await parseWith(this.options.parsers ?? [], source);
     this.activeSpace = MODEL_SPACE;
-    this.activate(tessellate(this.document, { curveSegments: this.options.curveSegments }));
+    this.activate(tessellate(this.document, this.tessellateOptions()));
     this.emit("loaded");
   }
 
@@ -207,6 +215,54 @@ export class DrawingViewer {
     return this.activeSpace;
   }
 
+  private tessellateOptions(): { curveSegments?: number; legibleOn?: number } {
+    return { curveSegments: this.options.curveSegments, legibleOn: this.legibleOn };
+  }
+
+  /**
+   * Re-tessellate the space on screen without reloading the drawing.
+   *
+   * Needed because pen colours are baked into vertex buffers: unlike the
+   * paper, which is one uniform, changing the canvas a drawing is judged
+   * against changes every vertex. The camera is deliberately left alone —
+   * the geometry has not moved, and refitting under the user would read as
+   * the viewer losing their place.
+   */
+  private retessellate(): void {
+    if (!this.document) return;
+    const opts = this.tessellateOptions();
+    const layout =
+      this.activeSpace === MODEL_SPACE
+        ? null
+        : this.document.layouts?.find((l) => l.name === this.activeSpace);
+    const view = this.view;
+    this.activate(
+      layout ? tessellateLayout(this.document, layout, opts) : tessellate(this.document, opts),
+    );
+    this.setView(view);
+  }
+
+  /**
+   * Re-colour the canvas for a theme switch (VIEW-17, VIEW-18).
+   *
+   * One call rather than two setters because the two halves have to agree:
+   * the paper and the pen colours judged against it are the same decision,
+   * and applying one without the other puts dark ink on a dark canvas.
+   */
+  setCanvasColors(colors: {
+    sheet?: number | null;
+    sheetEdge?: number | null;
+    legibleOn?: number;
+  }): void {
+    const relegible = colors.legibleOn !== this.legibleOn;
+    this.legibleOn = colors.legibleOn;
+    this.renderer.setSheetColors(colors.sheet ?? null, colors.sheetEdge ?? null);
+    // Only re-walk the drawing when the pen colours actually changed; the
+    // paper alone is a uniform swap.
+    if (relegible) this.retessellate();
+    else this.requestRender();
+  }
+
   /**
    * Repaint the paper, e.g. when the host switches theme (VIEW-17).
    *
@@ -237,7 +293,7 @@ export class DrawingViewer {
    */
   setActiveSpace(name: string): void {
     if (!this.document || name === this.activeSpace) return;
-    const opts = { curveSegments: this.options.curveSegments };
+    const opts = this.tessellateOptions();
     if (name === MODEL_SPACE) {
       this.activeSpace = name;
       this.activate(tessellate(this.document, opts));
