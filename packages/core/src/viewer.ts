@@ -28,6 +28,8 @@ export interface DrawingViewerOptions {
    * affected. See `TessellateOptions.legibleOn`.
    */
   legibleOn?: number;
+  /** The ink a hueless pen darkens towards under `legibleOn`. See VIEW-18. */
+  ink?: number;
   /**
    * The paper drawn under a space that declares a page box — a PDF page
    * (VIEW-17). 24-bit RGB, or null to draw no sheet. Default: white.
@@ -125,6 +127,7 @@ export class DrawingViewer {
   private snapIndex: SnapIndex | null = null;
   private activeSpace = MODEL_SPACE;
   private legibleOn: number | undefined;
+  private ink: number | undefined;
   private renderQueued = false;
   private highlightedLayer: string | null = null;
   private selectedIndex: number | null = null;
@@ -147,6 +150,7 @@ export class DrawingViewer {
     container.appendChild(this.canvas);
 
     this.legibleOn = options.legibleOn;
+    this.ink = options.ink;
     this.renderer = new SceneRenderer(this.canvas, {
       background: options.background,
       sheet: options.sheet,
@@ -215,8 +219,12 @@ export class DrawingViewer {
     return this.activeSpace;
   }
 
-  private tessellateOptions(): { curveSegments?: number; legibleOn?: number } {
-    return { curveSegments: this.options.curveSegments, legibleOn: this.legibleOn };
+  private tessellateOptions(): { curveSegments?: number; legibleOn?: number; ink?: number } {
+    return {
+      curveSegments: this.options.curveSegments,
+      legibleOn: this.legibleOn,
+      ink: this.ink,
+    };
   }
 
   /**
@@ -253,10 +261,22 @@ export class DrawingViewer {
     sheet?: number | null;
     sheetEdge?: number | null;
     legibleOn?: number;
+    ink?: number;
+    select?: number;
+    selectOnSheet?: number;
   }): void {
-    const relegible = colors.legibleOn !== this.legibleOn;
+    const relegible = colors.legibleOn !== this.legibleOn || colors.ink !== this.ink;
     this.legibleOn = colors.legibleOn;
-    this.renderer.setSheetColors(colors.sheet ?? null, colors.sheetEdge ?? null);
+    this.ink = colors.ink;
+    if (colors.select !== undefined || colors.selectOnSheet !== undefined)
+      this.renderer.setSelectColors(colors.select, colors.selectOnSheet);
+    // `undefined` means "unspecified", not "no paper": omitting the sheet
+    // must leave the default white in place, the same as at construction.
+    // Only an explicit null turns the paper off.
+    this.renderer.setSheetColors(
+      colors.sheet === undefined ? 0xffffff : colors.sheet,
+      colors.sheetEdge ?? null,
+    );
     // Only re-walk the drawing when the pen colours actually changed; the
     // paper alone is a uniform swap.
     if (relegible) this.retessellate();

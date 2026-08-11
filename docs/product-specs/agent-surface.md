@@ -197,3 +197,9 @@ declared once so the two tables cannot drift apart. The hosted surface adds
 two more — `view_dxf` and the app-only `load_dxf_for_viewer` of AGT-14 —
 for eight in total; they are hosted-only because the in-chat viewer needs a
 host that speaks the MCP Apps extension.
+
+### AGT-17: Rendered pages carry their paper
+
+A render of a bounded space draws the page on its sheet, matching the
+viewer (VIEW-17). The background option still controls the surround, and a
+space with no page box is unaffected, so DXF output is unchanged.

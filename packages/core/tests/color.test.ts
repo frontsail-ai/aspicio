@@ -9,7 +9,12 @@
  */
 
 import { describe, expect, it } from "vite-plus/test";
-import { contrastRatio, darkenForContrast, relativeLuminance } from "../src/geom/color.ts";
+import {
+  contrastRatio,
+  darkenForContrast,
+  darkenForLegibility,
+  relativeLuminance,
+} from "../src/geom/color.ts";
 
 /** The light theme's canvas, which is what pen colours are judged against. */
 const CANVAS = 0xdcd8d1;
@@ -158,5 +163,49 @@ describe("legibleOn in tessellation", () => {
 
     // And nothing changes when the caller does not ask.
     expect(drawn(drawing("dxf"))).toBe(ACI.yellow);
+  });
+});
+
+describe("darkenForLegibility", () => {
+  const INK = 0x1c1a17;
+  const legible = (c: number): number => darkenForLegibility(c, CANVAS, TARGET, INK);
+
+  it("takes ACI 7 to ink, not to the minimum legible grey", () => {
+    // The default DXF pen arrives as white because the palette assumes a
+    // black screen. Stopping at the contrast target leaves it mid-grey,
+    // where every CAD tool draws near-black.
+    const out = legible(0xffffff);
+    expect(contrastRatio(out, CANVAS)).toBeGreaterThan(11);
+    expect(contrastRatio(out, CANVAS)).toBeCloseTo(contrastRatio(INK, CANVAS), 0);
+  });
+
+  it("keeps the achromatic ramp distinct instead of collapsing it", () => {
+    // The regression this exists for: clamping at the target maps every grey
+    // from #a0a0a0 to #ffffff onto one mid-grey — 96 values to 1 — so a
+    // drawing that separates linework by grey level loses the separation.
+    const greys = [];
+    for (let g = 0xa0; g <= 0xff; g += 8) greys.push(legible((g << 16) | (g << 8) | g));
+    expect(new Set(greys).size).toBeGreaterThan(8);
+    expect(greys.every((c) => contrastRatio(c, CANVAS) >= TARGET - 0.02)).toBe(true);
+  });
+
+  it("reflects the ramp: a lighter pen becomes a darker one", () => {
+    // Prominence has to survive the flip. On a dark screen the lightest pen
+    // reads strongest; on a light one the darkest does.
+    const lum = (c: number): number => relativeLuminance(legible(c));
+    expect(lum(0xffffff)).toBeLessThan(lum(0xd0d0d0));
+    expect(lum(0xd0d0d0)).toBeLessThan(lum(0xa0a0a0));
+  });
+
+  it("leaves chromatic pens to the contrast rule", () => {
+    for (const color of Object.values(ACI)) {
+      expect(legible(color)).toBe(darkenForContrast(color, CANVAS, TARGET));
+    }
+  });
+
+  it("changes nothing on a dark canvas", () => {
+    for (const color of [...Object.values(ACI), 0xffffff, 0xd0d0d0]) {
+      expect(darkenForLegibility(color, 0x16181d, TARGET, INK)).toBe(color);
+    }
   });
 });

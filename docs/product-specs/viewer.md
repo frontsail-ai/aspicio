@@ -65,6 +65,11 @@ The selected entity is drawn with a bright overlay (lines and fills) above
 all content, raster images included; selecting `null` clears it. Selection
 resets on load and space switch.
 
+The overlay's colour is supplied by the host per theme, because no single
+value works everywhere: the dark-canvas blue is 10:1 there, 1.8:1 on paper
+and 1.25:1 on a light canvas. The renderer picks between the pair by
+whether the space has paper; the host picks the pair by theme.
+
 ### VIEW-9: Object snap
 
 Within tolerance, the cursor snaps to endpoints, points, centers, and
@@ -164,6 +169,16 @@ threshold can guarantee a ratio.
 Darkening is one-directional and only helps against a light background,
 so when the target cannot be reached the colour is left as it reads best
 rather than walked towards the background.
+
+A pen with no hue is a separate case. Its identity is entirely its
+lightness, and the default DXF pen — ACI 7, the commonest colour in real
+drawings — arrives as white because the palette assumes a black screen.
+Stopping such a pen at the contrast target leaves it a washed-out
+mid-grey where every CAD tool draws near-black. So the achromatic ramp is
+reflected into the range between the theme's ink and the lightest legible
+grey: white lands on ink, and the ramp stays distinct and ordered rather
+than collapsing to one value. Prominence survives the flip — the lightest
+pen on a dark screen becomes the darkest on a light one.
 
 Layer summaries and swatches report the colours actually drawn, so this
 transform is visible in them too (INV-2).

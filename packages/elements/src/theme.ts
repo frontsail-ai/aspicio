@@ -39,17 +39,10 @@ export const aspicioTokens = {
   amber: "#e0a82e",
   amberdim: "rgba(224,168,46,.16)",
   amberborder: "rgba(224,168,46,.4)",
-  /** Paper under a bounded space. White in both palettes — see `sheet` below. */
-  sheet: "#ffffff",
   /** Everything outside the paper. The darkest region after the app frame. */
   surround: "#0d0f13",
-  /** Sheet boundary. None in dark: 19:1 against the surround already carries it. */
-  sheetEdge: "transparent",
   gridMinor: "rgba(255,255,255,.028)",
   gridMajor: "rgba(255,255,255,.05)",
-  /** Selection over the canvas, and its variant for selection over paper. */
-  select: "#8fc8ff",
-  selectSheet: "#2b78c8",
   fontSans: '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif',
   fontMono: '"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace',
 } as const;
@@ -85,19 +78,13 @@ export const aspicioLightTokens: AspicioTokens = {
   amber: "#8a6209",
   amberdim: "rgba(138,98,9,.14)",
   amberborder: "rgba(138,98,9,.4)",
-  sheet: "#ffffff",
   // Strictly neutral while the chrome stays warm: this is the only surface
   // that borders artwork, and at L*~79 it is bright enough to shift an
   // adjacent hue by simultaneous contrast. A dark surround contributes no
   // chromatic adaptation at all, which is why only this one is forced grey.
   surround: "#c4c4c4",
-  // Sheet-to-surround is 1.75:1 here, so contrast cannot carry the boundary
-  // on its own and the hairline stops being decorative.
-  sheetEdge: "#a8a8a8",
   gridMinor: "rgba(0,0,0,.035)",
   gridMajor: "rgba(0,0,0,.065)",
-  select: "#2b78c8",
-  selectSheet: "#2b78c8",
   fontSans: aspicioTokens.fontSans,
   fontMono: aspicioTokens.fontMono,
 };
@@ -109,14 +96,42 @@ export const aspicioLightTokens: AspicioTokens = {
  * custom property. Deriving both from one palette keeps the paper on the
  * canvas and the paper in the CSS from drifting apart.
  */
-export const aspicioCanvasColors: Record<
-  AspicioThemeMode,
-  { sheet: number; sheetEdge: number | null; legibleOn?: number }
-> = {
-  dark: { sheet: 0xffffff, sheetEdge: null },
-  // `legibleOn` darkens DXF pen colours until they read on the light canvas
-  // (VIEW-18); PDF ink is never affected.
-  light: { sheet: 0xffffff, sheetEdge: 0xa8a8a8, legibleOn: 0xdcd8d1 },
+export interface AspicioCanvasColors {
+  /** Paper under a bounded space. White in both palettes: in a PDF the sheet
+   * is the *unpainted* region, so a tint would make 0/0/0/0 white artwork
+   * show as a rectangle against the paper it is meant to match. */
+  sheet: number;
+  /** Sheet boundary, or null when contrast alone carries it. */
+  sheetEdge: number | null;
+  /** Selection over an unbounded canvas, and over paper (VIEW-8). */
+  select: number;
+  selectOnSheet: number;
+  /** Canvas that DXF pen colours must stay legible against (VIEW-18). */
+  legibleOn?: number;
+  /** What a hueless pen darkens towards under `legibleOn`. */
+  ink?: number;
+}
+
+export const aspicioCanvasColors: Record<AspicioThemeMode, AspicioCanvasColors> = {
+  dark: {
+    sheet: 0xffffff,
+    // 19:1 against the surround already carries the boundary; a hairline is
+    // lost in either the white or the void.
+    sheetEdge: null,
+    select: 0x8fc8ff,
+    selectOnSheet: 0x2b78c8,
+  },
+  light: {
+    sheet: 0xffffff,
+    // 1.75:1 here, so contrast cannot carry the boundary on its own.
+    sheetEdge: 0xa8a8a8,
+    // #8fc8ff is 1.25:1 on this canvas — invisible. One value serves both
+    // surfaces in light mode.
+    select: 0x2b78c8,
+    selectOnSheet: 0x2b78c8,
+    legibleOn: 0xdcd8d1,
+    ink: 0x1c1a17,
+  },
 };
 
 /** `fontSans` → `--aspicio-font-sans`. */

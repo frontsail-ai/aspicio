@@ -108,6 +108,23 @@ export async function canvasPixel(
   return [png.data[i], png.data[i + 1], png.data[i + 2]];
 }
 
+/**
+ * The channel-mean of the darkest pixel on the canvas.
+ *
+ * Scale-invariant, unlike a pixel count: how *dark* the darkest pixel gets
+ * says which colour was drawn, while how *many* dark pixels there are says
+ * only how big the viewport was.
+ */
+export async function canvasDarkest(page: Page): Promise<number> {
+  const png = PNG.sync.read(await page.locator("#viewer canvas").screenshot());
+  let min = 255;
+  for (let i = 0; i < png.data.length; i += 4) {
+    const mean = (png.data[i] + png.data[i + 1] + png.data[i + 2]) / 3;
+    if (mean < min) min = mean;
+  }
+  return min;
+}
+
 /** {@link countNear} against the live canvas. */
 export async function canvasCountNear(
   page: Page,

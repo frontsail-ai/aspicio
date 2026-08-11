@@ -180,6 +180,9 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
           const doc = await parseFor(parsers, await loadDrawing(source), "render");
           const svg = tessellationToSvg(tessellateSpace(doc, space), undefined, {
             background: DEFAULT_BG,
+            // Paper under a bounded page, matching the canvas (VIEW-12, VIEW-17).
+            // No-ops for a space with no page box, so DXF output is unchanged.
+            sheet: "#ffffff",
           });
           const png = await renderPng(svg, width ?? 1200);
           const link = renderLink(origin, source, width ?? 1200, space);

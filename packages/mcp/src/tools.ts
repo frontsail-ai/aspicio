@@ -173,6 +173,11 @@ export async function renderDocPng(
 }
 
 function toPng(doc: DrawingDocument, width: number, space?: string): Uint8Array {
-  const svg = tessellationToSvg(tessellateSpace(doc, space), undefined, { background: DEFAULT_BG });
+  const svg = tessellationToSvg(tessellateSpace(doc, space), undefined, {
+    background: DEFAULT_BG,
+    // Paper under a bounded page, matching the canvas (VIEW-12, VIEW-17).
+    // No-ops for a space with no page box, so DXF output is unchanged.
+    sheet: "#ffffff",
+  });
   return new Resvg(svg, { fitTo: { mode: "width", value: width } }).render().asPng();
 }
