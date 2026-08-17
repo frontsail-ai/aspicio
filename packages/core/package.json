@@ -39,7 +39,7 @@
     "@types/three": "^0.185.4",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "@vitest/coverage-v8": "4.1.10",
-    "bumpp": "^12.2.0",
+    "bumpp": "^12.2.1",
     "happy-dom": "^20.11.2",
     "three": "^0.185.1",
     "typescript": "^7.0.2",
