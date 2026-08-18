@@ -1467,6 +1467,27 @@ button {
   margin: 0 0 14px;
 }
 
+/* The shell carries the live screen's actions, dimmed: the page then reads as
+   an app still starting rather than one finished with nothing to press. They
+   stay hit-testable on purpose, so an eager press is recorded (index.html)
+   instead of landing on nothing. */
+.seo-shell [data-boot] {
+  opacity: 0.45;
+  cursor: progress;
+}
+
+.seo-shell .empty-actions {
+  margin-bottom: 10px;
+}
+
+.boot-note {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text3);
+  margin-bottom: 22px;
+}
+
 /* ===================== ERROR TOAST ===================== */
 
 .error-toast {

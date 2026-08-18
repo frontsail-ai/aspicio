@@ -1320,3 +1320,111 @@ test("a valid but geometry-free file explains itself without a skip count", asyn
   await expect(page.locator("#empty-result-body")).toContainText("no drawable 2D geometry");
   await expect(page.locator("#skipped-btn")).toBeHidden(); // nothing skipped, no chip (DEMO-2)
 });
+
+/* ---------- boot screen (DEMO-15) ---------- */
+
+/**
+ * Hold the app bundle so the pre-boot shell stays on screen.
+ *
+ * Matches the dev entry and the built bundle alike, because this suite runs
+ * against both. Returns the release, so a test can decide when boot happens.
+ */
+async function holdBoot(page: Page): Promise<() => void> {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\/(src\/main\.ts|assets\/[^/]*\.js)/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  return release;
+}
+
+test("the boot screen offers the app's actions, marked not ready", async ({ page }) => {
+  const release = await holdBoot(page);
+  await page.goto("/", { waitUntil: "commit" });
+
+  // A visitor must be able to tell this screen is still starting. Prose alone
+  // read as a finished page that simply had nothing to press.
+  const sample = page.locator("[data-boot='sample']");
+  await expect(sample).toBeVisible();
+  // Busy, never disabled: the press is honoured, so the markup must not claim
+  // otherwise — assistive tech and Playwright both read `aria-disabled` as
+  // "this does nothing", which would be a lie about what happens next.
+  await expect(sample).toHaveAttribute("aria-busy", "true");
+  await expect(sample).toBeEnabled();
+  await expect(page.locator("[data-boot='open']")).toBeVisible();
+  await expect(page.locator("#boot-note")).toHaveText("Starting…");
+
+  release();
+  // Once wired, the live screen owns the actions and no boot control survives.
+  await expect(page.locator("#empty-sample")).toBeVisible();
+  await expect(page.locator("[data-boot]")).toHaveCount(0);
+});
+
+test("a press during boot is carried out, not discarded", async ({ page }) => {
+  const release = await holdBoot(page);
+  await page.goto("/", { waitUntil: "commit" });
+  await page.locator("[data-boot='sample']").click();
+  // The press is acknowledged the instant it lands, before the app exists.
+  await expect(page.locator("#boot-note")).toContainText("as soon as it's ready");
+
+  release();
+  // No second click: the press made while the shell was up is what loads this.
+  await expect(page.locator("#file-chip")).toHaveText("sample.dxf");
+});
+
+test("a press held across the boot swap still counts", async ({ page }) => {
+  const release = await holdBoot(page);
+  await page.goto("/", { waitUntil: "commit" });
+
+  // Pressing before the swap and releasing after produces no click event at
+  // all — the element the press began on is gone by the time it ends — so the
+  // intent has to be captured on pointer-down or it is lost silently.
+  const box = await page.locator("[data-boot='sample']").boundingBox();
+  if (!box) throw new Error("boot action has no bounding box");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  release();
+  await expect(page.locator("[data-boot]")).toHaveCount(0); // the swap happened
+  await page.mouse.up();
+
+  await expect(page.locator("#file-chip")).toHaveText("sample.dxf");
+});
+
+test("a share link in the URL wins over a press during boot", async ({ page }) => {
+  // Routed, never fetched: a real request would leave the machine and stall
+  // the shared browser, which is why every remote URL in this suite is faked.
+  const remote = "https://cdn.example.test/shared.dxf";
+  await page.route(remote, (route) => route.abort());
+
+  const release = await holdBoot(page);
+  // A query keeps this a real document load: a goto differing only in the hash
+  // would navigate within the page already booted by beforeEach.
+  await page.goto(`/?boot#src=${encodeURIComponent(remote)}`, { waitUntil: "commit" });
+  await page.locator("[data-boot='sample']").click();
+
+  release();
+  // The link is what the visitor asked for first. It fails here, and the boot
+  // press must not quietly load the sample on top of that failure.
+  await expect(page.locator("#od-cors")).toBeVisible();
+  await expect(page.locator("#file-chip")).toBeHidden();
+});
+
+test("a press during boot does not answer a query-string offer", async ({ page }) => {
+  // Routed, never fetched: the offer exists to be answered deliberately, so
+  // this URL only ever needs to be named on screen (DEMO-23).
+  const remote = "https://cdn.example.test/offered.dxf";
+  await page.route(remote, (route) => route.abort());
+
+  const release = await holdBoot(page);
+  await page.goto(`/?src=${encodeURIComponent(remote)}`, { waitUntil: "commit" });
+  await page.locator("[data-boot='sample']").click();
+
+  release();
+  // The offer is a question still on screen. Carrying out the queued press
+  // would answer it on the visitor's behalf — loading the sample behind a
+  // modal that is still asking whether to fetch something else.
+  await expect(page.locator("#src-prompt")).toBeVisible();
+  await expect(page.locator("#file-chip")).toBeHidden();
+  await expect(page.locator("#open-dialog")).toBeHidden();
+});

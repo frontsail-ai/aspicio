@@ -79,6 +79,20 @@
             The same engine ships as a TypeScript library with React, Vue, Svelte, and web-component
             bindings, plus an HTTP API and an MCP server for AI agents.
           </p>
+          <!-- The actions the live screen offers, in their not-yet-ready state.
+               Without them this paint looks finished while offering no way to
+               act on it, and an eager click lands on nothing (DEMO-15). -->
+          <div class="empty-actions">
+            <button class="btn-primary" type="button" data-boot="open" aria-busy="true">
+              Open
+            </button>
+            <button class="btn-ghost" type="button" data-boot="sample" aria-busy="true">
+              Load sample
+            </button>
+          </div>
+          <!-- Busy, not disabled: the press is honoured once the app is wired,
+               so claiming "disabled" here would misdescribe what happens. -->
+          <div id="boot-note" class="boot-note" role="status">Starting…</div>
           <div class="empty-supports">
             OPENS · DXF · PDF<br />
             DXF ENTITIES · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · SPLINE · TEXT · MTEXT · INSERT
@@ -95,6 +109,23 @@
         </div>
       </div>
     </div>
+    <!-- The boot screen's only script: remember which action an eager visitor
+         reached for, so main.ts can carry it out the moment it is wired. It
+         records on pointerdown rather than click because the app replaces this
+         whole subtree — a press that straddles that swap never becomes a
+         click at all, which is the interaction most easily lost. -->
+    <script>
+      window.__aspicioBoot = null;
+      document.addEventListener("pointerdown", function (e) {
+        var el = e.target instanceof Element ? e.target.closest("[data-boot]") : null;
+        if (!el) return;
+        window.__aspicioBoot = el.getAttribute("data-boot");
+        var note = document.getElementById("boot-note");
+        // Say so immediately. Silence here is the whole complaint: the press
+        // appears to do nothing, and nothing explains why.
+        if (note) note.textContent = "Starting… we'll do that as soon as it's ready.";
+      });
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

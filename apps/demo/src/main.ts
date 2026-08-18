@@ -1923,6 +1923,22 @@ function offerSrc(src: string): void {
 const entry = resolveEntry(location.hash, location.search);
 if (entry.kind === "offer") offerSrc(entry.src);
 else openFromLink(entry.kind === "link" ? entry.link : null, true);
+
+// An action the visitor reached for while the static shell was still on screen
+// (DEMO-15) is carried out here rather than discarded — this is the first
+// moment it can be. Anything the URL itself asked for wins: a share link is
+// already loading, and a query-string offer (DEMO-23) is a question still on
+// screen, so acting on a queued press would answer it on the visitor's behalf.
+{
+  const booted = window as Window & { __aspicioBoot?: string | null };
+  const intent = booted.__aspicioBoot ?? null;
+  booted.__aspicioBoot = null;
+  if (entry.kind === "none") {
+    if (intent === "sample") loadSample();
+    else if (intent === "open") openDialog();
+  }
+}
+
 // React to a hash the user introduces after load — pasting a share link into the
 // address bar, or back/forward between shared links. Our own writes go through
 // history.replaceState, which never fires hashchange, so this can't loop.
