@@ -127,7 +127,7 @@ jobs:
       # Post (and keep updating) one sticky PR comment per target.
       - name: Comment the preview URL on the PR
         if: env.VERCEL_TOKEN != '' && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           MARKER: ${{ matrix.marker }}
           LABEL: ${{ matrix.label }}
