@@ -30,18 +30,26 @@
             "name": "Aspicio",
             "url": "https://aspicio.frontsail.app/",
             "description": "Open-source, TypeScript-first viewer for DXF and vector PDF drawings — parse, render, measure, and export CAD drawings and PDF/X-4 artwork in the browser.",
-            "publisher": { "@id": "https://frontsail.ai/#organization" },
+            "publisher": { "@id": "https://frontsail.ai/#org" },
             "inLanguage": "en"
           },
           {
             "@type": "Organization",
-            "@id": "https://frontsail.ai/#organization",
+            "@id": "https://frontsail.ai/#org",
             "name": "FrontSail AI",
-            "url": "https://frontsail.ai/",
+            "legalName": "FrontSail Labs Inc.",
+            "url": "https://frontsail.ai",
             "sameAs": [
-              "https://github.com/frontsail-ai/aspicio",
-              "https://www.npmjs.com/package/@aspicio/core"
-            ]
+              "https://x.com/frontsail_ai",
+              "https://linkedin.com/company/frontsail",
+              "https://www.youtube.com/@frontsail"
+            ],
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Waterloo Region",
+              "addressRegion": "Ontario",
+              "addressCountry": "CA"
+            }
           },
           {
             "@type": "WebApplication",
@@ -54,8 +62,12 @@
             "browserRequirements": "Requires JavaScript and WebGL",
             "isAccessibleForFree": true,
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-            "creator": { "@id": "https://frontsail.ai/#organization" },
-            "sameAs": ["https://github.com/frontsail-ai/aspicio"]
+            "creator": { "@id": "https://frontsail.ai/#org" },
+            "provider": { "@id": "https://frontsail.ai/#org" },
+            "sameAs": [
+              "https://github.com/frontsail-ai/aspicio",
+              "https://www.npmjs.com/package/@aspicio/core"
+            ]
           }
         ]
       }
