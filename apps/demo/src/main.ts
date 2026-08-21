@@ -168,6 +168,8 @@ app.innerHTML = `
             <a href="https://www.npmjs.com/package/@aspicio/core" target="_blank" rel="noopener">npm</a>
             <a href="/privacy/">Privacy</a>
             <a href="/terms/">Terms</a>
+            <a href="https://frontsail.ai" target="_blank" rel="noopener">Made by FrontSail AI</a>
+            <a href="https://frontsail.app" target="_blank" rel="noopener">More free tools</a>
           </nav>
         </div>
       </div>

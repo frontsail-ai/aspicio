@@ -1440,8 +1440,9 @@ button {
 
 .empty-links {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 16px;
+  gap: 6px 16px;
   margin-top: 14px;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1451,6 +1452,7 @@ button {
 .empty-links a {
   color: var(--text2);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .empty-links a:hover {
