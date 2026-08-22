@@ -110,6 +110,9 @@
             DXF ENTITIES · LINE · POLYLINE · CIRCLE · ARC · ELLIPSE · SPLINE · TEXT · MTEXT · INSERT
             · DIMENSION · HATCH · SOLID · POINT
           </div>
+          <!-- Keep in sync with the runtime copy of this row in src/main.ts:
+               this one is what a client that does not execute JavaScript
+               reads, and e2e/viewer.spec.ts asserts the two agree. -->
           <nav class="empty-links" aria-label="Project links">
             <a href="/docs/">Docs</a>
             <a href="/mcp/">MCP</a>
@@ -117,6 +120,8 @@
             <a href="https://www.npmjs.com/package/@aspicio/core">npm</a>
             <a href="/privacy/">Privacy</a>
             <a href="/terms/">Terms</a>
+            <a href="https://frontsail.ai" target="_blank" rel="noopener">Made by FrontSail AI</a>
+            <a href="https://frontsail.app" target="_blank" rel="noopener">More free tools</a>
           </nav>
         </div>
       </div>
