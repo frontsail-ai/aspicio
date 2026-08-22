@@ -58,8 +58,13 @@ jobs:
         if: env.VERCEL_TOKEN == ''
         run: echo "VERCEL_TOKEN not configured — skipping Vercel deploy."
 
+      # Full history: the sitemap's per-page <lastmod> comes from the last
+      # commit that touched each page (see apps/demo/vite.config.ts). A
+      # shallow clone would ship the entries without dates.
       - uses: actions/checkout@v7
         if: env.VERCEL_TOKEN != ''
+        with:
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
         if: env.VERCEL_TOKEN != ''
