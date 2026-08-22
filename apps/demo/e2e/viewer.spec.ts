@@ -1149,6 +1149,18 @@ test("empty state exposes an h1 title, project links, and crawl files", async ({
   const sitemap = await page.request.get("/sitemap.xml");
   expect(sitemap.ok()).toBeTruthy();
   expect(await sitemap.text()).toContain("<urlset");
+
+  // The attribution links must reach clients that never run our JavaScript:
+  // AI crawlers and link-graph tools mostly do not, and they are the reason
+  // these links exist. The boot screen in index.html and the runtime copy in
+  // main.ts each hold a link row, and only the runtime one was updated when
+  // the links landed — so this reads the raw document, not the rendered DOM.
+  const raw = await page.request.get("/");
+  expect(raw.ok()).toBeTruthy();
+  const rawHtml = await raw.text();
+  for (const href of ["https://frontsail.ai", "https://frontsail.app"]) {
+    expect(rawHtml, `${href} must be linked before JavaScript runs`).toContain(`href="${href}"`);
+  }
 });
 
 // DEMO-13: the toolbar must never push the primary CTA off-screen.
