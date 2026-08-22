@@ -169,7 +169,7 @@ app.innerHTML = `
             <a href="/privacy/">Privacy</a>
             <a href="/terms/">Terms</a>
             <a href="https://frontsail.ai" target="_blank" rel="noopener">Made by FrontSail AI</a>
-            <a href="https://frontsail.app" target="_blank" rel="noopener">More free tools</a>
+            <a href="https://frontsail.app" target="_blank" rel="noopener">More free apps</a>
           </nav>
         </div>
       </div>
