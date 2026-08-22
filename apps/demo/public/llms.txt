@@ -91,11 +91,11 @@ released under the MIT license.
 Developed and maintained by [FrontSail AI](https://frontsail.ai/) —
 contact [support@frontsail.ai](mailto:support@frontsail.ai).
 
-Aspicio is one of the free tools from FrontSail Labs Inc., the
+Aspicio is one of the free apps from FrontSail Labs Inc., the
 Waterloo, Ontario company behind the FrontSail AI assistant:
 
 - [FrontSail Apps](https://frontsail.app/) — the directory of free
-  browser tools from FrontSail Labs Inc.; each tool lives on its own
+  browser apps from FrontSail Labs Inc.; each app lives on its own
   subdomain of frontsail.app.
 - [FrontSail AI](https://frontsail.ai/) — the FrontSail AI assistant,
   a virtual operations assistant for service businesses: answers
