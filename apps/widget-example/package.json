@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@aspicio/widget": "workspace:*",
-    "@modelcontextprotocol/ext-apps": "^1.7.5"
+    "@modelcontextprotocol/ext-apps": "^2.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
