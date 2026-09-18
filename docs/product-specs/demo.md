@@ -206,11 +206,13 @@ reason (DEMO-23).
 
 ### DEMO-19: Analytics consent
 
-The demo asks once, before measuring anything. Google Analytics is loaded with
-Consent Mode v2 defaults of `denied` for `ad_storage`, `ad_user_data`,
-`ad_personalization` and `analytics_storage`, so no analytics cookies exist
-until the visitor accepts; the denial is queued ahead of `config`, so even the
-first pageview is covered. A bottom-anchored banner names Google Analytics,
+The demo asks once, and contacts Google only if the answer is yes. Until the
+visitor accepts, nothing Google-bound is requested — not the collector, and not
+gtag.js itself; accepting is what fetches the tag. The queue it arrives to leads
+with Consent Mode v2 defaults of `denied` for `ad_storage`, `ad_user_data`,
+`ad_personalization` and `analytics_storage`, followed by the grant and then
+`config`, so the first pageview fires as analytics-only: ad storage stays denied
+for someone who agreed to analytics. A bottom-anchored banner names Google Analytics,
 says it sets cookies, restates that drawings never leave the browser, and links
 to the privacy policy. Accept queues `consent update` with
 `analytics_storage: granted` (ad storage stays denied — the demo runs no ads);
@@ -226,13 +228,17 @@ lookalike domain — so dev servers and the Playwright suites never report.
 `?asp_consent_ui=1` renders the banner off-host for review and e2e without ever
 loading the tag.
 
-Measurement has to actually happen, and that is a separate claim from the
-queueing above: a visit sends a `page_view`, cookieless (`gcs=G100`) until the
-visitor accepts, and accepting lets gtag.js set `_ga` while ad storage stays
-denied (`gcs=G101`). This is asserted end to end against the real gtag.js,
-because a tag that loads and silently discards its queue is indistinguishable
-from a working one in every other check — which is exactly what shipped between
-2026-08-06 and 2026-09-18, six weeks of zero data behind a green suite.
+Both halves are asserted end to end against the real gtag.js. Measurement has to
+actually happen — accepting sends a `page_view` with `gcs=G101` and lets gtag.js
+set `_ga` — because a tag that loads and silently discards its queue is
+indistinguishable from a working one in every other check, which is exactly what
+shipped between 2026-08-06 and 2026-09-18: six weeks of zero data behind a green
+suite. And the silence has to be real: a visitor who declines or ignores the
+banner produces no Google-bound request at all, on that visit or any later one.
+Google's advanced consent mode, which loads the tag denied and sends cookieless
+pings, was rejected for that reason — it would contact Google about people who
+declined, contradicting the privacy policy, in exchange for modelled traffic
+that needs 1,000 denied events a day to materialise.
 
 ### DEMO-20: Empty-result notice
 
