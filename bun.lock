@@ -19,7 +19,7 @@
         "@modelcontextprotocol/ext-apps": "^1.7.5",
         "@modelcontextprotocol/sdk": "^1.30.0",
         "three": "^0.186.0",
-        "zod": "^4.6.2",
+        "zod": "4.4.3",
       },
       "devDependencies": {
         "@resvg/resvg-js": "^2.6.2",
@@ -160,7 +160,7 @@
       "name": "@aspicio/agent-tools",
       "version": "0.0.0",
       "dependencies": {
-        "zod": "^4.6.2",
+        "zod": "4.4.3",
       },
       "devDependencies": {
         "typescript": "~7.0.2",
@@ -216,7 +216,7 @@
         "@modelcontextprotocol/sdk": "^1.30.0",
         "@resvg/resvg-js": "^2.6.2",
         "three": "^0.186.0",
-        "zod": "^4.6.2",
+        "zod": "4.4.3",
       },
       "devDependencies": {
         "@aspicio/agent-tools": "workspace:*",
@@ -1175,13 +1175,11 @@
 
     "zimmerframe": ["zimmerframe@1.1.4", "", {}, "sha512-B58NGBEoc8Y9MWWCQGl/gq9xBCe4IiKM0a2x7GZdQKOW5Exr8S1W24J6OgM1njK8xCRGvAJIL/MxXHf6SkmQKQ=="],
 
-    "zod": ["zod@4.6.2", "", {}, "sha512-lh5RCAGFa1Cm2hjtNwLQhSs/AsqdWnTQaBER9fEwN/88pSh7KOtJavtBx/0VlkN/uFd61SwYmljLMDAsHlvzBQ=="],
+    "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
     "zod-to-json-schema": ["zod-to-json-schema@3.25.2", "", { "peerDependencies": { "zod": "^3.25.28 || ^4" } }, "sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA=="],
 
     "@babel/code-frame/js-tokens": ["js-tokens@4.0.0", "", {}, "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="],
-
-    "@modelcontextprotocol/sdk/zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
     "@testing-library/dom/aria-query": ["aria-query@5.3.0", "", { "dependencies": { "dequal": "^2.0.3" } }, "sha512-b0P0sZPKtyu8HkeRAfCq0IfURZK+SuwMjY1UXGBU27wpAiTwQAIlq56IbIO+ytk/JjS1fMR14ee5WBBfKi5J6A=="],
 
