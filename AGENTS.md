@@ -128,6 +128,19 @@ docs/             architecture, guidelines, product specs, releasing
   (cold cache) caught it. If you touched core, fresh-build one example
   app (`cd apps/vanilla-example && rm -rf dist && vp build`) before
   believing a green gate.
+- **A third-party runtime is not verified by a test of our model of it.**
+  The demo's GA4 tag pushed its commands to `dataLayer` as plain arrays;
+  gtag.js executes an entry only when it is an `arguments` object and reads
+  an array as the legacy GTM `["object.method", …]` form, dropping it with
+  no error. The tag loaded, the banner worked, unit tests asserted the array
+  shape with `toEqual` (the bug, compared against itself), and the e2e suite
+  deliberately never loaded the tag — six weeks of zero data behind a green
+  gate. When code talks to someone else's runtime, one test must run the
+  real thing and assert on the observable outcome (the request that leaves,
+  the cookie that appears), not on the payload we constructed. The cost of
+  reaching the real thing when it is awkward — here a production-only host
+  gate, plus `.app` being HSTS-preloaded — is lower than the cost of not
+  knowing: see `apps/demo/e2e/analytics-tag.spec.ts`.
 - **Centralizing a contract: enumerate what it contains, not just its
   top-level fields.** Three bugs in one week shared this shape — shared
   machinery covered the obvious strings while something one level down

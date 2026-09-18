@@ -27,12 +27,17 @@ export const ANALYTICS_HOST = "aspicio.frontsail.app";
 /** Renders the banner off-host, for e2e and manual review. Never loads the tag. */
 export const BANNER_PREVIEW_PARAM = "asp_consent_ui";
 
-/** One queued `gtag(...)` call, in the shape gtag.js reads back off dataLayer. */
+/** One queued `gtag(...)` call, as arguments: `["config", MEASUREMENT_ID]`. */
 export type GtagCommand = unknown[];
 
 declare global {
   interface Window {
-    dataLayer?: GtagCommand[];
+    /**
+     * gtag.js executes a queue entry only when it is an `arguments` object, so
+     * the queue is typed as one: pushing a plain array is a type error here
+     * rather than a tag that loads, reports nothing, and looks healthy.
+     */
+    dataLayer?: IArguments[];
   }
 }
 
@@ -96,10 +101,22 @@ export function scriptUrl(): string {
   return `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`;
 }
 
+/**
+ * Google's snippet is `function gtag(){ dataLayer.push(arguments) }`, and the
+ * `arguments` object is load-bearing: gtag.js dispatches a queue entry only
+ * when `Object.prototype.toString.call(entry) === "[object Arguments]"`. A
+ * plain array takes the legacy GTM `["object.method", …]` branch instead — it
+ * splits `entry[0]` on `.`, finds no global named `config`, and drops the
+ * command with no error. Commands therefore travel as arrays (readable, and
+ * assertable in unit tests) and are converted here, at the one place that
+ * touches the queue.
+ */
+const asArguments = function (): IArguments {
+  return arguments;
+} as (...command: unknown[]) => IArguments;
+
 function push(command: GtagCommand): void {
-  // gtag.js reads its queue with Array.prototype.slice, so a plain array is
-  // interchangeable with the `arguments` object Google's inline snippet pushes.
-  (window.dataLayer ??= []).push(command);
+  (window.dataLayer ??= []).push(asArguments(...command));
 }
 
 /**

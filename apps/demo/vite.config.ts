@@ -1,8 +1,10 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite-plus";
 
-const SITE = "https://aspicio.frontsail.app";
+const SITE_HOST = "aspicio.frontsail.app";
+const SITE = `https://${SITE_HOST}`;
 
 /* The sitemap is generated rather than hand-written: its dates froze at
    2026-07-19/21 while every page kept changing, and Google uses <lastmod>
@@ -22,6 +24,13 @@ const PAGES: { path: string; sources: string[] }[] = [
 ];
 
 const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
+
+/** TLS for the analytics e2e server only; `{}` — plain HTTP — everywhere else. */
+function e2eTls(): { https?: { key: Buffer; cert: Buffer } } {
+  const dir = process.env.ASPICIO_E2E_TLS_DIR;
+  if (!dir) return {};
+  return { https: { key: readFileSync(`${dir}key.pem`), cert: readFileSync(`${dir}cert.pem`) } };
+}
 
 /** Commit date (YYYY-MM-DD) of the last change to `file`, or null. */
 function lastCommitDate(file: string): string | null {
@@ -77,6 +86,15 @@ function sitemap(): Plugin {
 
 export default defineConfig({
   plugins: [sitemap()],
+  /* e2e/analytics-tag.spec.ts serves the demo under its production hostname
+     (Chromium maps it to loopback) because the GA4 tag loads on that host and
+     no other. Vite rejects unknown Host headers, so both servers have to know
+     the name, and `.app` is HSTS-preloaded so that one server has to speak TLS
+     — with a throwaway cert the test browser is told to ignore (e2e/tls.ts).
+     None of this touches what is deployed: without the env var set by the
+     Playwright config, both servers are exactly as they were. */
+  server: { allowedHosts: [SITE_HOST], ...e2eTls() },
+  preview: { allowedHosts: [SITE_HOST], ...e2eTls() },
   resolve: {
     alias: {
       // Consume core from source for instant HMR during development.

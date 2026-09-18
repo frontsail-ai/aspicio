@@ -226,6 +226,14 @@ lookalike domain — so dev servers and the Playwright suites never report.
 `?asp_consent_ui=1` renders the banner off-host for review and e2e without ever
 loading the tag.
 
+Measurement has to actually happen, and that is a separate claim from the
+queueing above: a visit sends a `page_view`, cookieless (`gcs=G100`) until the
+visitor accepts, and accepting lets gtag.js set `_ga` while ad storage stays
+denied (`gcs=G101`). This is asserted end to end against the real gtag.js,
+because a tag that loads and silently discards its queue is indistinguishable
+from a working one in every other check — which is exactly what shipped between
+2026-08-06 and 2026-09-18, six weeks of zero data behind a green suite.
+
 ### DEMO-20: Empty-result notice
 
 A silently empty canvas under full viewer chrome reads as a failure, so an
