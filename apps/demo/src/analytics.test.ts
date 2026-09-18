@@ -1,4 +1,4 @@
-import { expect, test } from "vite-plus/test";
+import { afterEach, expect, test, vi } from "vite-plus/test";
 import {
   ANALYTICS_HOST,
   MEASUREMENT_ID,
@@ -6,9 +6,14 @@ import {
   bannerVisible,
   bootCommands,
   grantCommand,
+  grantConsent,
   scriptUrl,
   tagEnabled,
 } from "./analytics.ts";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 test("only the exact production host reports", () => {
   expect(tagEnabled(ANALYTICS_HOST)).toBe(true);
@@ -105,6 +110,22 @@ test("a returning refuser stays denied with no update", () => {
 test("the boot sequence configures exactly this property", () => {
   expect(bootCommands(null, new Date(0))).toContainEqual(["config", MEASUREMENT_ID]);
   expect(scriptUrl()).toBe(`https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`);
+});
+
+test("a queued command reaches dataLayer as `arguments`, never as an array", () => {
+  // The shape is the mechanism, not a detail: gtag.js dispatches an entry only
+  // when it is an `arguments` object, and reads an array as the legacy GTM
+  // `["object.method", …]` form — dropping it silently. A tag that loads and
+  // reports nothing looks identical to a healthy one from the outside, so the
+  // check belongs here, and end to end in e2e/analytics-tag.spec.ts.
+  const stub = {} as Window;
+  vi.stubGlobal("window", stub);
+
+  grantConsent();
+
+  const queued = stub.dataLayer?.[0];
+  expect(Object.prototype.toString.call(queued)).toBe("[object Arguments]");
+  expect(Array.from(queued ?? [])).toEqual(grantCommand());
 });
 
 test("granting lifts analytics storage only", () => {
