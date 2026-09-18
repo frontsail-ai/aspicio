@@ -426,32 +426,34 @@ export class AspicioLayerPanel extends LitElement {
         }}
       >
         ${themed && isSolo ? html`<span class="solo-rail" aria-hidden="true"></span>` : nothing}
-        ${themed
-          ? html`
-              <span
-                class="checkbox"
-                part="checkbox"
-                role="checkbox"
-                aria-checked=${visible}
-                aria-label=${layer.name}
-                tabindex="0"
-                @click=${(e: Event) => {
-                  e.stopPropagation();
-                  this.#toggleLayer(layer);
-                }}
-              >
-                ${visible ? checkIcon() : uncheckIcon()}
-              </span>
-            `
-          : html`
-              <input
-                type="checkbox"
-                part="checkbox"
-                .checked=${visible}
-                aria-label=${layer.name}
-                @change=${() => this.#toggleLayer(layer)}
-              />
-            `}
+        ${
+          themed
+            ? html`
+                <span
+                  class="checkbox"
+                  part="checkbox"
+                  role="checkbox"
+                  aria-checked=${visible}
+                  aria-label=${layer.name}
+                  tabindex="0"
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    this.#toggleLayer(layer);
+                  }}
+                >
+                  ${visible ? checkIcon() : uncheckIcon()}
+                </span>
+              `
+            : html`
+                <input
+                  type="checkbox"
+                  part="checkbox"
+                  .checked=${visible}
+                  aria-label=${layer.name}
+                  @change=${() => this.#toggleLayer(layer)}
+                />
+              `
+        }
         <span class="swatch" part="swatch" aria-hidden="true"></span>
         <span class="name" part="name">${layer.name}</span>
         ${themed && isSolo ? html`<span class="solo-tag">SOLO</span>` : nothing}
@@ -474,33 +476,37 @@ export class AspicioLayerPanel extends LitElement {
           LAYERS
           <span class="header-count">${this._layers.length}</span>
         </div>
-        ${this._soloLayer
-          ? html`
-              <div class="solo-banner" part="solo-banner">
-                <span class="solo-banner-label">SOLO</span>
-                <span class="solo-banner-name">${this._soloLayer}</span>
-                <button type="button" class="solo-exit" @click=${() => this.#exitSolo()}>
-                  EXIT
-                </button>
-              </div>
-            `
-          : nothing}
+        ${
+          this._soloLayer
+            ? html`
+                <div class="solo-banner" part="solo-banner">
+                  <span class="solo-banner-label">SOLO</span>
+                  <span class="solo-banner-name">${this._soloLayer}</span>
+                  <button type="button" class="solo-exit" @click=${() => this.#exitSolo()}>
+                    EXIT
+                  </button>
+                </div>
+              `
+            : nothing
+        }
         <ul class="rows" part="rows">
           ${this._layers.length === 0 ? html`<li class="empty">No layers yet.</li>` : nothing}
           ${this._layers.map((layer) => this.#renderRow(layer))}
         </ul>
-        ${!this.noHints
-          ? html`
-              <div class="hints" part="hints">
-                ${DESKTOP_HINTS.map(
-                  ([k, v]) => html`
-                    <span class="hint-key">${k}</span>
-                    <span class="hint-desc">${v}</span>
-                  `,
-                )}
-              </div>
-            `
-          : nothing}
+        ${
+          !this.noHints
+            ? html`
+                <div class="hints" part="hints">
+                  ${DESKTOP_HINTS.map(
+                    ([k, v]) => html`
+                      <span class="hint-key">${k}</span>
+                      <span class="hint-desc">${v}</span>
+                    `,
+                  )}
+                </div>
+              `
+            : nothing
+        }
       </div>
     `;
   }

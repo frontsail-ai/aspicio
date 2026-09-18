@@ -6,9 +6,7 @@ export default defineConfig({
     tsconfig: "./tsconfig.build.json",
     // One entry per format, so a page bundles only what it imports (INV-11).
     entry: ["src/index.ts", "src/formats/dxf.ts", "src/formats/pdf.ts"],
-    dts: {
-      tsgo: true,
-    },
+    dts: true,
     exports: true,
   },
   test: {

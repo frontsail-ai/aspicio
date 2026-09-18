@@ -348,47 +348,59 @@ export class AspicioPreview extends LitElement {
   render(): TemplateResult {
     return html`
       <div class="canvas-host" part="canvas-host"></div>
-      ${!this.noDownload && this._viewerReady
-        ? html`
-            <div class="download" part="download">
-              <button
-                type="button"
-                class="download-toggle"
-                aria-label="Download"
-                @click=${() => {
-                  this._downloadOpen = !this._downloadOpen;
-                }}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+      ${
+        !this.noDownload && this._viewerReady
+          ? html`
+              <div class="download" part="download">
+                <button
+                  type="button"
+                  class="download-toggle"
+                  aria-label="Download"
+                  @click=${() => {
+                    this._downloadOpen = !this._downloadOpen;
+                  }}
                 >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <path d="M7 10l5 5 5-5" />
-                  <path d="M12 15V3" />
-                </svg>
-              </button>
-              ${this._downloadOpen
-                ? html`
-                    <div class="download-menu">
-                      <button type="button" class="download-item" @click=${() => this.#save("svg")}>
-                        SVG
-                      </button>
-                      <button type="button" class="download-item" @click=${() => this.#save("png")}>
-                        PNG
-                      </button>
-                    </div>
-                  `
-                : nothing}
-            </div>
-          `
-        : nothing}
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <path d="M7 10l5 5 5-5" />
+                    <path d="M12 15V3" />
+                  </svg>
+                </button>
+                ${
+                  this._downloadOpen
+                    ? html`
+                        <div class="download-menu">
+                          <button
+                            type="button"
+                            class="download-item"
+                            @click=${() => this.#save("svg")}
+                          >
+                            SVG
+                          </button>
+                          <button
+                            type="button"
+                            class="download-item"
+                            @click=${() => this.#save("png")}
+                          >
+                            PNG
+                          </button>
+                        </div>
+                      `
+                    : nothing
+                }
+              </div>
+            `
+          : nothing
+      }
     `;
   }
 }
