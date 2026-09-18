@@ -25,7 +25,7 @@ import { clearRecents, loadRecents, pushRecent } from "./recents.ts";
 import { formatBytes } from "./format.ts";
 import { loadConsent, saveConsent } from "./consent.ts";
 import type { ConsentChoice } from "./consent.ts";
-import { bannerForced, bannerVisible, grantConsent, loadTag, tagEnabled } from "./analytics.ts";
+import { bannerForced, bannerVisible, loadTag, tagEnabled } from "./analytics.ts";
 
 /* ---------- SVG fragments ---------- */
 
@@ -1953,13 +1953,13 @@ window.addEventListener("hashchange", () => openFromLink(decodeView(location.has
 {
   const stored = loadConsent();
   const tag = tagEnabled(location.hostname);
-  if (tag) loadTag(stored);
+  if (tag && stored === "granted") loadTag();
 
   if (bannerVisible({ stored, tag, forced: bannerForced(location.search) })) {
     const banner = $("#consent-banner");
     const answer = (choice: ConsentChoice): void => {
       saveConsent(choice);
-      if (choice === "granted" && tag) grantConsent();
+      if (choice === "granted" && tag) loadTag();
       banner.hidden = true;
     };
     $("#consent-accept").addEventListener("click", () => answer("granted"));
