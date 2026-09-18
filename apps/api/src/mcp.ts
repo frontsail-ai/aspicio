@@ -203,11 +203,9 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
   // extension ignore the UI metadata and still get a usable text result.
   registerAppResource(
     server,
-    "aspicio-viewer",
+    "Aspicio DXF viewer",
     VIEWER_RESOURCE_URI,
     {
-      title: "Aspicio DXF viewer",
-      description: "Interactive in-chat DXF viewer (pan, zoom, layer toggles).",
       // No `_meta.ui.csp`: the widget parses the drawing in-iframe and makes
       // no network requests, so the spec's restrictive default CSP is exact.
     },
@@ -242,7 +240,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
       outputSchema: DRAWING_SUMMARY_SHAPE,
       _meta: { ui: { resourceUri: VIEWER_RESOURCE_URI } },
     },
-    async ({ source, allow_file_open }) => {
+    async ({ source, allow_file_open }: { source: string; allow_file_open?: boolean }) => {
       const bytes = await loadDrawing(source);
       const doc = await parseWith([dxfParser, pdfParser], bytes);
       const summary = describeDrawing(doc);
@@ -302,7 +300,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
       },
       _meta: { ui: { resourceUri: VIEWER_RESOURCE_URI, visibility: ["app"] } },
     },
-    async ({ source, offset, length }) => {
+    async ({ source, offset, length }: { source: string; offset?: number; length?: number }) => {
       const bytes = await loadDrawing(source);
       const start = offset ?? 0;
       const slice =

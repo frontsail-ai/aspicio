@@ -12,9 +12,9 @@
   },
   "dependencies": {
     "@aspicio/core": "workspace:*",
-    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/ext-apps": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "three": "^0.185.1"
+    "three": "^0.186.0"
   },
   "devDependencies": {
     "typescript": "~7.0.2",
