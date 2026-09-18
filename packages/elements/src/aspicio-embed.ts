@@ -185,9 +185,9 @@ export class AspicioEmbed extends LitElement {
     return html`
       ${this.panel === "left" ? this.#renderPanel() : nothing}
       <div
-        class="canvas-wrap ${themed ? "canvas-grid" : ""} ${themed && this.#hasPage
-          ? "page-mode"
-          : ""}"
+        class="canvas-wrap ${themed ? "canvas-grid" : ""} ${
+          themed && this.#hasPage ? "page-mode" : ""
+        }"
       >
         <aspicio-preview
           part="preview"
