@@ -6,7 +6,7 @@ import {
   bannerVisible,
   bootCommands,
   grantCommand,
-  grantConsent,
+  loadTag,
   scriptUrl,
   tagEnabled,
 } from "./analytics.ts";
@@ -66,7 +66,7 @@ test("an answered visitor is never asked again, either way", () => {
 });
 
 test("consent is denied before anything else is queued", () => {
-  const commands = bootCommands(null, new Date(0));
+  const commands = bootCommands(new Date(0));
   expect(commands[0]).toEqual([
     "consent",
     "default",
@@ -79,53 +79,45 @@ test("consent is denied before anything else is queued", () => {
   ]);
 });
 
-test("the denial is queued ahead of config, not after it", () => {
-  // If `config` ran first the pageview would fire with storage still allowed —
-  // this ordering is the whole mechanism, so assert the indices, not just
-  // membership.
-  const names = bootCommands(null, new Date(0)).map((c) => `${String(c[0])}:${String(c[1])}`);
-  const denial = names.findIndex((n) => n.startsWith("consent:default"));
-  const config = names.findIndex((n) => n.startsWith("config:"));
-  expect(denial).toBeGreaterThanOrEqual(0);
-  expect(config).toBeGreaterThan(denial);
-});
-
-test("an unanswered visitor is never silently granted", () => {
-  const commands = bootCommands(null, new Date(0));
-  expect(commands).not.toContainEqual(grantCommand());
-});
-
-test("a returning granter is restored before config", () => {
-  const commands = bootCommands("granted", new Date(0));
-  const grant = commands.findIndex((c) => c[0] === "consent" && c[1] === "update");
-  const config = commands.findIndex((c) => c[0] === "config");
-  expect(grant).toBeGreaterThan(0);
-  expect(config).toBeGreaterThan(grant);
-});
-
-test("a returning refuser stays denied with no update", () => {
-  expect(bootCommands("denied", new Date(0))).not.toContainEqual(grantCommand());
+test("the denial leads, the grant follows it, and config comes last", () => {
+  // If `config` ran before either consent command the pageview would fire under
+  // the wrong consent state — the ordering is the whole mechanism, so assert the
+  // indices rather than mere membership.
+  const commands = bootCommands(new Date(0));
+  const at = (name: string): number =>
+    commands.findIndex((c) => `${String(c[0])}:${String(c[1])}`.startsWith(name));
+  expect(at("consent:default")).toBe(0);
+  expect(at("consent:update")).toBe(1);
+  expect(at("config:")).toBe(commands.length - 1);
 });
 
 test("the boot sequence configures exactly this property", () => {
-  expect(bootCommands(null, new Date(0))).toContainEqual(["config", MEASUREMENT_ID]);
+  expect(bootCommands(new Date(0))).toContainEqual(["config", MEASUREMENT_ID]);
   expect(scriptUrl()).toBe(`https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`);
 });
 
-test("a queued command reaches dataLayer as `arguments`, never as an array", () => {
+test("every queued command reaches dataLayer as `arguments`, never as an array", () => {
   // The shape is the mechanism, not a detail: gtag.js dispatches an entry only
   // when it is an `arguments` object, and reads an array as the legacy GTM
   // `["object.method", …]` form — dropping it silently. A tag that loads and
   // reports nothing looks identical to a healthy one from the outside, so the
   // check belongs here, and end to end in e2e/analytics-tag.spec.ts.
-  const stub = {} as Window;
-  vi.stubGlobal("window", stub);
+  const win = {} as Window;
+  const appended: { src?: string }[] = [];
+  vi.stubGlobal("window", win);
+  vi.stubGlobal("document", {
+    createElement: () => ({}) as HTMLScriptElement,
+    head: { append: (node: { src?: string }) => appended.push(node) },
+  });
 
-  grantConsent();
+  loadTag(new Date(0));
 
-  const queued = stub.dataLayer?.[0];
-  expect(Object.prototype.toString.call(queued)).toBe("[object Arguments]");
-  expect(Array.from(queued ?? [])).toEqual(grantCommand());
+  const queued = win.dataLayer ?? [];
+  expect(queued.map((c) => Object.prototype.toString.call(c))).toEqual(
+    bootCommands(new Date(0)).map(() => "[object Arguments]"),
+  );
+  expect(queued.map((c) => Array.from(c))).toEqual(bootCommands(new Date(0)));
+  expect(appended[0]?.src).toBe(scriptUrl());
 });
 
 test("granting lifts analytics storage only", () => {

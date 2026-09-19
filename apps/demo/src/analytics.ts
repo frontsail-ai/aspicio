@@ -11,9 +11,13 @@
  *      follows gate 1, but a query flag forces it so the UI is testable and
  *      reviewable off the production host.
  *
- * Consent starts denied. gtag.js is loaded with `analytics_storage: 'denied'`,
- * which is Google's advanced consent mode: the tag boots but sets no cookies
- * until `grantConsent()` runs. See DEMO-19.
+ * Nothing is requested from Google until the visitor accepts — not the
+ * collector, not gtag.js itself. Google's advanced consent mode (load the tag
+ * denied, send cookieless pings until consent) would hand us modelled traffic
+ * in exchange for contacting Google about people who declined, which the
+ * privacy policy promises we do not do; the modelling needs 1,000 denied
+ * events a day to engage anyway, which this site will never see. So the tag
+ * loads on grant and not before. See DEMO-19.
  */
 
 import type { ConsentChoice } from "./consent.ts";
@@ -69,12 +73,13 @@ export function bannerVisible(options: {
 }
 
 /**
- * The commands queued before gtag.js arrives, in order. `consent default` must
- * precede `config`, or the first pageview fires before the denial applies —
- * that ordering is the entire point of consent mode.
+ * The commands queued before gtag.js arrives, in order. The denial still leads
+ * even though every caller has consent by then: it is what keeps ad storage
+ * denied for a visitor who only agreed to analytics, and `config` must follow
+ * it or the first pageview fires under the wrong consent state.
  */
-export function bootCommands(stored: ConsentChoice | null, now: Date): GtagCommand[] {
-  const commands: GtagCommand[] = [
+export function bootCommands(now: Date): GtagCommand[] {
+  return [
     [
       "consent",
       "default",
@@ -85,10 +90,10 @@ export function bootCommands(stored: ConsentChoice | null, now: Date): GtagComma
         analytics_storage: "denied",
       },
     ],
+    grantCommand(),
+    ["js", now],
+    ["config", MEASUREMENT_ID],
   ];
-  if (stored === "granted") commands.push(grantCommand());
-  commands.push(["js", now], ["config", MEASUREMENT_ID]);
-  return commands;
 }
 
 /** The command that lifts the denial once the visitor accepts. */
@@ -120,18 +125,14 @@ function push(command: GtagCommand): void {
 }
 
 /**
- * Queue the consent defaults and load gtag.js. Safe to call once per page; the
- * caller is responsible for the `tagEnabled` check.
+ * Start measuring: queue the commands and fetch gtag.js. Calling this *is* the
+ * act of reporting to Google, so call it only for a visitor who accepted, and
+ * only on the production host (`tagEnabled`). Safe to call once per page.
  */
-export function loadTag(stored: ConsentChoice | null, now: Date = new Date()): void {
-  for (const command of bootCommands(stored, now)) push(command);
+export function loadTag(now: Date = new Date()): void {
+  for (const command of bootCommands(now)) push(command);
   const script = document.createElement("script");
   script.async = true;
   script.src = scriptUrl();
   document.head.append(script);
-}
-
-/** Lift the denial. A no-op when the tag never loaded — the queue just grows. */
-export function grantConsent(): void {
-  push(grantCommand());
 }
