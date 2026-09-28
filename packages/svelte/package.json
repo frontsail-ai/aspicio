@@ -48,9 +48,9 @@
     "@aspicio/elements": "workspace:^"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "happy-dom": "^20.14.5",
-    "svelte": "^5.57.0",
+    "svelte": "^5.57.1",
     "typescript": "^7.0.2",
     "vite-plus": "catalog:"
   },
