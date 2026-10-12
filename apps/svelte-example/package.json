@@ -13,13 +13,13 @@
     "@aspicio/core": "workspace:*",
     "@aspicio/elements": "workspace:*",
     "@aspicio/svelte": "workspace:*",
-    "svelte": "^5.57.0",
-    "three": "^0.186.0"
+    "svelte": "^5.57.2",
+    "three": "^0.186.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0",
-    "@sveltejs/vite-plugin-svelte": "^7.3.0",
-    "@types/node": "^26.5.1",
+    "@playwright/test": "^1.64.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/node": "^26.6.4",
     "typescript": "~7.0.2",
     "vite-plus": "catalog:"
   }
