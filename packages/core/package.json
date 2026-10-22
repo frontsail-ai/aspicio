@@ -38,12 +38,14 @@
     "@types/node": "^26.6.5",
     "@types/three": "^0.186.0",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
-    "@vitest/coverage-v8": "5.0.5",
+    "@vitest/coverage-v8": "catalog:",
     "bumpp": "^12.3.0",
     "happy-dom": "^20.14.5",
     "three": "^0.186.1",
     "typescript": "^7.0.2",
-    "vite-plus": "catalog:"
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "three": ">=0.184.0 <1.0.0"

@@ -58,7 +58,7 @@ older commit. Follow these steps in order; each gates the next.
 5. **Merge the PR** (`gh pr merge <n> --merge`).
 
 6. **Pull the latest master.** `git fetch && git checkout master &&
-git pull`; confirm the working tree is clean and local `master` matches
+   git pull`; confirm the working tree is clean and local `master` matches
    `origin/master`. The merge commit is the tip you'll tag.
 
 7. **Tag that merge commit and push the tag.**
@@ -160,7 +160,7 @@ render a drawing.
 
 - **The gate fails** — nothing was published; fix the failure on `master`,
   delete and re-push the tag (`git tag -d v0.1.0 && git push --delete
-origin v0.1.0`, then re-tag). Deleting tags is safe _only_ while the
+  origin v0.1.0`, then re-tag). Deleting tags is safe _only_ while the
   publish failed — never move a tag whose version reached npm.
 - **Core published, react failed** (network, registry hiccup) — do **not**
   re-push the same tag: npm refuses to republish an existing version, so

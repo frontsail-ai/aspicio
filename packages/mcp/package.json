@@ -28,6 +28,7 @@
     "@aspicio/agent-tools": "workspace:*",
     "@types/node": "^26.6.5",
     "typescript": "~7.0.2",
+    "vite": "catalog:",
     "vite-plus": "catalog:"
   },
   "mcpName": "io.github.frontsail-ai/aspicio"
