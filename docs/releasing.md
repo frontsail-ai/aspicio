@@ -79,11 +79,19 @@ older commit. Follow these steps in order; each gates the next.
 
 1. **Claim the npm scope.** Create the `aspicio` organization on
    [npmjs.com](https://www.npmjs.com) — scoped packages publish under it.
-2. **Create an automation token.** npmjs.com → Access Tokens → Generate →
-   Granular access token, with read/write on packages in the `@aspicio`
-   scope. Automation tokens bypass 2FA prompts, which CI needs.
-3. **Add the secret.** `gh secret set NPM_TOKEN` (or repo Settings →
-   Secrets and variables → Actions → `NPM_TOKEN`).
+2. **Trust the publish workflow — on every package.** npmjs.com → each of
+   the six packages → Settings → Trusted Publisher → GitHub Actions:
+   organization `frontsail-ai`, repository `aspicio`, workflow
+   `publish.yml`, environment blank (the job declares none). CI then
+   publishes through GitHub OIDC; no npm token exists to store, leak, or
+   expire. A package missing this setting fails to publish while the
+   others succeed — see [When things go wrong](#when-things-go-wrong).
+   A new package can't be configured before it exists on npm: publish
+   its first version by hand, then add the trust.
+
+   Why not a token: npm caps write-enabled granular tokens at 90 days.
+   v0.13.1's first publish run died on a 102-day-old `NPM_TOKEN` with a
+   bare `404 Not Found` — npm's answer to an unauthorized write.
 
 ## Versioning policy
 
@@ -110,20 +118,22 @@ older commit. Follow these steps in order; each gates the next.
 Before the first real release (or any risky one), run the workflow
 manually: GitHub → Actions → "Publish to npm" → Run workflow → enter a
 version and check **dry run**. It executes the entire pipeline — gate,
-version stamping, builds, tarball packing — and uploads nothing. Works
-even before `NPM_TOKEN` exists.
+version stamping, builds, tarball packing — and uploads nothing.
 
 The same dry run works locally:
 
 ```bash
 vp run -r build
-cd packages/core && bun publish --access public --dry-run
-cd ../elements && bun publish --access public --dry-run
-cd ../react && bun publish --access public --dry-run
-cd ../vue && bun publish --access public --dry-run
-cd ../svelte && bun publish --access public --dry-run
-cd ../mcp && bun publish --access public --dry-run
+for p in core elements react vue svelte mcp; do
+  (cd packages/$p && bun pm pack --destination /tmp/aspicio-npm/$p --quiet)
+  (cd /tmp/aspicio-npm/$p && npm publish ./*.tgz --access public --dry-run --tag dry-run)
+done
 ```
+
+Same two halves as CI: bun packs (resolving `catalog:` ranges), npm
+publishes — `bun publish` cannot authenticate through OIDC. The
+`--tag` is only needed locally, where manifests sit at `0.0.0` and npm
+refuses to make a version lower than the current one `latest`.
 
 ## After the tag: the GitHub Release
 
@@ -171,8 +181,10 @@ render a drawing.
   it breaks downstream lockfiles anyway). Deprecate instead:
   `npm deprecate @aspicio/core@0.1.0 "broken, use 0.1.1"`, then release
   the fix.
-- **`403` on publish** — the token expired, lacks the `@aspicio` scope, or
-  the org name isn't claimed. Re-check the one-time setup.
+- **`404 Not Found` or `403` on publish** — npm refused the write. Check
+  that the failing package has the trusted publisher configured exactly as
+  in the one-time setup (a renamed workflow file breaks it), and that the
+  run's npm is ≥ 11.5.1 (the workflow checks).
 
 ## What exactly ships
 
