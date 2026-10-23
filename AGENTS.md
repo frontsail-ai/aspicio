@@ -89,8 +89,9 @@ docs/             architecture, guidelines, product specs, releasing
 ## Conventions & process (the short version)
 
 - **Vite+ first**: use `vp` for anything it covers; bun only as the
-  package-manager/runtime backend. Exception: `bun publish` (vp has no
-  publish; bun rewrites `workspace:` deps).
+  package-manager/runtime backend. Exception: publishing — `bun pm pack`
+  then `npm publish` of the tarball (vp has no publish; bun resolves
+  `catalog:` ranges; only npm speaks trusted publishing).
 - Core stays framework-free and UI-opinion-free (INV-1); new entity types
   go through `registerEntityHandler` (INV-6).
 - The renderer is e2e-tested; all other new logic ships with unit tests

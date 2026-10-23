@@ -64,7 +64,7 @@ jobs:
       - name: Set package versions
         # npm version trips over the root devEngines (bun) declaration;
         # stamp the manifests with bun directly instead. The workspace:^
-        # dependency is replaced explicitly: bun publish would rewrite it
+        # dependency is replaced explicitly: bun pm pack would rewrite it
         # from the (stale, pre-stamp) lockfile — that shipped react@0.1.0
         # depending on core@^0.0.0.
         env:
@@ -102,43 +102,57 @@ jobs:
       - name: Build all packages
         run: bunx vp run -r build
 
-      # bun publish reads NPM_CONFIG_TOKEN (it ignores ~/.npmrc), and wants a
-      # token even for --dry-run — hence the placeholder fallback.
+      # npm trusted publishing (OIDC): each package on npmjs.com trusts this
+      # repo's publish.yml, so no token is stored anywhere. Only the npm CLI
+      # (>= 11.5.1) speaks it — bun publish does not — so bun packs (resolving
+      # catalog: ranges; workspace: ones are already stamped above) and npm
+      # publishes the tarball. Provenance is attested automatically.
+      - name: Check npm supports trusted publishing
+        run: |
+          npm --version
+          node -e '
+            const [a, b, c] = process.argv[1].split(".").map(Number);
+            if (a < 11 || (a === 11 && (b < 5 || (b === 5 && c < 1)))) {
+              console.error("npm >= 11.5.1 is required for trusted publishing");
+              process.exit(1);
+            }
+          ' "$(npm --version)"
+
       - name: Publish @aspicio/core
-        run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         working-directory: packages/core
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
+        run: |
+          bun pm pack --destination "$RUNNER_TEMP/npm/core" --quiet
+          cd "$RUNNER_TEMP/npm/core" && npm publish ./*.tgz --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
 
       - name: Publish @aspicio/elements
-        run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         working-directory: packages/elements
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
+        run: |
+          bun pm pack --destination "$RUNNER_TEMP/npm/elements" --quiet
+          cd "$RUNNER_TEMP/npm/elements" && npm publish ./*.tgz --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
 
       - name: Publish @aspicio/react
-        run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         working-directory: packages/react
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
+        run: |
+          bun pm pack --destination "$RUNNER_TEMP/npm/react" --quiet
+          cd "$RUNNER_TEMP/npm/react" && npm publish ./*.tgz --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
 
       - name: Publish @aspicio/vue
-        run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         working-directory: packages/vue
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
+        run: |
+          bun pm pack --destination "$RUNNER_TEMP/npm/vue" --quiet
+          cd "$RUNNER_TEMP/npm/vue" && npm publish ./*.tgz --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
 
       - name: Publish @aspicio/svelte
-        run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         working-directory: packages/svelte
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
+        run: |
+          bun pm pack --destination "$RUNNER_TEMP/npm/svelte" --quiet
+          cd "$RUNNER_TEMP/npm/svelte" && npm publish ./*.tgz --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
 
       - name: Publish @aspicio/mcp
-        run: bun publish --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         working-directory: packages/mcp
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN || 'dry-run-placeholder' }}
+        run: |
+          bun pm pack --destination "$RUNNER_TEMP/npm/mcp" --quiet
+          cd "$RUNNER_TEMP/npm/mcp" && npm publish ./*.tgz --access public ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
 
       # ------------------------------------------------------------------
       # Official MCP registry: publish the listing via GitHub OIDC — the
