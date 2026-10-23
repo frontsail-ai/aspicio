@@ -40,6 +40,7 @@ interface Manifest {
   name?: string;
   exports?: Record<string, unknown> | string;
   private?: boolean;
+  repository?: { url?: string; directory?: string };
 }
 
 /** Every first-party package manifest, by package name. */
@@ -142,4 +143,33 @@ test("the shared agent-tool table declares only zod as a dependency", () => {
     readFileSync(join(REPO, "packages/agent-tools/package.json"), "utf8"),
   ) as { dependencies?: Record<string, string> };
   expect(Object.keys(manifest.dependencies ?? {})).toEqual(["zod"]);
+});
+
+/**
+ * Every published package names this repository, at its own directory.
+ *
+ * The publish workflow attests provenance, and npm rejects a tarball whose
+ * `repository.url` does not match the repo the attestation names. v0.13.1
+ * shipped five packages and then failed on `@aspicio/mcp`, whose manifest had
+ * never carried a `repository` field — harmless for years under token
+ * publishing, fatal mid-release once provenance arrived. npm's 422 is the
+ * only other place this is checked, and it runs after the earlier packages
+ * are already public.
+ */
+test("every published package declares this repository and its directory", () => {
+  const missing: string[] = [];
+
+  for (const { dir, manifest } of manifests().values()) {
+    const path = relative(REPO, dir).split("\\").join("/");
+    if (!path.startsWith("packages/") || manifest.private) continue;
+    const repo = manifest.repository;
+    if (
+      repo?.url !== "git+https://github.com/frontsail-ai/aspicio.git" ||
+      repo.directory !== path
+    ) {
+      missing.push(`${path}: repository is ${JSON.stringify(repo ?? null)}`);
+    }
+  }
+
+  expect(missing, missing.join("\n")).toEqual([]);
 });
