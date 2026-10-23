@@ -2,8 +2,14 @@
   "name": "@aspicio/mcp",
   "version": "0.0.0",
   "description": "MCP server exposing DXF and PDF drawings to AI agents: facts, renders, in-chat viewer.",
+  "homepage": "https://github.com/frontsail-ai/aspicio/tree/master/packages/mcp#readme",
   "license": "MIT",
   "author": "Dmitri Kochelorov <dmitri@frontsail.ai>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frontsail-ai/aspicio.git",
+    "directory": "packages/mcp"
+  },
   "bin": {
     "aspicio-mcp": "./dist/index.mjs"
   },
