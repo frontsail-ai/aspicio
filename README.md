@@ -5,13 +5,16 @@
   <p><em>Aspicio</em> (Latin: "I look at")</p>
   <p>
     <a href="https://github.com/frontsail-ai/aspicio/actions/workflows/ci.yml"><img src="https://github.com/frontsail-ai/aspicio/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
+    <br>
     <a href="https://www.npmjs.com/package/@aspicio/core"><img src="https://img.shields.io/npm/v/%40aspicio%2Fcore?label=%40aspicio%2Fcore" alt="npm: @aspicio/core" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/elements"><img src="https://img.shields.io/npm/v/%40aspicio%2Felements?label=%40aspicio%2Felements" alt="npm: @aspicio/elements" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/react"><img src="https://img.shields.io/npm/v/%40aspicio%2Freact?label=%40aspicio%2Freact" alt="npm: @aspicio/react" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/vue"><img src="https://img.shields.io/npm/v/%40aspicio%2Fvue?label=%40aspicio%2Fvue" alt="npm: @aspicio/vue" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/svelte"><img src="https://img.shields.io/npm/v/%40aspicio%2Fsvelte?label=%40aspicio%2Fsvelte" alt="npm: @aspicio/svelte" /></a>
     <a href="https://www.npmjs.com/package/@aspicio/mcp"><img src="https://img.shields.io/npm/v/%40aspicio%2Fmcp?label=%40aspicio%2Fmcp" alt="npm: @aspicio/mcp" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
+    <br>
+    <a href="https://mcprush.com/to/aspicio-mcp?ref=badge"><img height="20" src="https://mcprush.com/badge/aspicio-mcp/score.svg" alt="Aspicio MCP on mcprush" /></a>
   </p>
   <p><a href="https://aspicio.frontsail.app"><strong>▶ Live demo</strong></a></p>
 </div>
