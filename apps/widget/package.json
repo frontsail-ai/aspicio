@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@aspicio/core": "workspace:*",
-    "@modelcontextprotocol/ext-apps": "^2.0.3",
-    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/ext-apps": "^2.0.4",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "three": "^0.186.1"
   },
   "devDependencies": {
