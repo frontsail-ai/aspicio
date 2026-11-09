@@ -45,7 +45,7 @@
     "typescript": "^7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:",
-    "vue": "^3.5.44"
+    "vue": "^3.5.45"
   },
   "peerDependencies": {
     "three": ">=0.184.0 <1.0.0",

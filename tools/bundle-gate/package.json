@@ -14,10 +14,10 @@
     "@aspicio/react": "workspace:*",
     "@aspicio/svelte": "workspace:*",
     "@aspicio/vue": "workspace:*",
-    "three": "^0.186.1"
+    "three": "^0.187.0"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "typescript": "^7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:"
