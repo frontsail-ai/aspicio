@@ -27,8 +27,11 @@ dist-ssr
 # AI agent worktrees
 .claude/worktrees/
 
-# Scratch space: plans, corpora, throwaway probes
-tmp/
+# Scratch space: plans, corpora, throwaway probes. No trailing slash: a
+# review worktree symlinks tmp to the primary checkout's, and "tmp/" matches
+# directories only, so the symlink got committed (#197) and git then deleted
+# the ignored corpus beneath it on checkout.
+tmp
 
 # Playwright
 test-results/
