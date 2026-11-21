@@ -5,8 +5,10 @@ import {
   tessellateSpace,
   tessellationToSvg,
 } from "@aspicio/core";
-import { dxfParser } from "@aspicio/core/dxf";
-import { pdfParser } from "@aspicio/core/pdf";
+import type { DrawingParser } from "@aspicio/core";
+import type { ToolFormat } from "@aspicio/agent-tools";
+import { ENDPOINTS, otherFormat, PARSERS, phraseFor, routeOf } from "./endpoints.ts";
+import type { Kind } from "./endpoints.ts";
 import { fetchDrawing, HttpError, MAX_BYTES } from "./fetch.ts";
 import { handleMcp } from "./mcp.ts";
 import { openapiDocument } from "./openapi.ts";
@@ -23,41 +25,41 @@ export type RenderPng = (svg: string, width: number) => Promise<Uint8Array>;
 export type CheckRateLimit = (key: string) => Promise<boolean>;
 
 /** Endpoints that do real work (fetch/parse/rasterize) and get rate-limited. */
-const WORK_ENDPOINTS = new Set([
-  "/describe",
-  "/render",
-  "/describe-pdf",
-  "/render-pdf",
-  "/describe-doc",
-  "/render-doc",
+const WORK_ENDPOINTS = new Set<string>([
+  ...Object.values(ENDPOINTS).flatMap((paths) => Object.values(paths)),
   "/mcp",
 ]);
 
 /**
- * The parsers each endpoint family accepts (AGT-16).
+ * A typed endpoint received the other format (AGT-16).
  *
  * The typed endpoints let a caller state the format it believes it has; the
- * agnostic ones let it decline to guess. Handing a typed endpoint the wrong
- * format names the endpoint that would have worked.
+ * agnostic ones let it decline to guess. A POST is told which endpoint would
+ * have worked. A GET is redirected there, query intact: a GET is a link, and a
+ * link built for the wrong endpoint — every PDF render link the hosted MCP
+ * tools handed out before the endpoint table existed — should still resolve.
  */
-const DXF_ONLY = [dxfParser];
-const PDF_ONLY = [pdfParser];
-const ANY_FORMAT = [dxfParser, pdfParser];
+class WrongFormat extends Error {
+  /** The endpoint that reads this drawing. */
+  readonly path: string;
+
+  constructor(kind: Kind, format: Exclude<ToolFormat, "doc">) {
+    const path = ENDPOINTS[kind][format];
+    super(`this is a ${format.toUpperCase()} — use ${path}`);
+    this.path = path;
+  }
+}
 
 async function parseFor(
-  parsers: readonly (typeof dxfParser)[],
+  parsers: readonly DrawingParser[],
   bytes: Uint8Array,
-  kind: "describe" | "render",
+  kind: Kind,
 ): Promise<Awaited<ReturnType<typeof parseWith>>> {
   try {
     return await parseWith(parsers, bytes);
   } catch (error) {
-    const other = ANY_FORMAT.find((p) => !parsers.includes(p) && p.sniff(bytes));
-    if (other)
-      throw new HttpError(
-        422,
-        `this is a ${other.format.toUpperCase()} — use /${kind}-${other.format}`,
-      );
+    const other = otherFormat(parsers, bytes);
+    if (other) throw new WrongFormat(kind, other);
     throw error;
   }
 }
@@ -71,19 +73,30 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-/** Resolve the DXF bytes from a GET `?src=` URL or a POST request body. */
-async function resolveDxf(req: Request, url: URL): Promise<Uint8Array> {
+/**
+ * Error wording, written for the DXF endpoints and rephrased for the others
+ * by the same rules as the OpenAPI document (INV-12). A PDF endpoint that
+ * answered "DXF exceeds the 8 MB limit" sent its caller to check the wrong
+ * file.
+ */
+const TOO_LARGE = "DXF exceeds the 8 MB limit";
+const NO_SOURCE = "provide `?src=<url>` or POST the DXF as the body";
+const UNREADABLE = "could not process the DXF";
+
+/** Resolve the drawing's bytes from a GET `?src=` URL or a POST request body. */
+async function resolveDrawing(req: Request, url: URL, format: ToolFormat): Promise<Uint8Array> {
+  const tooLarge = phraseFor(format, TOO_LARGE);
   if (req.method === "POST") {
     const declared = Number(req.headers.get("content-length"));
-    if (declared > MAX_BYTES) throw new HttpError(413, "DXF exceeds the 8 MB limit");
+    if (declared > MAX_BYTES) throw new HttpError(413, tooLarge);
     const buf = new Uint8Array(await req.arrayBuffer());
     if (buf.byteLength === 0) throw new HttpError(400, "empty request body");
-    if (buf.byteLength > MAX_BYTES) throw new HttpError(413, "DXF exceeds the 8 MB limit");
+    if (buf.byteLength > MAX_BYTES) throw new HttpError(413, tooLarge);
     return buf;
   }
   const src = url.searchParams.get("src");
-  if (!src) throw new HttpError(400, "provide `?src=<dxf-url>` or POST the DXF as the body");
-  return fetchDrawing(src);
+  if (!src) throw new HttpError(400, phraseFor(format, NO_SOURCE));
+  return fetchDrawing(src, tooLarge);
 }
 
 /**
@@ -99,7 +112,7 @@ function spaceParam(url: URL): string | undefined {
 async function handleDescribe(
   bytes: Uint8Array,
   url: URL,
-  parsers: readonly (typeof dxfParser)[],
+  parsers: readonly DrawingParser[],
 ): Promise<Response> {
   const doc = await parseFor(parsers, bytes, "describe");
   return json(describeDrawing(doc, { space: spaceParam(url) }));
@@ -109,7 +122,7 @@ async function handleRender(
   bytes: Uint8Array,
   url: URL,
   renderPng: RenderPng,
-  parsers: readonly (typeof dxfParser)[],
+  parsers: readonly DrawingParser[],
 ): Promise<Response> {
   const format = (url.searchParams.get("format") ?? "png").toLowerCase();
   if (format !== "png" && format !== "svg") throw new HttpError(400, "format must be png or svg");
@@ -154,6 +167,8 @@ export async function handleRequest(
   widgetHtml?: string,
 ): Promise<Response> {
   const url = new URL(req.url);
+  // The endpoint's format, once routed: it words the catch-all 422 below.
+  let format: ToolFormat = "dxf";
   if (req.method === "OPTIONS")
     return new Response(null, {
       headers: {
@@ -192,50 +207,63 @@ export async function handleRequest(
         // than one domain, and a hardcoded URL lies on all but one of them.
         return json({ ...openapiDocument, servers: [{ url: url.origin }] });
       case "/":
-        return json({
-          name: "aspicio-api",
-          openapi: "/openapi.json",
-          endpoints: {
-            "GET|POST /describe": "structured JSON summary of a DXF (?src=<url> or POST body)",
-            "GET|POST /render": "?format=png|svg&width=&bg=  — render a DXF to an image",
-            "GET|POST /describe-pdf": "the same, for a PDF",
-            "GET|POST /render-pdf": "the same, for a PDF",
-            "GET|POST /describe-doc":
-              "the same, for any supported format (detected from the bytes)",
-            "GET|POST /render-doc": "the same, for any supported format (detected from the bytes)",
-          },
-        });
+        return json({ name: "aspicio-api", openapi: "/openapi.json", endpoints: INDEX });
       case "/mcp":
         // Remote MCP (Streamable HTTP, stateless) — the connector endpoint
         // for Claude.ai and other web clients.
         return await handleMcp(req, renderPng, widgetHtml);
-      case "/describe":
-        return await handleDescribe(await resolveDxf(req, url), url, DXF_ONLY);
-      case "/describe-pdf":
-        return await handleDescribe(await resolveDxf(req, url), url, PDF_ONLY);
-      case "/describe-doc":
-        return await handleDescribe(await resolveDxf(req, url), url, ANY_FORMAT);
-      case "/render":
-        // `await` matters: without it a rejection inside handleRender would
-        // escape this try/catch and surface as an unhandled 500.
-        return await handleRender(await resolveDxf(req, url), url, renderPng, DXF_ONLY);
-      case "/render-pdf":
-        return await handleRender(await resolveDxf(req, url), url, renderPng, PDF_ONLY);
-      case "/render-doc":
-        return await handleRender(await resolveDxf(req, url), url, renderPng, ANY_FORMAT);
-      default:
-        return json({ error: "not found" }, 404);
     }
+    const route = routeOf(url.pathname);
+    if (!route) return json({ error: "not found" }, 404);
+    format = route.format;
+    const bytes = await resolveDrawing(req, url, route.format);
+    // `await` matters: without it a rejection inside the handler would escape
+    // this try/catch and surface as an unhandled 500.
+    return route.kind === "describe"
+      ? await handleDescribe(bytes, url, PARSERS[route.format])
+      : await handleRender(bytes, url, renderPng, PARSERS[route.format]);
   } catch (err) {
     // Naming a space the drawing lacks is a bad request, not a broken file —
     // 422 ("could not process") would send the caller looking at their PDF.
     if (err instanceof UnknownSpaceError) return json({ error: err.message }, 400);
+    if (err instanceof WrongFormat) {
+      if (req.method === "GET")
+        return new Response(null, {
+          status: 307,
+          headers: { location: `${err.path}${url.search}`, ...CORS },
+        });
+      return json({ error: err.message }, 422);
+    }
     if (err instanceof HttpError) {
       const res = json({ error: err.message }, err.status);
       // Well-behaved clients back off on this; 60 = the bucket period.
       if (err.status === 429) res.headers.set("retry-after", "60");
       return res;
     }
-    return json({ error: `could not process DXF: ${(err as Error).message}` }, 422);
+    return json({ error: `${phraseFor(format, UNREADABLE)}: ${(err as Error).message}` }, 422);
   }
 }
+
+/** What each drawing endpoint does, keyed and ordered like the table. */
+const INDEX_PROSE: Record<Kind, Record<ToolFormat, string>> = {
+  describe: {
+    dxf: "structured JSON summary of a DXF (?src=<url> or POST body)",
+    pdf: "the same, for a PDF",
+    doc: "the same, for any supported format (detected from the bytes)",
+  },
+  render: {
+    dxf: "?format=png|svg&width=&bg=  — render a DXF to an image",
+    pdf: "the same, for a PDF",
+    doc: "the same, for any supported format (detected from the bytes)",
+  },
+};
+
+/** The `/` listing: by format, then kind — describe-pdf before render-pdf. */
+const INDEX = Object.fromEntries(
+  (Object.keys(ENDPOINTS.describe) as ToolFormat[]).flatMap((format) =>
+    (Object.keys(ENDPOINTS) as Kind[]).map((kind) => [
+      `GET|POST ${ENDPOINTS[kind][format]}`,
+      INDEX_PROSE[kind][format],
+    ]),
+  ),
+);

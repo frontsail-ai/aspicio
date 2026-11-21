@@ -158,11 +158,16 @@ test("an over-cap inline drawing degrades to facts plus a too-large marker", asy
 
 test("render_dxf offers a direct image link for URL sources only (AGT-9)", () => {
   // Chat UIs that drop MCP image blocks can still show a plain URL.
-  expect(renderLink("http://api.test", "https://x.test/a b.dxf", 800)).toBe(
+  expect(renderLink("http://api.test", "https://x.test/a b.dxf", 800, "dxf")).toBe(
     "http://api.test/render?src=https%3A%2F%2Fx.test%2Fa%20b.dxf&width=800",
   );
+  // Each format links the endpoint that reads it — not the DXF-only /render.
+  // tests/endpoint-paths.test.ts follows every such link through the router.
+  expect(renderLink("http://api.test", "https://x.test/a.pdf", 800, "pdf", "Page 2")).toBe(
+    "http://api.test/render-pdf?src=https%3A%2F%2Fx.test%2Fa.pdf&width=800&space=Page%202",
+  );
   // Inline DXF text has nothing to link statelessly.
-  expect(renderLink("http://api.test", "0\nSECTION\n...", 800)).toBeUndefined();
+  expect(renderLink("http://api.test", "0\nSECTION\n...", 800, "dxf")).toBeUndefined();
 });
 
 test("the widget's load tool is app-only and serves whole files and byte ranges", async () => {

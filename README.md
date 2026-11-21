@@ -195,8 +195,10 @@ Connect:
 - **Any client that supports remote MCP (Streamable HTTP)** — point it
   at `https://aspicio-api.frontsail.app/mcp` (no install;
   speaks MCP, not a browser page)
-- **Plain HTTP** — `GET /describe?src=<dxf-url>`,
-  `GET /render?src=<dxf-url>&format=png|svg`; the API self-describes at
+- **Plain HTTP** — `GET /describe?src=<url>` and
+  `GET /render?src=<url>&format=png|svg` for DXF, the same two as
+  `/describe-pdf` and `/render-pdf` for PDF, and `/describe-doc` and
+  `/render-doc` for either; the API self-describes at
   [`/openapi.json`](https://aspicio-api.frontsail.app/openapi.json)
 
 URL fetches are guarded (private-network blocking, size caps, redirect

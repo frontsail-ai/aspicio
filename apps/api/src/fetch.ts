@@ -3,7 +3,7 @@
  * endpoints and the remote MCP tools — one copy of the SSRF policy.
  */
 
-export const MAX_BYTES = 8 * 1024 * 1024; // reject DXF payloads larger than 8 MB
+export const MAX_BYTES = 8 * 1024 * 1024; // reject drawings larger than 8 MB
 const FETCH_TIMEOUT_MS = 10_000;
 
 export class HttpError extends Error {
@@ -63,7 +63,16 @@ function validateSrcUrl(src: string, base?: URL): URL {
   return url;
 }
 
-export async function fetchDrawing(src: string): Promise<Uint8Array> {
+/**
+ * Fetch a drawing from a public URL.
+ *
+ * `tooLarge` words the 413: this runs before the bytes are parsed, so only the
+ * caller knows which format its endpoint promised (INV-12).
+ */
+export async function fetchDrawing(
+  src: string,
+  tooLarge = "The drawing exceeds the 8 MB limit",
+): Promise<Uint8Array> {
   let url = validateSrcUrl(src);
 
   const controller = new AbortController();
@@ -81,9 +90,9 @@ export async function fetchDrawing(src: string): Promise<Uint8Array> {
       }
       if (!res.ok) throw new HttpError(502, `failed to fetch ${url}: HTTP ${res.status}`);
       const declared = Number(res.headers.get("content-length"));
-      if (declared > MAX_BYTES) throw new HttpError(413, "DXF exceeds the 8 MB limit");
+      if (declared > MAX_BYTES) throw new HttpError(413, tooLarge);
       const buf = new Uint8Array(await res.arrayBuffer());
-      if (buf.byteLength > MAX_BYTES) throw new HttpError(413, "DXF exceeds the 8 MB limit");
+      if (buf.byteLength > MAX_BYTES) throw new HttpError(413, tooLarge);
       return buf;
     }
     throw new HttpError(502, "too many redirects");

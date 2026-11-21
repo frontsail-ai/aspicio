@@ -176,8 +176,10 @@ codex mcp add aspicio -- npx -y @aspicio/mcp</code></pre>
       <h2>More</h2>
       <ul>
         <li>
-          Prefer plain HTTP? <code>GET /describe?src=&lt;dxf-url&gt;</code> and
-          <code>GET /render?src=&lt;dxf-url&gt;&amp;format=png|svg</code>, self-described via
+          Prefer plain HTTP? <code>GET /describe?src=&lt;url&gt;</code> and
+          <code>GET /render?src=&lt;url&gt;&amp;format=png|svg</code> for DXF, the same two as
+          <code>/describe-pdf</code> and <code>/render-pdf</code> for PDF, and
+          <code>/describe-doc</code> and <code>/render-doc</code> for either, self-described via
           <a href="https://aspicio-api.frontsail.app/openapi.json">OpenAPI 3.1</a>.
         </li>
         <li>

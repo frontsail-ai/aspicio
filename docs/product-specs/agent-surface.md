@@ -61,7 +61,8 @@ index endpoints stay exempt.
 
 Errors are JSON with meaningful statuses: 400 bad input, 413 too large,
 422 unparseable drawing, 429 rate-limited, 502 upstream fetch failure.
-Unknown routes are 404; a health endpoint reports ok. A 429 may instead
+Messages name the format the endpoint reads: a PDF endpoint never reports
+a problem with a DXF. Unknown routes are 404; a health endpoint reports ok. A 429 may instead
 be emitted by the platform firewall in front of the API, with a
 platform-standard body.
 
@@ -189,7 +190,11 @@ agnostic pair exists so it doesn't have to guess. Handing a format-specific
 tool the wrong format fails with a message naming the tool that would have
 worked, never a parse error about the file. The HTTP API mirrors the same
 six as `/describe`, `/render`, `/describe-pdf`, `/render-pdf`,
-`/describe-doc`, and `/render-doc`.
+`/describe-doc`, and `/render-doc`. A typed endpoint handed the other
+format answers a POST with a 422 naming the endpoint that reads it, and
+redirects a GET (307) to that endpoint with the query unchanged — a GET is
+a link, and a link built for the wrong endpoint should still show the
+drawing.
 
 Results report which format was read, so a caller never infers it from the
 shape of the answer. Both MCP surfaces offer the same six format tools,

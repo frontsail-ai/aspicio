@@ -5,6 +5,18 @@
  * per-platform work. Served at /openapi.json.
  */
 
+import type { ToolFormat } from "@aspicio/agent-tools";
+import { ENDPOINTS, phraseFor } from "./endpoints.ts";
+
+/** A GET whose `src` holds the other typed format is redirected, not refused
+ *  (AGT-16). Worded with no format name, so the per-format rewrite below
+ *  cannot turn it into "a PDF, not a PDF". */
+const WRONG_FORMAT_REDIRECT = {
+  description:
+    "The src is another supported format: redirects, query intact, to the endpoint that reads it",
+  headers: { location: { schema: { type: "string" } } },
+};
+
 const errorResponse = (description: string): object => ({
   description,
   content: {
@@ -66,6 +78,7 @@ export const openapi = {
               "application/json": { schema: { $ref: "#/components/schemas/DrawingSummary" } },
             },
           },
+          "307": WRONG_FORMAT_REDIRECT,
           "400": errorResponse(
             "Bad input (missing/invalid src, unknown space, private address refused)",
           ),
@@ -127,6 +140,7 @@ export const openapi = {
               "image/svg+xml": { schema: { type: "string" } },
             },
           },
+          "307": WRONG_FORMAT_REDIRECT,
           "400": errorResponse("Bad input (src, space, format, or bg invalid)"),
           "413": errorResponse("DXF exceeds the 8 MB limit"),
           "422": errorResponse("The file could not be parsed as DXF"),
@@ -370,67 +384,20 @@ export const openapi = {
  */
 type Operation = Record<string, unknown>;
 
-/** Phrase rewrites per target, longest-context first: "DXF file" must match
- *  before the bare "DXF", or the qualifier is left stranded. */
-const PHRASES: Record<string, readonly (readonly [RegExp, string])[]> = {
-  PDF: [
-    [/\ba \.dxf file \(ASCII or binary DXF\)/g, "a .pdf file"],
-    [/\bDXF file\b/g, "PDF file"],
-    [/\ba DXF\b/g, "a PDF"],
-    [/\bDXF\b/g, "PDF"],
-  ],
-  drawing: [
-    [
-      /\ba \.dxf file \(ASCII or binary DXF\)/g,
-      "a drawing file (DXF or PDF, detected from the bytes)",
-    ],
-    [/\bDXF file\b/g, "drawing file"],
-    // "a DXF drawing" → "a drawing", not "a drawing drawing": the alternation
-    // takes the first alternative that matches at a position, so every longer
-    // context has to precede the shorter one it contains.
-    [/\ba DXF drawing\b/g, "a drawing"],
-    [/\bDXF drawing\b/g, "drawing"],
-    [/\ba DXF\b/g, "a drawing"],
-    [/\bparsed as DXF\b/g, "parsed as any supported format"],
-    // Sentence-initial: the bare noun would read "drawing exceeds the 8 MB…".
-    [/\bDXF exceeds\b/g, "The drawing exceeds"],
-    [/\bDXF\b/g, "drawing"],
-  ],
-};
-
-/**
- * Apply the phrases in a single pass.
- *
- * Chained `.replace()` calls re-scan their own output: the `.dxf file` rule
- * emits "(DXF or PDF, detected from the bytes)", which the later bare-`DXF`
- * rule then rewrote *inside* that replacement, producing "a drawing file
- * (drawing (DXF or PDF, detected from the bytes) or PDF, detected from the
- * bytes)". One alternation, matched left-to-right with the longest context
- * first, cannot re-enter what it just wrote.
- */
-function applyPhrases(text: string, phrases: readonly (readonly [RegExp, string])[]): string {
-  const combined = new RegExp(phrases.map(([pattern]) => `(?:${pattern.source})`).join("|"), "g");
-  return text.replace(combined, (match) => {
-    for (const [pattern, replacement] of phrases)
-      if (new RegExp(`^(?:${pattern.source})$`).test(match)) return replacement;
-    return match;
-  });
-}
-
 /** Rewrite prose in place, wherever it sits in the operation tree. */
-function rewriteProse(node: unknown, phrases: readonly (readonly [RegExp, string])[]): void {
+function rewriteProse(node: unknown, format: ToolFormat): void {
   if (Array.isArray(node)) {
-    for (const item of node) rewriteProse(item, phrases);
+    for (const item of node) rewriteProse(item, format);
     return;
   }
   if (node === null || typeof node !== "object") return;
   const record = node as Record<string, unknown>;
   for (const [key, value] of Object.entries(record)) {
     if (key === "description" || key === "summary") {
-      if (typeof value === "string") record[key] = applyPhrases(value, phrases);
+      if (typeof value === "string") record[key] = phraseFor(format, value);
       continue;
     }
-    rewriteProse(value, phrases);
+    rewriteProse(value, format);
   }
 }
 
@@ -448,35 +415,55 @@ function rewriteProse(node: unknown, phrases: readonly (readonly [RegExp, string
  * reaches importers only through a document they re-fetch. INV-12 applies
  * normally here — a name carries `Dxf` iff the thing is DXF-specific.
  */
-function retargetId(id: string, token: "Pdf" | "Doc"): string {
+type Derived = Exclude<ToolFormat, "dxf">;
+
+/** The operation-id segment for each derived format. */
+const ID_TOKEN: Record<Derived, string> = { pdf: "Pdf", doc: "Doc" };
+
+function retargetId(id: string, format: Derived): string {
+  const token = ID_TOKEN[format];
   return id.includes("Dxf") ? id.replace("Dxf", token) : `${id}${token}`;
 }
 
-function retarget(path: Operation, token: "Pdf" | "Doc", target: "PDF" | "drawing"): Operation {
+function retarget(path: Operation, format: Derived): Operation {
   const out: Operation = {};
   for (const [method, op] of Object.entries(path)) {
     const cloned = structuredClone(op) as Record<string, unknown>;
     if (typeof cloned["operationId"] === "string")
-      cloned["operationId"] = retargetId(cloned["operationId"], token);
+      cloned["operationId"] = retargetId(cloned["operationId"], format);
     // `$ref`d components are shared by every endpoint, so they are never
     // rewritten — only the inline prose this operation owns.
-    rewriteProse(cloned, PHRASES[target]);
+    rewriteProse(cloned, format);
+    // The agnostic endpoints read every format, so they never redirect.
+    if (format === "doc") delete (cloned["responses"] as Record<string, unknown>)["307"];
     out[method] = cloned;
   }
   return out;
 }
 
-const describePath = openapi.paths["/describe"] as unknown as Operation;
-const renderPath = openapi.paths["/render"] as unknown as Operation;
+/** The hand-written DXF operations each derived endpoint is built from. */
+const BASE: Record<keyof typeof ENDPOINTS, Operation> = {
+  describe: openapi.paths[ENDPOINTS.describe.dxf] as unknown as Operation,
+  render: openapi.paths[ENDPOINTS.render.dxf] as unknown as Operation,
+};
+
+/**
+ * The PDF and agnostic endpoints, keyed by the endpoint table (AGT-16).
+ *
+ * Format outside, kind inside, so the keys keep their published order:
+ * describe-pdf, render-pdf, describe-doc, render-doc.
+ */
+const derivedPaths = Object.fromEntries(
+  (Object.keys(ID_TOKEN) as Derived[]).flatMap((format) =>
+    (Object.keys(BASE) as (keyof typeof BASE)[]).map((kind) => [
+      ENDPOINTS[kind][format],
+      retarget(BASE[kind], format),
+    ]),
+  ),
+);
 
 /** The published document, including the endpoints derived above. */
 export const openapiDocument = {
   ...openapi,
-  paths: {
-    ...openapi.paths,
-    "/describe-pdf": retarget(describePath, "Pdf", "PDF"),
-    "/render-pdf": retarget(renderPath, "Pdf", "PDF"),
-    "/describe-doc": retarget(describePath, "Doc", "drawing"),
-    "/render-doc": retarget(renderPath, "Doc", "drawing"),
-  },
+  paths: { ...openapi.paths, ...derivedPaths },
 };
