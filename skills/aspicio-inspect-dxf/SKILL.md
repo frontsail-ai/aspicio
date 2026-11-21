@@ -3,9 +3,9 @@ name: aspicio-inspect-dxf
 description: "Use when the user shares, references, or asks questions about a DXF or PDF drawing (.dxf, .pdf) — what it contains, its layers, dimensions, size, units, or what it looks like. Requires the aspicio MCP server (describe_dxf / render_dxf, describe_pdf / render_pdf, describe_doc / render_doc). Covers choosing between structural facts and visual rendering, and interpreting the results."
 ---
 
-# Inspecting DXF drawings with Aspicio
+# Inspecting DXF and PDF drawings with Aspicio
 
-You have two Aspicio MCP tools. Pick by the kind of question:
+You have six Aspicio MCP tools, in three describe/render pairs. Pick by the kind of question:
 
 | Question kind                                                                      | Tool                                    | Why                                                |
 | ---------------------------------------------------------------------------------- | --------------------------------------- | -------------------------------------------------- |

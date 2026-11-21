@@ -5,7 +5,7 @@
     {
       "name": "aspicio",
       "source": "./",
-      "description": "Open, inspect, and render DXF/CAD drawings — MCP tools (describe_dxf, render_dxf) plus skills for reading drawings and embedding the viewer."
+      "description": "Open, inspect, and render DXF and vector PDF drawings: MCP tools that describe and render them, plus skills for reading drawings and embedding the viewer."
     }
   ]
 }

@@ -15,11 +15,15 @@ entity and segment counts, layers with the color actually drawn, per-type
 counts, and what was skipped. Every `render_*` returns a PNG (`width`
 64–4000, default 1200).
 
+<!-- tools:start -->
+
 | Tool                          | Reads                           |
 | ----------------------------- | ------------------------------- |
 | `describe_dxf` / `render_dxf` | DXF only                        |
 | `describe_pdf` / `render_pdf` | PDF only                        |
 | `describe_doc` / `render_doc` | Either, detected from the bytes |
+
+<!-- tools:end -->
 
 Use a `describe_*` for structural questions (layers, counts, dimensions,
 units) and a `render_*` for visual ones. Handing a typed tool the wrong

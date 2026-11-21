@@ -60,10 +60,14 @@ drawings, so neither convention regresses silently.
 inter-package ranges never leak the workspace protocol into published
 tarballs.
 
-### INV-10: Agent-facing docs never overclaim
+### INV-10: Agent-facing docs neither overclaim nor omit
 
-READMEs, skills, and tool descriptions state only shipped behavior; drift
-guards tie taught API names to the source that defines them.
+READMEs, skills, plugin manifests, and tool descriptions state only
+shipped behavior. A list of the tools names every tool a user of that
+surface can call: the hosted server's lists name its viewer, the stdio
+server's and the plugins' never do. Drift guards tie taught API names to
+the source that defines them, and tie each tool list to the tools its
+server actually serves.
 
 ### INV-11: Format parsers live behind their own entry point
 
