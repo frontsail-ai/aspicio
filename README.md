@@ -161,10 +161,17 @@ and first-class touch. Out of scope: editing and 3D.
 The same engine speaks MCP and HTTP, so an agent can _read_ a drawing
 instead of guessing at it:
 
-- **`describe_dxf`** — units, bounds, size, layers with effective colors,
-  entity counts, and the drawing's text content. An agent reads a title
-  block or a dimension value directly — no OCR, no vision round-trip.
-- **`render_dxf`** — a PNG of the drawing the model can look at.
+<!-- tools:start -->
+
+- **`describe_dxf`**, **`describe_pdf`**, **`describe_doc`** — units,
+  bounds, size, layers with effective colors, entity counts, and the
+  drawing's text content. An agent reads a title block or a dimension
+  value directly — no OCR, no vision round-trip.
+- **`render_dxf`**, **`render_pdf`**, **`render_doc`** — a PNG of the
+  drawing the model can look at.
+- The `_dxf` and `_pdf` tools each read one format and name the right
+  tool when handed the other; the `_doc` pair detects the format from
+  the bytes.
 - **`view_dxf`** (hosted server) — an interactive in-chat viewer for the
   _person_ in the conversation, via the open [MCP Apps
   extension](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp):
@@ -173,13 +180,15 @@ instead of guessing at it:
   network requests; hosts without MCP Apps still get the structured
   facts.
 
+<!-- tools:end -->
+
 <img src="docs/demo-widget.gif" alt="The in-chat viewer loading a 1.1 MB floor-plan DXF, toggling dimension and text layers, and expanding to fullscreen" />
 
 | Surface                                      | Local files | URLs | Inline DXF |
 | -------------------------------------------- | ----------- | ---- | ---------- |
 | stdio MCP — `npx -y @aspicio/mcp`            | ✅          | ✅   | ✅         |
 | Hosted MCP — `aspicio-api.frontsail.app/mcp` | —           | ✅   | ✅         |
-| HTTP API — `/describe`, `/render`            | POST body   | ✅   | ✅         |
+| HTTP API — the six endpoints below           | POST body   | ✅   | ✅         |
 
 Connect:
 
@@ -203,7 +212,7 @@ Connect:
 
 URL fetches are guarded (private-network blocking, size caps, redirect
 validation, timeouts). The stdio server reads local files in-process and
-never uploads the DXF to any Aspicio service — though, as with any tool
+never uploads the drawing to any Aspicio service — though, as with any tool
 result, your MCP client passes the returned summary or image to its
 model provider. Full details:
 [privacy policy](https://aspicio.frontsail.app/privacy/) ·
@@ -230,8 +239,8 @@ upload flow so remote surfaces can handle local files.
 | [`@aspicio/react`](packages/react)       | React bindings: `<AspicioEmbed>`, `<AspicioPreview>`, `<AspicioLayerPanel>`                                         |
 | [`@aspicio/vue`](packages/vue)           | Vue 3 bindings: the same three components with typed props and emits                                                |
 | [`@aspicio/svelte`](packages/svelte)     | Svelte 5 bindings: the same three components as raw .svelte source                                                  |
-| [`@aspicio/mcp`](packages/mcp)           | MCP server for AI agents: `describe_dxf` + `render_dxf`                                                             |
-| [`@aspicio/api`](apps/api)               | DXF HTTP API server (private): `/describe`, `/render`, `/mcp`                                                       |
+| [`@aspicio/mcp`](packages/mcp)           | MCP server for AI agents: the three describe and render pairs                                                       |
+| [`@aspicio/api`](apps/api)               | Drawing HTTP API server (private): the describe and render endpoints, `/mcp`                                        |
 | [`@aspicio/widget`](apps/widget)         | MCP Apps in-chat viewer widget (private), served by the api server                                                  |
 | [`@aspicio/demo`](apps/demo)             | Standalone demo app (private) — also the reference integration                                                      |
 

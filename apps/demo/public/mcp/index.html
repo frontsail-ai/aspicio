@@ -103,6 +103,7 @@
       </p>
 
       <h2>Tools</h2>
+      <!-- tools:start -->
       <table>
         <tr>
           <th>Tool</th>
@@ -110,15 +111,18 @@
           <th>Use for</th>
         </tr>
         <tr>
-          <td><code>describe_dxf</code></td>
           <td>
-            Structured JSON: units, bounds and size, entity and segment counts, layers with the
-            color actually drawn, per-type entity counts, skipped types
+            <code>describe_dxf</code><br /><code>describe_pdf</code><br /><code>describe_doc</code>
+          </td>
+          <td>
+            Structured JSON: the format read, units, bounds and size, entity and segment counts,
+            layers with the color actually drawn, per-type entity counts, skipped types, and the
+            drawing's text
           </td>
           <td>Structural questions — layers, counts, dimensions, units</td>
         </tr>
         <tr>
-          <td><code>render_dxf</code></td>
+          <td><code>render_dxf</code><br /><code>render_pdf</code><br /><code>render_doc</code></td>
           <td>A PNG image of the drawing</td>
           <td>Visual questions — what the drawing looks like</td>
         </tr>
@@ -131,6 +135,12 @@
           <td>Letting the user explore the drawing themselves</td>
         </tr>
       </table>
+      <p>
+        The <code>_dxf</code> tools read DXF and the <code>_pdf</code> tools read PDF; handed the
+        other format, each names the tool to use instead. The <code>_doc</code> pair accepts either
+        and detects the format from the bytes.
+      </p>
+      <!-- tools:end -->
 
       <h2>Hosted endpoint — no install</h2>
       <p>
