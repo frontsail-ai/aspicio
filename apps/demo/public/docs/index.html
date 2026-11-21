@@ -161,9 +161,11 @@
       <h2>HTTP API</h2>
       <p>
         The hosted API exposes the same pipeline over plain HTTP:
-        <code>GET /describe?src=&lt;dxf-url&gt;</code> returns structured facts,
-        <code>GET /render?src=&lt;dxf-url&gt;&amp;format=png|svg</code> returns an image —
-        self-described via <a href="https://aspicio-api.frontsail.app/openapi.json">OpenAPI 3.1</a>.
+        <code>GET /describe?src=&lt;url&gt;</code> returns structured facts,
+        <code>GET /render?src=&lt;url&gt;&amp;format=png|svg</code> returns an image. Those two read
+        DXF; <code>/describe-pdf</code> and <code>/render-pdf</code> read PDF, and
+        <code>/describe-doc</code> and <code>/render-doc</code> read either — all self-described via
+        <a href="https://aspicio-api.frontsail.app/openapi.json">OpenAPI 3.1</a>.
       </p>
 
       <h2>Go deeper</h2>
