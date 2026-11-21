@@ -1,6 +1,6 @@
 import { describeDrawing, parseWith, tessellateSpace, tessellationToSvg } from "@aspicio/core";
-import { dxfParser } from "@aspicio/core/dxf";
-import { pdfParser } from "@aspicio/core/pdf";
+import type { DrawingParser } from "@aspicio/core";
+import type { ToolFormat } from "@aspicio/agent-tools";
 import {
   DRAWING_SUMMARY_SHAPE as SHARED_SUMMARY_SHAPE,
   INLINE_PDF_REFUSAL,
@@ -26,6 +26,8 @@ import {
 import type { ViewerMeta } from "@aspicio/widget/meta";
 import { z } from "zod";
 import registry from "../../../server.json";
+import { ENDPOINTS, otherFormat, PARSERS } from "./endpoints.ts";
+import type { Kind } from "./endpoints.ts";
 import { fetchDrawing } from "./fetch.ts";
 import type { RenderPng } from "./handler.ts";
 
@@ -64,33 +66,40 @@ function toBase64(bytes: Uint8Array): string {
 
 /** A stateless HTTP link to the same render, for URL sources — chat UIs
  * that drop MCP image blocks from user display can still show a plain
- * image URL (AGT-9). Returns undefined for inline sources (nothing to link). */
+ * image URL (AGT-9). Returns undefined for inline sources (nothing to link).
+ *
+ * `format` is required, and picks the endpoint that reads it. This was written
+ * when `render_dxf` was the only render tool and always linked `/render`;
+ * once `render_pdf` and `render_doc` shared the call, every PDF link answered
+ * 422. */
 export function renderLink(
   origin: string,
   source: string,
   width: number,
+  format: ToolFormat,
   space?: string,
 ): string | undefined {
   const s = source.trim();
   if (!/^https?:\/\//i.test(s)) return undefined;
   const query = space === undefined ? "" : `&space=${encodeURIComponent(space)}`;
-  return `${origin}/render?src=${encodeURIComponent(s)}&width=${width}${query}`;
+  return `${origin}${ENDPOINTS.render[format]}?src=${encodeURIComponent(s)}&width=${width}${query}`;
 }
 
 /** Build the same describe/render tools as the local server, Worker-flavored,
  * plus the MCP Apps viewer (AGT-14). `widgetHtml` is the built widget bundle;
  * tests inject a stub so they never depend on the widget build. */
 async function parseFor(
-  parsers: readonly (typeof dxfParser)[],
+  parsers: readonly DrawingParser[],
   bytes: Uint8Array,
-  kind: "describe" | "render",
+  kind: Kind,
 ): Promise<Awaited<ReturnType<typeof parseWith>>> {
   try {
     return await parseWith(parsers, bytes);
   } catch (error) {
-    const other = [dxfParser, pdfParser].find((p) => !parsers.includes(p) && p.sniff(bytes));
-    if (other)
-      throw new Error(`This is a ${other.format.toUpperCase()}. Use ${kind}_${other.format}.`);
+    const other = otherFormat(parsers, bytes);
+    // Name a tool that exists, looked up rather than spelled from a pattern.
+    const tool = other && TOOLS.find((t) => t.kind === kind && t.format === other);
+    if (other && tool) throw new Error(`This is a ${other.toUpperCase()}. Use ${tool.name}.`);
     throw error;
   }
 }
@@ -119,8 +128,6 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     },
   );
 
-  const parsersFor = { dxf: [dxfParser], pdf: [pdfParser], doc: [dxfParser, pdfParser] } as const;
-
   /**
    * The shared description plus this surface's own guidance.
    *
@@ -143,7 +150,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
   };
 
   for (const tool of TOOLS) {
-    const parsers = parsersFor[tool.format];
+    const parsers = PARSERS[tool.format];
     if (tool.kind === "describe") {
       server.registerTool(
         tool.name,
@@ -185,7 +192,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
             sheet: "#ffffff",
           });
           const png = await renderPng(svg, width ?? 1200);
-          const link = renderLink(origin, source, width ?? 1200, space);
+          const link = renderLink(origin, source, width ?? 1200, tool.format, space);
           return {
             content: [
               { type: "image", data: toBase64(png), mimeType: "image/png" },
@@ -242,7 +249,7 @@ function createServer(renderPng: RenderPng, widgetHtml?: string, origin = ""): M
     },
     async ({ source, allow_file_open }: { source: string; allow_file_open?: boolean }) => {
       const bytes = await loadDrawing(source);
-      const doc = await parseWith([dxfParser, pdfParser], bytes);
+      const doc = await parseWith(PARSERS.doc, bytes);
       const summary = describeDrawing(doc);
       const allowFilePicker = allow_file_open === true;
       const trimmed = source.trim();
